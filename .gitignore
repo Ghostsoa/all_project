@@ -1,0 +1,23 @@
+# Go依赖
+go.mod
+go.sum
+
+# 编译输出
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+all_project
+
+# 测试文件
+测试结果.txt
+*.log
+
+# IDE
+.vscode/
+.idea/
+
+# 临时文件
+*.tmp
+*.swp
