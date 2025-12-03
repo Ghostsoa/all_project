@@ -88,6 +88,8 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    margin: 8px 0 8px 8px;
+    border-radius: 12px;
 }
 
 .sidebar-header {
@@ -284,6 +286,8 @@ body {
     border-left: 1px solid rgba(255, 255, 255, 0.08);
     border-right: 1px solid rgba(255, 255, 255, 0.08);
     overflow: hidden;
+    margin: 8px 0;
+    border-radius: 12px;
 }
 
 .no-selection {
@@ -317,6 +321,7 @@ body {
     padding: 8px;
     overflow-x: auto;
     overflow-y: hidden;
+    border-radius: 12px 12px 0 0;
 }
 
 .tabs-list {
@@ -382,6 +387,9 @@ body {
     flex: 1;
     position: relative;
     overflow: hidden;
+    background: #000000;
+    margin: 8px;
+    border-radius: 12px;
 }
 
 .terminal-pane {
@@ -390,12 +398,29 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    padding: 10px;
+    padding: 16px;
     display: none;
+    background: #000000;
+    border-radius: 12px;
 }
 
 .terminal-pane.active {
     display: block;
+}
+
+/* 终端内部样式 - 确保纯黑 */
+.terminal-pane .xterm {
+    height: 100%;
+    background: #000000 !important;
+    padding: 0;
+}
+
+.terminal-pane .xterm .xterm-viewport {
+    background: #000000 !important;
+}
+
+.terminal-pane .xterm .xterm-screen {
+    background: #000000 !important;
 }
 
 /* 状态灯带 - 纯灯带 */
@@ -537,6 +562,8 @@ body {
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    margin: 8px 8px 8px 0;
+    border-radius: 12px;
 }
 
 .right-panel-tabs {
