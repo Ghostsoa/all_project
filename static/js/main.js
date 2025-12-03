@@ -156,6 +156,12 @@ window.closeTab = function(sessionId) {
         } else {
             document.getElementById('noSelection').style.display = 'flex';
             document.getElementById('terminalWrapper').style.display = 'none';
+            
+            // 清空文件树
+            const fileTree = document.getElementById('fileTree');
+            if (fileTree) {
+                fileTree.innerHTML = '<div class="file-tree-empty">连接服务器后显示文件</div>';
+            }
         }
     }
     
