@@ -757,43 +757,74 @@ function renderTags() {
 
 // ==================== 命令记录功能 ====================
 
-// 保存命令到数据库
-async function saveCommand(serverId, command) {
-    try {
-        await fetch('/api/command/save', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                server_id: serverId,
-                command: command
-            })
-        });
-        
-        // 如果当前显示的是该服务器，刷新命令列表
-        const session = terminals.get(activeSessionId);
-        if (session && session.server.ID === serverId) {
-            loadCommandHistory(serverId, session.server.name);
-        }
-    } catch (error) {
-        console.error('保存命令失败:', error);
+// 命令保存队列和防抖
+let commandSaveQueue = [];
+let commandSaveTimer = null;
+
+// 保存命令到数据库（优化：批量保存，防抖处理）
+function saveCommand(serverId, command) {
+    // 添加到队列
+    commandSaveQueue.push({ serverId, command });
+    
+    // 防抖：500ms后批量保存
+    if (commandSaveTimer) {
+        clearTimeout(commandSaveTimer);
     }
+    
+    commandSaveTimer = setTimeout(async () => {
+        const queue = [...commandSaveQueue];
+        commandSaveQueue = [];
+        
+        // 批量保存
+        for (const item of queue) {
+            try {
+                // 异步保存，不等待结果
+                fetch('/api/command/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        server_id: item.serverId,
+                        command: item.command
+                    })
+                }).catch(err => console.error('保存命令失败:', err));
+            } catch (error) {
+                console.error('保存命令失败:', error);
+            }
+        }
+        
+        // 刷新当前显示的命令列表
+        const session = terminals.get(activeSessionId);
+        if (session) {
+            loadCommandHistory(session.server.ID, session.server.name);
+        }
+    }, 500);
 }
 
-// 加载命令历史
+// 命令历史加载防抖
+let loadHistoryTimer = null;
+
+// 加载命令历史（添加防抖）
 async function loadCommandHistory(serverId, serverName) {
-    try {
-        const response = await fetch(`/api/commands?server_id=${serverId}&limit=50`);
-        const data = await response.json();
-        
-        if (data.success) {
-            const displayName = serverId === 0 ? '💻 本地终端' : serverName || '未知服务器';
-            document.getElementById('commandsServerName').textContent = displayName;
-            renderCommandHistory(data.data || []);
-        }
-    } catch (error) {
-        console.error('加载命令历史失败:', error);
-        renderCommandHistory([]);
+    // 防抖：避免频繁加载
+    if (loadHistoryTimer) {
+        clearTimeout(loadHistoryTimer);
     }
+    
+    loadHistoryTimer = setTimeout(async () => {
+        try {
+            const response = await fetch(`/api/commands?server_id=${serverId}&limit=50`);
+            const data = await response.json();
+            
+            if (data.success) {
+                const displayName = serverId === 0 ? '💻 本地终端' : serverName || '未知服务器';
+                document.getElementById('commandsServerName').textContent = displayName;
+                renderCommandHistory(data.data || []);
+            }
+        } catch (error) {
+            console.error('加载命令历史失败:', error);
+            renderCommandHistory([]);
+        }
+    }, 300);
 }
 
 // 渲染命令历史列表
