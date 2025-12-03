@@ -57,8 +57,8 @@ func main() {
 		auth.POST("/logout", middleware.GinLogoutHandler)
 	}
 
-	// 主页（需要认证）
-	r.GET("/", middleware.GinAuthMiddleware(), func(c *gin.Context) {
+	// 主页（需要认证，未登录则重定向）
+	r.GET("/", middleware.GinPageAuthMiddleware(), func(c *gin.Context) {
 		c.File("./static/index.html")
 	})
 
@@ -81,8 +81,8 @@ func main() {
 		api.POST("/commands/clear", commandHandler.GinClearServerCommands)
 	}
 
-	// WebSocket 路由（需要认证）
-	r.GET("/ws", middleware.GinAuthMiddleware(), wsHandler.GinHandleWebSocket)
+	// WebSocket 路由（需要认证，未登录则重定向）
+	r.GET("/ws", middleware.GinPageAuthMiddleware(), wsHandler.GinHandleWebSocket)
 
 	// 启动服务器
 	port := config.GetPort()

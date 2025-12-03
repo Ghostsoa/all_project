@@ -8,7 +8,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-// GinAuthMiddleware Gin认证中间件
+// GinAuthMiddleware Gin认证中间件（用于API，返回JSON）
 func GinAuthMiddleware() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		// 获取 Token
@@ -27,6 +27,32 @@ func GinAuthMiddleware() gin.HandlerFunc {
 				"success": false,
 				"error":   "未授权访问",
 			})
+			c.Abort()
+			return
+		}
+
+		// Token 正确，继续处理
+		c.Next()
+	}
+}
+
+// GinPageAuthMiddleware Gin页面认证中间件（用于页面，重定向到登录）
+func GinPageAuthMiddleware() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		// 获取 Token
+		token := c.GetHeader("Authorization")
+		if token == "" {
+			// 尝试从 Cookie 获取
+			token, _ = c.Cookie("auth_token")
+		} else {
+			// 移除 "Bearer " 前缀
+			token = strings.TrimPrefix(token, "Bearer ")
+		}
+
+		// 验证 Token
+		if token != config.GetToken() {
+			// 页面访问：重定向到登录页
+			c.Redirect(http.StatusFound, "/login")
 			c.Abort()
 			return
 		}
