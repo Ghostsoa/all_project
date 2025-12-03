@@ -3,6 +3,7 @@ package sshapi
 import (
 	"bytes"
 	"io"
+	"strings"
 	"sync"
 	"time"
 )
@@ -208,16 +209,48 @@ func (t *Terminal) scroll() {
 	// 注意：不在这里设置cursorRow，由调用者决定
 }
 
-// GetScreen 获取屏幕内容
+// GetScreen 获取屏幕内容（去重相邻重复行）
 func (t *Terminal) GetScreen() []string {
 	t.mu.RLock()
 	defer t.mu.RUnlock()
 
-	lines := make([]string, t.height)
+	// 先获取原始内容
+	rawLines := make([]string, t.height)
 	for i := 0; i < t.height; i++ {
-		lines[i] = string(t.buffer[i])
+		rawLines[i] = string(t.buffer[i])
 	}
-	return lines
+
+	// 去除相邻的完全相同的行（保留第一次出现）
+	result := make([]string, 0, t.height)
+	var lastNonEmptyLine string
+	consecutiveCount := 0
+
+	for _, line := range rawLines {
+		trimmed := strings.TrimRight(line, " ")
+
+		// 检测是否与上一行相同
+		if trimmed != "" && trimmed == lastNonEmptyLine {
+			consecutiveCount++
+			// 连续重复超过1次，跳过
+			if consecutiveCount > 1 {
+				continue
+			}
+		} else {
+			consecutiveCount = 0
+			if trimmed != "" {
+				lastNonEmptyLine = trimmed
+			}
+		}
+
+		result = append(result, line)
+	}
+
+	// 补齐到height行（避免数组越界）
+	for len(result) < t.height {
+		result = append(result, strings.Repeat(" ", t.width))
+	}
+
+	return result[:t.height]
 }
 
 // GetCursor 获取光标位置
