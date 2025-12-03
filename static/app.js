@@ -11,7 +11,36 @@ let sessionCounter = 0;
 document.addEventListener('DOMContentLoaded', function() {
     loadServers();
     initTagsInput();
+    checkAuthStatus();
 });
+
+// 检查认证状态
+async function checkAuthStatus() {
+    try {
+        const response = await fetch('/api/servers');
+        if (response.status === 401) {
+            // 未授权，跳转到登录页
+            window.location.href = '/login';
+        }
+    } catch (error) {
+        console.error('检查认证状态失败:', error);
+    }
+}
+
+// 登出
+async function logout() {
+    if (!confirm('确定要退出登录吗？')) {
+        return;
+    }
+    
+    try {
+        await fetch('/api/logout');
+        window.location.href = '/login';
+    } catch (error) {
+        console.error('登出失败:', error);
+        window.location.href = '/login';
+    }
+}
 
 // 加载服务器列表
 async function loadServers() {
@@ -497,12 +526,15 @@ async function deleteServer(id) {
         const data = await response.json();
         
         if (data.success) {
-            // 如果当前连接的是被删除的服务器，关闭终端
-            if (currentServer && currentServer.ID === id) {
-                closeTerminal();
+            // 关闭所有该服务器的终端会话
+            for (let [sessionId, session] of terminals) {
+                if (session.server.ID === id) {
+                    closeTab(sessionId);
+                }
             }
-            loadServers();
-            alert('删除成功');
+            
+            // 刷新服务器列表
+            await loadServers();
         } else {
             alert(data.error || '删除失败');
         }

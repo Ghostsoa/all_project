@@ -8,43 +8,47 @@ import (
 	"net/http"
 	"strconv"
 
+	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 	"golang.org/x/crypto/ssh"
 )
 
+// WebSocket 升级器
 var upgrader = websocket.Upgrader{
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
 }
 
+// WebSocketHandler WebSocket处理器
 type WebSocketHandler struct {
 	repo *models.ServerRepository
 }
 
+// NewWebSocketHandler 创建WebSocket处理器
 func NewWebSocketHandler(repo *models.ServerRepository) *WebSocketHandler {
 	return &WebSocketHandler{repo: repo}
 }
 
-// HandleWebSocket 处理 WebSocket 连接
-func (h *WebSocketHandler) HandleWebSocket(w http.ResponseWriter, r *http.Request) {
+// GinHandleWebSocket 处理 WebSocket 连接 (Gin版本)
+func (h *WebSocketHandler) GinHandleWebSocket(c *gin.Context) {
 	// 获取服务器ID
-	idStr := r.URL.Query().Get("server_id")
+	idStr := c.Query("server_id")
 	id, err := strconv.ParseUint(idStr, 10, 32)
 	if err != nil {
-		http.Error(w, "无效的服务器ID", http.StatusBadRequest)
+		c.JSON(400, gin.H{"error": "无效的服务器ID"})
 		return
 	}
 
 	// 从数据库获取服务器配置
 	server, err := h.repo.GetByID(uint(id))
 	if err != nil {
-		http.Error(w, "服务器不存在", http.StatusNotFound)
+		c.JSON(404, gin.H{"error": "服务器不存在"})
 		return
 	}
 
 	// 升级到 WebSocket
-	ws, err := upgrader.Upgrade(w, r, nil)
+	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
 	if err != nil {
 		log.Println("WebSocket 升级失败:", err)
 		return

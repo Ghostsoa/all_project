@@ -1,15 +1,23 @@
 package main
 
 import (
+	"all_project/config"
 	"all_project/database"
 	"all_project/handlers"
+	"all_project/middleware"
 	"all_project/models"
 	"fmt"
 	"log"
-	"net/http"
+
+	"github.com/gin-gonic/gin"
 )
 
 func main() {
+	// 加载配置文件
+	if err := config.LoadConfig("./config.json"); err != nil {
+		log.Fatalf("❌ 配置文件加载失败: %v", err)
+	}
+
 	// 初始化数据库
 	if err := database.InitDB(); err != nil {
 		log.Fatalf("❌ 数据库初始化失败: %v", err)
@@ -28,42 +36,64 @@ func main() {
 	commandHandler := handlers.NewCommandHandler(commandRepo)
 	wsHandler := handlers.NewWebSocketHandler(serverRepo)
 
-	// 静态文件服务
-	fs := http.FileServer(http.Dir("./static"))
-	http.Handle("/static/", http.StripPrefix("/static/", fs))
+	// 设置Gin为发布模式（生产环境）
+	gin.SetMode(gin.ReleaseMode)
 
-	// 主页
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" {
-			http.ServeFile(w, r, "./static/index.html")
-		} else {
-			http.NotFound(w, r)
-		}
+	// 创建Gin路由
+	r := gin.Default()
+
+	// 静态文件服务（不需要认证）
+	r.Static("/static", "./static")
+
+	// 登录页面（不需要认证）
+	r.GET("/login", func(c *gin.Context) {
+		c.File("./static/login.html")
 	})
 
-	// API 路由 - 服务器管理
-	http.HandleFunc("/api/servers", serverHandler.GetServers)
-	http.HandleFunc("/api/server", serverHandler.GetServer)
-	http.HandleFunc("/api/server/create", serverHandler.CreateServer)
-	http.HandleFunc("/api/server/update", serverHandler.UpdateServer)
-	http.HandleFunc("/api/server/delete", serverHandler.DeleteServer)
-	http.HandleFunc("/api/servers/search", serverHandler.SearchServers)
+	// 登录/登出 API（不需要认证）
+	auth := r.Group("/api")
+	{
+		auth.POST("/login", middleware.GinLoginHandler)
+		auth.POST("/logout", middleware.GinLogoutHandler)
+	}
 
-	// API 路由 - 命令历史
-	http.HandleFunc("/api/command/save", commandHandler.SaveCommand)
-	http.HandleFunc("/api/commands", commandHandler.GetServerCommands)
-	http.HandleFunc("/api/commands/recent", commandHandler.GetRecentCommands)
-	http.HandleFunc("/api/commands/clear", commandHandler.ClearServerCommands)
+	// 主页（需要认证）
+	r.GET("/", middleware.GinAuthMiddleware(), func(c *gin.Context) {
+		c.File("./static/index.html")
+	})
 
-	// WebSocket 路由
-	http.HandleFunc("/ws", wsHandler.HandleWebSocket)
+	// API 路由（需要认证）
+	api := r.Group("/api")
+	api.Use(middleware.GinAuthMiddleware())
+	{
+		// 服务器管理
+		api.GET("/servers", serverHandler.GinGetServers)
+		api.GET("/server", serverHandler.GinGetServer)
+		api.POST("/server/create", serverHandler.GinCreateServer)
+		api.POST("/server/update", serverHandler.GinUpdateServer)
+		api.POST("/server/delete", serverHandler.GinDeleteServer)
+		api.GET("/servers/search", serverHandler.GinSearchServers)
+
+		// 命令历史
+		api.POST("/command/save", commandHandler.GinSaveCommand)
+		api.GET("/commands", commandHandler.GinGetServerCommands)
+		api.GET("/commands/recent", commandHandler.GinGetRecentCommands)
+		api.POST("/commands/clear", commandHandler.GinClearServerCommands)
+	}
+
+	// WebSocket 路由（需要认证）
+	r.GET("/ws", middleware.GinAuthMiddleware(), wsHandler.GinHandleWebSocket)
 
 	// 启动服务器
+	port := config.GetPort()
 	fmt.Println("╔═══════════════════════════════════════════════════╗")
-	fmt.Println("║   🚀 Web SSH 客户端管理系统                        ║")
-	fmt.Println("║   📡 服务地址: http://localhost:8080              ║")
+	fmt.Println("║   🚀 Web SSH 客户端管理系统 (Gin Framework)      ║")
+	fmt.Printf("║   📡 服务地址: http://localhost:%s              ║\n", port)
 	fmt.Println("║   💾 数据库: PostgreSQL (my)                      ║")
+	fmt.Println("║   🔐 Token 认证已启用 (30天自动登录)             ║")
 	fmt.Println("╚═══════════════════════════════════════════════════╝")
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	if err := r.Run(":" + port); err != nil {
+		log.Fatalf("❌ 服务器启动失败: %v", err)
+	}
 }

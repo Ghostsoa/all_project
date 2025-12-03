@@ -1,0 +1,4 @@
+{
+  "auth_token": "your-secret-token-here-change-me",
+  "server_port": "8080"
+}
