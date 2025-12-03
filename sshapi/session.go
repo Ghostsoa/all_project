@@ -317,7 +317,7 @@ func (s *Session) detectPrompt(output string) bool {
 	return s.isLikelyPrompt(trimmed)
 }
 
-// isLikelyPrompt 判断一行是否像提示符（通用算法）
+// isLikelyPrompt 判断一行是否像提示符（通用算法，增强版）
 func (s *Session) isLikelyPrompt(line string) bool {
 	// 特征1: 长度适中（提示符通常不会太长）
 	if len(line) > 200 {
@@ -328,13 +328,15 @@ func (s *Session) isLikelyPrompt(line string) bool {
 	promptEndings := []string{
 		"# ", "$ ", "> ", ">> ", ">>> ",
 		"#", "$", ">", ">>", ">>>",
-		"% ", "% ",
+		"% ", "%",
 	}
 
 	hasPromptEnding := false
+	matchedEnding := ""
 	for _, ending := range promptEndings {
 		if strings.HasSuffix(line, ending) {
 			hasPromptEnding = true
+			matchedEnding = ending
 			break
 		}
 	}
@@ -343,26 +345,63 @@ func (s *Session) isLikelyPrompt(line string) bool {
 		return false
 	}
 
-	// 特征3: 包含提示符的典型字符或模式
-	// - @ 符号（user@host）
-	// - : 符号（路径分隔符）
-	// - 特殊Unicode字符（如 ▶）
-	// - 包含路径或项目名
-	hasPromptPattern :=
-		strings.Contains(line, "@") || // user@host
-			strings.Contains(line, ":~") || // 路径
-			strings.Contains(line, ":/") || // 绝对路径
-			strings.Contains(line, "▶") || // 特殊提示符
-			strings.Contains(line, "❯") || // 现代shell
-			strings.Contains(line, "λ") || // lambda提示符
-			strings.Contains(line, "⚡") || // 快速提示符
-			len(strings.Fields(line)) <= 5 // 字段少（提示符简洁）
+	// 特征3: 强特征优先（这些是明确的提示符标志）
+	strongPatterns := []string{
+		"@",  // user@host
+		":~", // 路径
+		":/", // 绝对路径
+		"▶",  // 特殊提示符
+		"❯",  // 现代shell
+		"λ",  // lambda提示符
+		"⚡",  // 快速提示符
+	}
 
-	if !hasPromptPattern {
+	hasStrongPattern := false
+	for _, pattern := range strongPatterns {
+		if strings.Contains(line, pattern) {
+			hasStrongPattern = true
+			break
+		}
+	}
+
+	// 如果有强特征，直接通过
+	if hasStrongPattern {
+		// 仍需检查排除模式
+		if s.shouldExcludeAsPrompt(line) {
+			return false
+		}
+		return true
+	}
+
+	// 没有强特征，需要更严格的验证
+	// 特征4: 弱特征需要满足多个条件
+	fields := strings.Fields(line)
+	fieldCount := len(fields)
+
+	// 弱特征检查：
+	// - 字段数很少（≤3）
+	// - 不包含空格太多（紧凑）
+	// - 结束符前有内容
+	spaceCount := strings.Count(line, " ")
+	isCompact := spaceCount <= 5
+	isShort := fieldCount <= 3
+	hasContentBeforeEnding := len(strings.TrimSuffix(line, matchedEnding)) > 0
+
+	if !isShort || !isCompact || !hasContentBeforeEnding {
 		return false
 	}
 
-	// 特征4: 不包含常见的非提示符内容
+	// 特征5: 排除明显的非提示符
+	if s.shouldExcludeAsPrompt(line) {
+		return false
+	}
+
+	// 通过所有检测
+	return true
+}
+
+// shouldExcludeAsPrompt 检查是否应排除（不是提示符）
+func (s *Session) shouldExcludeAsPrompt(line string) bool {
 	// 排除明显的命令输出
 	excludePatterns := []string{
 		"error:", "Error:", "ERROR:",
@@ -371,17 +410,31 @@ func (s *Session) isLikelyPrompt(line string) bool {
 		"total ",                // ls -l 输出
 		"drwxr", "drwx", "-rw-", // 文件权限
 		"Installing", "Downloading", "Building",
-		"100%", // 进度条
+		"Unpacking", "Setting up", "Processing",
+		"100%", "50%", "75%", // 进度条
+		"KB", "MB", "GB", // 大小单位
+		"请问", "是否", "输入", // 中文提示（这些是交互提示，不是提示符）
 	}
 
+	lowerLine := strings.ToLower(line)
 	for _, pattern := range excludePatterns {
-		if strings.Contains(line, pattern) {
-			return false
+		if strings.Contains(lowerLine, strings.ToLower(pattern)) {
+			return true
 		}
 	}
 
-	// 通过所有检测，认为是提示符
-	return true
+	// 排除包含过多数字的行（可能是数据输出）
+	digitCount := 0
+	for _, c := range line {
+		if c >= '0' && c <= '9' {
+			digitCount++
+		}
+	}
+	if digitCount > len(line)/2 {
+		return true
+	}
+
+	return false
 }
 
 // GetInfo 获取会话信息

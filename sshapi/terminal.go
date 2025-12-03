@@ -68,18 +68,24 @@ func (t *Terminal) Write(p []byte) (n int, err error) {
 		// 处理普通字符
 		switch b {
 		case '\n':
+			// 换行：移到下一行开头
 			t.cursorRow++
 			t.cursorCol = 0
+			// 如果超出屏幕，滚动
 			if t.cursorRow >= t.height {
 				t.scroll()
+				t.cursorRow = t.height - 1
 			}
 		case '\r':
+			// 回车：光标回到行首
 			t.cursorCol = 0
 		case '\b':
+			// 退格：光标左移
 			if t.cursorCol > 0 {
 				t.cursorCol--
 			}
 		case '\t':
+			// Tab：移到下一个8字符边界
 			t.cursorCol = (t.cursorCol + 8) &^ 7
 			if t.cursorCol >= t.width {
 				t.cursorCol = t.width - 1
@@ -87,14 +93,25 @@ func (t *Terminal) Write(p []byte) (n int, err error) {
 		case 0x07: // BEL
 			// 忽略响铃
 		default:
-			if b >= 32 && b < 127 { // 可打印ASCII字符
+			// 可打印字符
+			if b >= 32 && b < 127 {
+				// 确保光标在有效范围内
 				if t.cursorRow >= t.height {
 					t.scroll()
+					t.cursorRow = t.height - 1
 				}
-				if t.cursorCol < t.width {
-					t.buffer[t.cursorRow][t.cursorCol] = rune(b)
-					t.cursorCol++
+				if t.cursorCol >= t.width {
+					// 自动换行
+					t.cursorRow++
+					t.cursorCol = 0
+					if t.cursorRow >= t.height {
+						t.scroll()
+						t.cursorRow = t.height - 1
+					}
 				}
+				// 写入字符
+				t.buffer[t.cursorRow][t.cursorCol] = rune(b)
+				t.cursorCol++
 			}
 		}
 		i++
@@ -180,7 +197,7 @@ func (t *Terminal) stripANSI(p []byte) []byte {
 	return result
 }
 
-// scroll 滚动屏幕
+// scroll 滚动屏幕（向上滚动一行，调用者需自己设置cursorRow）
 func (t *Terminal) scroll() {
 	// 向上滚动一行
 	copy(t.buffer[0:], t.buffer[1:])
@@ -188,7 +205,7 @@ func (t *Terminal) scroll() {
 	for j := 0; j < t.width; j++ {
 		t.buffer[t.height-1][j] = ' '
 	}
-	t.cursorRow = t.height - 1
+	// 注意：不在这里设置cursorRow，由调用者决定
 }
 
 // GetScreen 获取屏幕内容
