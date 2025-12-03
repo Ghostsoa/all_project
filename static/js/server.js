@@ -26,25 +26,25 @@ export function renderServerList(filterServers = null) {
     
     list.innerHTML = serversToRender.map(server => {
         const tagsHtml = server.tags && server.tags.length > 0 
-            ? `<div class="server-tags">${server.tags.map(tag => `<span class="server-tag">${escapeHtml(tag)}</span>`).join('')}</div>` 
-            : '';
+            ? `<div class="server-tags-compact">${server.tags.map(tag => `<span class="server-tag">${escapeHtml(tag)}</span>`).join('')}</div>` 
+            : '<div class="server-tags-compact"></div>';
         return `
             <div class="server-item" id="server-${server.ID}">
-                <!-- 折叠状态：只显示名字和连接按钮 -->
+                <!-- 折叠状态：名字+标签 | 按钮 -->
                 <div class="server-compact" onclick="window.toggleServerExpand(${server.ID})">
-                    <div class="server-name-compact">
-                        <span class="expand-icon">▶</span>
-                        ${escapeHtml(server.name)}
+                    <div class="server-info-left">
+                        <div class="server-name-compact">
+                            <span class="expand-icon">▶</span>
+                            ${escapeHtml(server.name)}
+                        </div>
+                        ${tagsHtml}
                     </div>
                     <button class="btn-small connect" onclick="event.stopPropagation(); window.selectServer(${server.ID})">🔌</button>
                 </div>
                 
-                <!-- 展开内容：详细信息 -->
+                <!-- 展开内容：地址和操作按钮 -->
                 <div class="server-expanded">
-                    <div class="server-info-detail">
-                        <div class="server-address">📍 ${escapeHtml(server.username)}@${escapeHtml(server.host)}:${server.port}</div>
-                        ${tagsHtml}
-                    </div>
+                    <div class="server-address">📍 ${escapeHtml(server.username)}@${escapeHtml(server.host)}:${server.port}</div>
                     <div class="server-actions-expanded">
                         <button class="btn-small" onclick="window.editServer(${server.ID})">✏️ 编辑</button>
                         <button class="btn-small delete" onclick="window.deleteServer(${server.ID})">🗑️ 删除</button>
