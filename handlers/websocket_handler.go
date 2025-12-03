@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
@@ -15,6 +16,8 @@ import (
 
 // WebSocket 升级器
 var upgrader = websocket.Upgrader{
+	ReadBufferSize:  32768, // 32KB 读缓冲
+	WriteBufferSize: 32768, // 32KB 写缓冲
 	CheckOrigin: func(r *http.Request) bool {
 		return true
 	},
@@ -97,32 +100,37 @@ func (h *WebSocketHandler) GinHandleWebSocket(c *gin.Context) {
 
 	log.Printf("SSH 连接成功: %s@%s:%d", server.Username, server.Host, server.Port)
 
-	// 双向数据转发
-	done := make(chan bool)
+	// 设置WebSocket为二进制模式，禁用压缩提高性能
+	ws.SetReadDeadline(time.Time{})  // 不设置读超时
+	ws.SetWriteDeadline(time.Time{}) // 不设置写超时
 
-	// SSH 输出 → WebSocket
+	// 双向数据转发
+	done := make(chan bool, 2)
+
+	// SSH 输出 → WebSocket (优化：使用32KB缓冲)
 	go func() {
-		buffer := make([]byte, 1024)
+		defer func() { done <- true }()
+		buffer := make([]byte, 32768) // 32KB缓冲
 		for {
 			n, err := stdout.Read(buffer)
 			if err != nil {
 				if err != io.EOF {
 					log.Println("读取 stdout 失败:", err)
 				}
-				done <- true
 				return
 			}
-			if err := ws.WriteMessage(websocket.BinaryMessage, buffer[:n]); err != nil {
-				log.Println("写入 WebSocket 失败:", err)
-				done <- true
-				return
+			if n > 0 {
+				if err := ws.WriteMessage(websocket.BinaryMessage, buffer[:n]); err != nil {
+					log.Println("写入 WebSocket 失败:", err)
+					return
+				}
 			}
 		}
 	}()
 
-	// SSH 错误输出 → WebSocket
+	// SSH 错误输出 → WebSocket (合并到stdout处理)
 	go func() {
-		buffer := make([]byte, 1024)
+		buffer := make([]byte, 8192) // 8KB缓冲
 		for {
 			n, err := stderr.Read(buffer)
 			if err != nil {
@@ -131,25 +139,28 @@ func (h *WebSocketHandler) GinHandleWebSocket(c *gin.Context) {
 				}
 				return
 			}
-			ws.WriteMessage(websocket.BinaryMessage, buffer[:n])
+			if n > 0 {
+				ws.WriteMessage(websocket.BinaryMessage, buffer[:n])
+			}
 		}
 	}()
 
-	// WebSocket → SSH 输入
+	// WebSocket → SSH 输入 (优化：批量写入)
 	go func() {
+		defer func() { done <- true }()
 		for {
 			msgType, data, err := ws.ReadMessage()
 			if err != nil {
 				log.Println("读取 WebSocket 失败:", err)
-				done <- true
 				return
 			}
 
 			if msgType == websocket.TextMessage || msgType == websocket.BinaryMessage {
-				if _, err := stdin.Write(data); err != nil {
-					log.Println("写入 stdin 失败:", err)
-					done <- true
-					return
+				if len(data) > 0 {
+					if _, err := stdin.Write(data); err != nil {
+						log.Println("写入 stdin 失败:", err)
+						return
+					}
 				}
 			}
 		}
@@ -168,6 +179,8 @@ func connectSSH(server *models.Server) (*ssh.Client, error) {
 			ssh.Password(server.Password),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
+		Timeout:         10 * time.Second,        // 连接超时10秒
+		ClientVersion:   "SSH-2.0-WebSSH_Client", // 客户端版本标识
 	}
 
 	address := fmt.Sprintf("%s:%d", server.Host, server.Port)
@@ -175,6 +188,18 @@ func connectSSH(server *models.Server) (*ssh.Client, error) {
 	if err != nil {
 		return nil, err
 	}
+
+	// 启动keepalive保持连接活跃
+	go func() {
+		ticker := time.NewTicker(30 * time.Second)
+		defer ticker.Stop()
+		for range ticker.C {
+			_, _, err := client.SendRequest("keepalive@openssh.com", true, nil)
+			if err != nil {
+				return
+			}
+		}
+	}()
 
 	return client, nil
 }

@@ -120,9 +120,9 @@ func handleUnixTerminal(ws *websocket.Conn, cmd *exec.Cmd) {
 
 	done := make(chan bool)
 
-	// PTY → WebSocket
+	// PTY → WebSocket (优化：32KB缓冲)
 	go func() {
-		buffer := make([]byte, 1024)
+		buffer := make([]byte, 32768) // 32KB缓冲
 		for {
 			n, err := ptmx.Read(buffer)
 			if err != nil {
@@ -132,10 +132,12 @@ func handleUnixTerminal(ws *websocket.Conn, cmd *exec.Cmd) {
 				done <- true
 				return
 			}
-			if err := ws.WriteMessage(websocket.BinaryMessage, buffer[:n]); err != nil {
-				log.Println("写入WebSocket失败:", err)
-				done <- true
-				return
+			if n > 0 {
+				if err := ws.WriteMessage(websocket.BinaryMessage, buffer[:n]); err != nil {
+					log.Println("写入WebSocket失败:", err)
+					done <- true
+					return
+				}
 			}
 		}
 	}()
