@@ -17,7 +17,7 @@ import (
 
 func main() {
 	// 启动API服务器
-	server := sshapi.NewServer(":8080")
+	server := sshapi.NewServer(":28080")
 	go func() {
 		if err := server.Start(); err != nil {
 			log.Fatalf("服务器启动失败: %v", err)
