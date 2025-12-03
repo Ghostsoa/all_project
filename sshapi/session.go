@@ -381,10 +381,10 @@ func (s *Session) isLikelyPrompt(line string) bool {
 		}
 	}
 
-	// 如果有强特征，直接通过
+	// 如果有强特征，直接通过（跳过数字检查）
 	if hasStrongPattern {
-		// 仍需检查排除模式
-		if s.shouldExcludeAsPrompt(line) {
+		// 仍需检查基本排除模式，但不检查数字
+		if s.shouldExcludeAsPromptBasic(line) {
 			return false
 		}
 		return true
@@ -408,7 +408,7 @@ func (s *Session) isLikelyPrompt(line string) bool {
 		return false
 	}
 
-	// 特征5: 排除明显的非提示符
+	// 特征5: 排除明显的非提示符（弱特征需要完整检查）
 	if s.shouldExcludeAsPrompt(line) {
 		return false
 	}
@@ -417,8 +417,8 @@ func (s *Session) isLikelyPrompt(line string) bool {
 	return true
 }
 
-// shouldExcludeAsPrompt 检查是否应排除（不是提示符）
-func (s *Session) shouldExcludeAsPrompt(line string) bool {
+// shouldExcludeAsPromptBasic 基本排除检查（不检查数字）
+func (s *Session) shouldExcludeAsPromptBasic(line string) bool {
 	// 排除明显的命令输出
 	excludePatterns := []string{
 		"error:", "Error:", "ERROR:",
@@ -430,7 +430,6 @@ func (s *Session) shouldExcludeAsPrompt(line string) bool {
 		"Unpacking", "Setting up", "Processing",
 		"100%", "50%", "75%", // 进度条
 		"KB", "MB", "GB", // 大小单位
-		"请问", "是否", "输入", // 中文提示（这些是交互提示，不是提示符）
 	}
 
 	lowerLine := strings.ToLower(line)
@@ -440,14 +439,26 @@ func (s *Session) shouldExcludeAsPrompt(line string) bool {
 		}
 	}
 
-	// 排除包含过多数字的行（可能是数据输出）
+	return false
+}
+
+// shouldExcludeAsPrompt 完整排除检查（包括数字检查）
+func (s *Session) shouldExcludeAsPrompt(line string) bool {
+	// 先做基本检查
+	if s.shouldExcludeAsPromptBasic(line) {
+		return true
+	}
+
+	// 额外检查：排除包含过多数字的行（可能是数据输出）
+	// 但主机名中的数字是正常的，所以阈值设高一些
 	digitCount := 0
 	for _, c := range line {
 		if c >= '0' && c <= '9' {
 			digitCount++
 		}
 	}
-	if digitCount > len(line)/2 {
+	// 数字超过60%才排除（之前是50%）
+	if digitCount > len(line)*6/10 {
 		return true
 	}
 
