@@ -85,7 +85,11 @@
                     </div>
                     <div class="form-group">
                         <label>标签</label>
-                        <input type="text" id="serverTags" placeholder="生产,数据库,重要">
+                        <div class="tags-input-wrapper">
+                            <div class="tags-display" id="tagsDisplay"></div>
+                            <input type="text" id="serverTagsInput" placeholder="输入标签后按回车..." class="tag-input">
+                        </div>
+                        <small class="form-hint">按回车添加标签，点击标签可删除</small>
                     </div>
                 </form>
             </div>

@@ -4,10 +4,12 @@ let currentServer = null;
 let term = null;
 let fitAddon = null;
 let ws = null;
+let currentTags = [];
 
 // 页面加载完成
 document.addEventListener('DOMContentLoaded', function() {
     loadServers();
+    initTagsInput();
 });
 
 // 加载服务器列表
@@ -35,17 +37,22 @@ function renderServerList(filterServers = null) {
         return;
     }
     
-    list.innerHTML = serversToRender.map(server => `
-        <div class="server-item" onclick="selectServer(${server.ID})">
-            <div class="server-name">${escapeHtml(server.name)}</div>
-            <div class="server-info">${escapeHtml(server.username)}@${escapeHtml(server.host)}:${server.port}</div>
-            ${server.tags ? `<div class="server-tags">🏷️ ${escapeHtml(server.tags)}</div>` : ''}
-            <div class="server-actions">
-                <button class="btn-small" onclick="event.stopPropagation(); editServer(${server.ID})">编辑</button>
-                <button class="btn-small delete" onclick="event.stopPropagation(); deleteServer(${server.ID})">删除</button>
+    list.innerHTML = serversToRender.map(server => {
+        const tagsHtml = server.tags && server.tags.length > 0 
+            ? `<div class="server-tags">🏷️ ${server.tags.map(tag => escapeHtml(tag)).join(', ')}</div>` 
+            : '';
+        return `
+            <div class="server-item" onclick="selectServer(${server.ID})">
+                <div class="server-name">${escapeHtml(server.name)}</div>
+                <div class="server-info">${escapeHtml(server.username)}@${escapeHtml(server.host)}:${server.port}</div>
+                ${tagsHtml}
+                <div class="server-actions">
+                    <button class="btn-small" onclick="event.stopPropagation(); editServer(${server.ID})">编辑</button>
+                    <button class="btn-small delete" onclick="event.stopPropagation(); deleteServer(${server.ID})">删除</button>
+                </div>
             </div>
-        </div>
-    `).join('');
+        `;
+    }).join('');
 }
 
 // 搜索服务器
@@ -213,6 +220,8 @@ function showAddServerModal() {
     document.getElementById('modalTitle').textContent = '添加服务器';
     document.getElementById('serverForm').reset();
     document.getElementById('serverId').value = '';
+    currentTags = [];
+    renderTags();
     document.getElementById('serverModal').classList.add('show');
 }
 
@@ -232,7 +241,8 @@ async function editServer(id) {
             document.getElementById('serverUsername').value = server.username;
             document.getElementById('serverPassword').value = '';
             document.getElementById('serverDescription').value = server.description || '';
-            document.getElementById('serverTags').value = server.tags || '';
+            currentTags = server.tags || [];
+            renderTags();
             document.getElementById('serverModal').classList.add('show');
         }
     } catch (error) {
@@ -252,7 +262,7 @@ async function saveServer() {
         password: document.getElementById('serverPassword').value,
         auth_type: 'password',
         description: document.getElementById('serverDescription').value.trim(),
-        tags: document.getElementById('serverTags').value.trim()
+        tags: currentTags
     };
     
     if (!server.name || !server.host || !server.username) {
@@ -343,3 +353,53 @@ document.getElementById('serverModal').addEventListener('click', function(e) {
         closeModal();
     }
 });
+
+// ==================== 标签管理功能 ====================
+
+// 初始化标签输入
+function initTagsInput() {
+    const input = document.getElementById('serverTagsInput');
+    if (!input) return;
+    
+    input.addEventListener('keydown', function(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            addTag();
+        } else if (e.key === 'Backspace' && input.value === '' && currentTags.length > 0) {
+            // 删除最后一个标签
+            currentTags.pop();
+            renderTags();
+        }
+    });
+}
+
+// 添加标签
+function addTag() {
+    const input = document.getElementById('serverTagsInput');
+    const tag = input.value.trim();
+    
+    if (tag && !currentTags.includes(tag)) {
+        currentTags.push(tag);
+        renderTags();
+        input.value = '';
+    }
+}
+
+// 删除标签
+function removeTag(index) {
+    currentTags.splice(index, 1);
+    renderTags();
+}
+
+// 渲染标签
+function renderTags() {
+    const display = document.getElementById('tagsDisplay');
+    if (!display) return;
+    
+    display.innerHTML = currentTags.map((tag, index) => `
+        <span class="tag-item" onclick="removeTag(${index})">
+            ${escapeHtml(tag)}
+            <span class="tag-remove">×</span>
+        </span>
+    `).join('');
+}

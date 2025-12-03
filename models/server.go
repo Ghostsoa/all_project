@@ -1,21 +1,22 @@
 package models
 
 import (
+	"github.com/lib/pq"
 	"gorm.io/gorm"
 )
 
 // Server SSH 服务器配置
 type Server struct {
 	gorm.Model
-	Name        string `gorm:"size:100;not null;index" json:"name"`
-	Host        string `gorm:"size:255;not null;index" json:"host"`
-	Port        int    `gorm:"default:22;not null" json:"port"`
-	Username    string `gorm:"size:100;not null" json:"username"`
-	Password    string `gorm:"size:255" json:"password,omitempty"`
-	AuthType    string `gorm:"size:20;default:'password';not null" json:"auth_type"` // password, privatekey
-	PrivateKey  string `gorm:"type:text" json:"private_key,omitempty"`
-	Description string `gorm:"type:text" json:"description"`
-	Tags        string `gorm:"size:255" json:"tags"`
+	Name        string         `gorm:"size:100;not null;index" json:"name"`
+	Host        string         `gorm:"size:255;not null;index" json:"host"`
+	Port        int            `gorm:"default:22;not null" json:"port"`
+	Username    string         `gorm:"size:100;not null" json:"username"`
+	Password    string         `gorm:"size:255" json:"password,omitempty"`
+	AuthType    string         `gorm:"size:20;default:'password';not null" json:"auth_type"` // password, privatekey
+	PrivateKey  string         `gorm:"type:text" json:"private_key,omitempty"`
+	Description string         `gorm:"type:text" json:"description"`
+	Tags        pq.StringArray `gorm:"type:text[]" json:"tags"`
 }
 
 // TableName 指定表名
@@ -81,7 +82,7 @@ func (r *ServerRepository) Search(keyword string) ([]*Server, error) {
 	keyword = "%" + keyword + "%"
 
 	err := r.db.Where(
-		"name ILIKE ? OR host ILIKE ? OR description ILIKE ? OR tags ILIKE ?",
+		"name ILIKE ? OR host ILIKE ? OR description ILIKE ? OR array_to_string(tags, ',') ILIKE ?",
 		keyword, keyword, keyword, keyword,
 	).Order("created_at DESC").Find(&servers).Error
 
