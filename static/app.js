@@ -211,16 +211,17 @@ function renderServerList(filterServers = null) {
     
     list.innerHTML = serversToRender.map(server => {
         const tagsHtml = server.tags && server.tags.length > 0 
-            ? `<div class="server-tags">🏷️ ${server.tags.map(tag => escapeHtml(tag)).join(', ')}</div>` 
+            ? `<div class="server-tags">${server.tags.map(tag => escapeHtml(tag)).join(' · ')}</div>` 
             : '';
         return `
-            <div class="server-item" onclick="selectServer(${server.ID})">
+            <div class="server-item">
                 <div class="server-name">${escapeHtml(server.name)}</div>
                 <div class="server-info">${escapeHtml(server.username)}@${escapeHtml(server.host)}:${server.port}</div>
                 ${tagsHtml}
                 <div class="server-actions">
-                    <button class="btn-small" onclick="event.stopPropagation(); editServer(${server.ID})">编辑</button>
-                    <button class="btn-small delete" onclick="event.stopPropagation(); deleteServer(${server.ID})">删除</button>
+                    <button class="btn-small connect" onclick="selectServer(${server.ID})">🔌 连接</button>
+                    <button class="btn-small" onclick="editServer(${server.ID})">✏️ 编辑</button>
+                    <button class="btn-small delete" onclick="deleteServer(${server.ID})">🗑️ 删除</button>
                 </div>
             </div>
         `;
