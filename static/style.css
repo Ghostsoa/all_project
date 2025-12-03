@@ -819,11 +819,8 @@ body {
     background: rgba(255, 255, 255, 0.02);
     border: 1px solid rgba(255, 255, 255, 0.06);
     transition: all 0.2s;
-    margin-bottom: 6px;
-    border-radius: 8px;
-    display: flex;
-    gap: 10px;
-    align-items: flex-start;
+    margin-bottom: 8px;
+    border-radius: 6px;
 }
 
 .command-item:hover {
@@ -837,14 +834,11 @@ body {
 }
 
 .command-checkbox {
-    font-size: 16px;
+    font-size: 14px;
     cursor: pointer;
     user-select: none;
-    line-height: 1;
-}
-
-.command-content {
-    flex: 1;
+    margin-right: 8px;
+    display: inline-block;
 }
 
 .command-text {
@@ -852,8 +846,8 @@ body {
     font-size: 12px;
     color: #4ec9b0;
     word-break: break-all;
-    margin-bottom: 4px;
-    line-height: 1.4;
+    margin-bottom: 6px;
+    line-height: 1.5;
 }
 
 .command-meta {
@@ -862,33 +856,29 @@ body {
     align-items: center;
     font-size: 10px;
     color: rgba(255, 255, 255, 0.4);
-    gap: 8px;
 }
 
-.command-meta > div {
+.command-actions {
     display: flex;
-    gap: 6px;
-    align-items: center;
+    gap: 12px;
 }
 
 .command-time {
-    display: flex;
-    align-items: center;
-    gap: 4px;
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 10px;
 }
 
-.command-copy {
-    background: transparent;
-    border: none;
-    color: rgba(255, 255, 255, 0.4);
+.command-link {
+    color: rgba(255, 255, 255, 0.5);
     cursor: pointer;
-    padding: 0;
     font-size: 10px;
     transition: color 0.2s;
+    user-select: none;
 }
 
-.command-copy:hover {
-    color: rgba(255, 255, 255, 0.8);
+.command-link:hover {
+    color: rgba(255, 255, 255, 0.9);
+    text-decoration: underline;
 }
 
 /* Button Styles */

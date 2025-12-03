@@ -95,14 +95,10 @@ function renderCommandHistory(commands) {
                 <div class="command-item">
                     <div class="command-text">${escapeHtml(cmd.command)}</div>
                     <div class="command-meta">
-                        <span class="command-time">⏰ ${timeStr}</span>
-                        <div>
-                            <button class="command-action" onclick="window.writeCommandToTerminal('${escapedCmd}')" title="填充到终端">
-                                ⚡ 填充
-                            </button>
-                            <button class="command-action" onclick="window.copyCommand('${escapedCmd}')" title="复制到剪贴板">
-                                📋 复制
-                            </button>
+                        <span class="command-time">${timeStr}</span>
+                        <div class="command-actions">
+                            <span class="command-link" onclick="window.copyCommand('${escapedCmd}')" title="复制到剪贴板">复制</span>
+                            <span class="command-link" onclick="window.writeCommandToTerminal('${escapedCmd}')" title="填充到终端">填充</span>
                         </div>
                     </div>
                 </div>
