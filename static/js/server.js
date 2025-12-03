@@ -26,13 +26,15 @@ export function renderServerList(filterServers = null) {
     
     list.innerHTML = serversToRender.map(server => {
         const tagsHtml = server.tags && server.tags.length > 0 
-            ? `<div class="server-tags">${server.tags.map(tag => escapeHtml(tag)).join(' · ')}</div>` 
+            ? `<div class="server-tags">${server.tags.map(tag => `<span class="server-tag">${escapeHtml(tag)}</span>`).join('')}</div>` 
             : '';
         return `
             <div class="server-item">
-                <div class="server-name">${escapeHtml(server.name)}</div>
-                <div class="server-info">${escapeHtml(server.username)}@${escapeHtml(server.host)}:${server.port}</div>
-                ${tagsHtml}
+                <div class="server-item-info">
+                    <div class="server-name">${escapeHtml(server.name)}</div>
+                    <div class="server-info">${escapeHtml(server.username)}@${escapeHtml(server.host)}:${server.port}</div>
+                    ${tagsHtml}
+                </div>
                 <div class="server-actions">
                     <button class="btn-small connect" onclick="window.selectServer(${server.ID})">🔌 连接</button>
                     <button class="btn-small" onclick="window.editServer(${server.ID})">✏️ 编辑</button>

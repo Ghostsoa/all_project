@@ -184,6 +184,10 @@ body {
     border-radius: 12px;
     margin-bottom: 12px;
     transition: all 0.3s;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
 }
 
 .server-item:hover {
@@ -198,28 +202,43 @@ body {
     border-color: rgba(255, 255, 255, 0.2);
 }
 
+.server-item-info {
+    flex: 1;
+    min-width: 0;
+}
+
 .server-name {
     font-weight: 600;
     color: #ffffff;
-    margin-bottom: 6px;
+    margin-bottom: 4px;
     font-size: 14px;
 }
 
 .server-info {
-    font-size: 12px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.5);
-    margin-bottom: 8px;
+    margin-bottom: 6px;
 }
 
 .server-tags {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.4);
-    margin-bottom: 12px;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.6);
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+}
+
+.server-tag {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .server-actions {
     display: flex;
-    gap: 8px;
+    flex-direction: column;
+    gap: 6px;
 }
 
 .command-action {
@@ -241,7 +260,7 @@ body {
 }
 
 .btn-small {
-    padding: 6px 12px;
+    padding: 6px 14px;
     font-size: 11px;
     background: rgba(255, 255, 255, 0.08);
     backdrop-filter: blur(10px);
@@ -251,6 +270,9 @@ body {
     cursor: pointer;
     transition: all 0.2s;
     font-weight: 500;
+    white-space: nowrap;
+    min-width: 70px;
+    text-align: center;
 }
 
 .btn-small:hover {
@@ -701,6 +723,34 @@ body {
     font-size: 13px;
 }
 
+.command-select-header {
+    display: flex;
+    gap: 8px;
+    padding: 8px;
+    margin-bottom: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+}
+
+.btn-select-all,
+.btn-delete-selected,
+.btn-cancel-select {
+    padding: 6px 12px;
+    font-size: 11px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    color: #ffffff;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-delete-selected {
+    background: rgba(255, 59, 48, 0.15);
+    border-color: rgba(255, 59, 48, 0.3);
+    color: #ff3b30;
+}
+
 .command-item {
     padding: 12px 14px;
     background: rgba(255, 255, 255, 0.03);
@@ -709,11 +759,29 @@ body {
     transition: all 0.2s;
     margin-bottom: 8px;
     border-radius: 10px;
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
 }
 
 .command-item:hover {
     background: rgba(255, 255, 255, 0.06);
     border-color: rgba(255, 255, 255, 0.12);
+}
+
+.command-item.selected {
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.25);
+}
+
+.command-checkbox {
+    font-size: 18px;
+    cursor: pointer;
+    user-select: none;
+}
+
+.command-content {
+    flex: 1;
 }
 
 .command-text {
