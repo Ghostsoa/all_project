@@ -136,6 +136,9 @@ window.switchTab = function(sessionId) {
     if (session) {
         setTimeout(() => session.fitAddon.fit(), 100);
         loadCommandHistory(session.server.ID, session.server.name);
+        
+        // 同步更新文件树到当前服务器
+        setCurrentServer(session.server.ID);
     }
 };
 
