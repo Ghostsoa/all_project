@@ -252,14 +252,12 @@ body {
     display: block;
 }
 
-/* 状态灯带 */
+/* 状态灯带 - 纯灯带 */
 .status-light-bar {
-    height: 4px;
-    background: #2d2d30;
+    height: 3px;
+    background: #1e1e1e;
     position: relative;
     overflow: hidden;
-    display: flex;
-    align-items: center;
 }
 
 .status-light {
@@ -272,55 +270,165 @@ body {
     transition: background 0.3s;
 }
 
-/* 连接中 - 跑马灯动画 */
+/* 连接中 - 彩色流光动画 */
 .status-light.connecting {
     background: linear-gradient(90deg, 
-        #007acc 0%, 
-        #1e90ff 25%, 
-        #00bfff 50%, 
-        #1e90ff 75%, 
-        #007acc 100%);
-    background-size: 200% 100%;
-    animation: flowingLight 1.5s linear infinite;
+        #ff0080 0%,
+        #ff8c00 10%,
+        #ffd700 20%,
+        #00ff00 30%,
+        #00bfff 40%,
+        #0080ff 50%,
+        #8000ff 60%,
+        #ff0080 70%,
+        #ff8c00 80%,
+        #ffd700 90%,
+        #00ff00 100%);
+    background-size: 300% 100%;
+    animation: flowingRainbow 2s linear infinite;
 }
 
-@keyframes flowingLight {
+@keyframes flowingRainbow {
     0% {
         background-position: 0% 0%;
     }
     100% {
-        background-position: 200% 0%;
+        background-position: 300% 0%;
     }
 }
 
 /* 连接成功 - 绿灯 */
 .status-light.connected {
     background: #4ec9b0;
+    box-shadow: 0 0 8px rgba(78, 201, 176, 0.5);
 }
 
 /* 断开连接 - 红灯 */
 .status-light.disconnected {
     background: #f48771;
+    box-shadow: 0 0 8px rgba(244, 135, 113, 0.5);
 }
 
-.status-message {
+/* 断连提示覆盖层 */
+.disconnect-overlay {
     position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-    font-size: 11px;
-    color: #ffffff;
-    text-shadow: 0 0 3px rgba(0,0,0,0.5);
-    z-index: 1;
-    pointer-events: none;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(30, 30, 30, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
 }
 
-/* Right Panel - 右侧预留 */
+.disconnect-content {
+    text-align: center;
+    max-width: 400px;
+    padding: 40px;
+}
+
+.disconnect-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.6;
+        transform: scale(1.1);
+    }
+}
+
+.disconnect-title {
+    font-size: 24px;
+    color: #f48771;
+    margin-bottom: 12px;
+    font-weight: 500;
+}
+
+.disconnect-message {
+    font-size: 14px;
+    color: #858585;
+    margin-bottom: 30px;
+    line-height: 1.6;
+}
+
+.btn-reconnect {
+    padding: 12px 32px;
+    background: #0e639c;
+    color: #fff;
+    border: none;
+    border-radius: 4px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 2px 8px rgba(14, 99, 156, 0.3);
+}
+
+.btn-reconnect:hover {
+    background: #1177bb;
+    box-shadow: 0 4px 12px rgba(14, 99, 156, 0.5);
+    transform: translateY(-1px);
+}
+
+.btn-reconnect:active {
+    transform: translateY(0);
+}
+
+/* Right Panel - 右侧面板 */
 .right-panel {
     background: #252526;
     border-left: 1px solid #3e3e42;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+}
+
+.right-panel-tabs {
+    display: flex;
+    background: #2d2d30;
+    border-bottom: 1px solid #3e3e42;
+}
+
+.right-tab {
+    flex: 1;
+    padding: 12px 16px;
+    text-align: center;
+    font-size: 13px;
+    color: #858585;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    transition: all 0.2s;
+}
+
+.right-tab:hover {
+    background: #383838;
+    color: #cccccc;
+}
+
+.right-tab.active {
+    color: #ffffff;
+    border-bottom-color: #007acc;
+    background: #252526;
+}
+
+.right-panel-content {
+    flex: 1;
+    display: none;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.right-panel-content.active {
+    display: flex;
 }
 
 .right-panel-placeholder {
@@ -340,6 +448,103 @@ body {
 .placeholder-content p {
     font-size: 13px;
     color: #858585;
+}
+
+/* 命令记录 */
+.commands-header {
+    padding: 12px 16px;
+    background: #2d2d30;
+    border-bottom: 1px solid #3e3e42;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.commands-title {
+    font-size: 13px;
+    color: #cccccc;
+    font-weight: 500;
+}
+
+.btn-clear-commands {
+    background: transparent;
+    border: none;
+    color: #858585;
+    font-size: 16px;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 3px;
+    transition: all 0.2s;
+}
+
+.btn-clear-commands:hover {
+    background: #3e3e42;
+    color: #f48771;
+}
+
+.commands-list {
+    flex: 1;
+    overflow-y: auto;
+    padding: 8px;
+}
+
+.commands-empty {
+    text-align: center;
+    padding: 40px 20px;
+    color: #858585;
+    font-size: 13px;
+}
+
+.command-item {
+    background: #2d2d30;
+    border: 1px solid #3e3e42;
+    border-radius: 4px;
+    padding: 10px 12px;
+    margin-bottom: 8px;
+    transition: all 0.2s;
+}
+
+.command-item:hover {
+    background: #333333;
+    border-color: #4e4e4e;
+}
+
+.command-text {
+    font-family: 'Consolas', 'Courier New', monospace;
+    font-size: 12px;
+    color: #4ec9b0;
+    word-break: break-all;
+    margin-bottom: 6px;
+}
+
+.command-meta {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 11px;
+    color: #858585;
+}
+
+.command-time {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+}
+
+.command-copy {
+    background: transparent;
+    border: none;
+    color: #858585;
+    cursor: pointer;
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    transition: all 0.2s;
+}
+
+.command-copy:hover {
+    background: #3e3e42;
+    color: #cccccc;
 }
 
 /* Button Styles */

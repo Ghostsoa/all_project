@@ -46,20 +46,49 @@
                 <!-- 终端容器 -->
                 <div class="terminals-container" id="terminalsContainer"></div>
 
-                <!-- 状态灯带 -->
-                <div class="status-light-bar" id="statusLightBar">
+                <!-- 状态灯带 - 纯灯带无文本 -->
+                <div class="status-light-bar">
                     <div class="status-light" id="statusLight"></div>
-                    <span class="status-message" id="statusMessage">未连接</span>
                 </div>
             </div>
         </div>
 
-        <!-- 右侧预留区域 -->
+        <!-- 右侧面板 -->
         <div class="right-panel">
-            <div class="right-panel-placeholder">
-                <div class="placeholder-content">
-                    <h3>🤖 AI 助手</h3>
-                    <p>敬请期待...</p>
+            <!-- 标签切换栏 -->
+            <div class="right-panel-tabs">
+                <div class="right-tab" data-tab="ai" onclick="switchRightTab('ai')">
+                    🤖 AI 助手
+                </div>
+                <div class="right-tab active" data-tab="commands" onclick="switchRightTab('commands')">
+                    📜 命令记录
+                </div>
+            </div>
+
+            <!-- AI 助手面板 -->
+            <div class="right-panel-content" id="aiPanel" style="display: none;">
+                <div class="right-panel-placeholder">
+                    <div class="placeholder-content">
+                        <h3>🤖 AI 助手</h3>
+                        <p>敬请期待...</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 命令记录面板 -->
+            <div class="right-panel-content active" id="commandsPanel">
+                <div class="commands-header">
+                    <div class="commands-title">
+                        <span id="commandsServerName">选择服务器查看命令</span>
+                    </div>
+                    <button class="btn-clear-commands" onclick="clearCurrentCommands()" title="清除命令历史">
+                        🗑️
+                    </button>
+                </div>
+                <div class="commands-list" id="commandsList">
+                    <div class="commands-empty">
+                        <p>暂无命令记录</p>
+                    </div>
                 </div>
             </div>
         </div>

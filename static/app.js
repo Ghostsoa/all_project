@@ -149,7 +149,8 @@ function createNewSession(server) {
         term: term,
         fitAddon: fitAddon,
         ws: null,
-        status: 'connecting'
+        status: 'connecting',
+        commandBuffer: '' // 命令缓冲区
     });
     
     // 切换到新标签
@@ -176,7 +177,7 @@ function connectSSH(sessionId, server) {
     const session = terminals.get(sessionId);
     if (!session) return;
     
-    updateStatusLight('connecting', '正在连接...');
+    updateStatusLight('connecting');
     
     // 建立 WebSocket 连接
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
@@ -184,7 +185,8 @@ function connectSSH(sessionId, server) {
     
     ws.onopen = () => {
         session.status = 'connected';
-        updateStatusLight('connected', `已连接到 ${server.name}`);
+        updateStatusLight('connected');
+        hideDisconnectOverlay(sessionId);
         setTimeout(() => session.fitAddon.fit(), 100);
     };
     
@@ -196,7 +198,8 @@ function connectSSH(sessionId, server) {
         } else {
             if (event.data.startsWith('SSH 连接失败')) {
                 session.status = 'disconnected';
-                updateStatusLight('disconnected', event.data);
+                updateStatusLight('disconnected');
+                showDisconnectOverlay(sessionId, '连接失败', event.data);
             } else {
                 session.term.write(event.data);
             }
@@ -205,21 +208,36 @@ function connectSSH(sessionId, server) {
     
     ws.onerror = (error) => {
         session.status = 'disconnected';
-        updateStatusLight('disconnected', 'WebSocket 错误');
+        updateStatusLight('disconnected');
         console.error('WebSocket error:', error);
     };
     
     ws.onclose = () => {
         session.status = 'disconnected';
-        if (sessionId === activeSessionId) {
-            updateStatusLight('disconnected', '连接已断开 - 点击重新连接');
-        }
+        updateStatusLight('disconnected');
+        showDisconnectOverlay(sessionId, '连接已断开', '网络连接中断或服务器超时');
     };
     
     // 监听终端输入
     session.term.onData(data => {
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(data);
+            
+            // 捕获命令（检测回车键）
+            if (data === '\r' || data === '\n') {
+                const command = session.commandBuffer.trim();
+                if (command && command.length > 0) {
+                    // 保存命令到数据库
+                    saveCommand(server.ID, command);
+                }
+                session.commandBuffer = '';
+            } else if (data === '\u007F' || data === '\b') {
+                // 退格键
+                session.commandBuffer = session.commandBuffer.slice(0, -1);
+            } else if (data >= ' ' && data <= '~') {
+                // 可打印字符
+                session.commandBuffer += data;
+            }
         }
     });
     
@@ -247,13 +265,10 @@ function switchTab(sessionId) {
     setTimeout(() => session.fitAddon.fit(), 100);
     
     // 更新状态灯
-    const statusMap = {
-        'connecting': ['connecting', '正在连接...'],
-        'connected': ['connected', `已连接到 ${session.server.name}`],
-        'disconnected': ['disconnected', '连接已断开 - 点击重新连接']
-    };
-    const [lightClass, message] = statusMap[session.status] || ['disconnected', '未知状态'];
-    updateStatusLight(lightClass, message);
+    updateStatusLight(session.status);
+    
+    // 加载命令历史
+    loadCommandHistory(session.server.ID, session.server.name);
 }
 
 // 关闭标签页
@@ -316,27 +331,65 @@ function renderTabs() {
     }
 }
 
-// 更新状态灯带
-function updateStatusLight(status, message) {
+// 更新状态灯带 - 纯灯带无文本
+function updateStatusLight(status) {
     const light = document.getElementById('statusLight');
-    const messageEl = document.getElementById('statusMessage');
-    
     light.className = 'status-light ' + status;
-    messageEl.textContent = message;
+}
+
+// 显示断连覆盖层
+function showDisconnectOverlay(sessionId, title, message) {
+    const pane = document.getElementById(sessionId);
+    if (!pane) return;
     
-    // 如果断开连接，添加重连功能
-    if (status === 'disconnected' && activeSessionId) {
-        messageEl.style.cursor = 'pointer';
-        messageEl.onclick = () => {
-            const session = terminals.get(activeSessionId);
-            if (session) {
-                connectSSH(activeSessionId, session.server);
-            }
-        };
-    } else {
-        messageEl.style.cursor = 'default';
-        messageEl.onclick = null;
+    // 检查是否已存在覆盖层
+    let overlay = pane.querySelector('.disconnect-overlay');
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.className = 'disconnect-overlay';
+        overlay.innerHTML = `
+            <div class="disconnect-content">
+                <div class="disconnect-icon">⚠️</div>
+                <div class="disconnect-title">${escapeHtml(title)}</div>
+                <div class="disconnect-message">${escapeHtml(message)}</div>
+                <button class="btn-reconnect" onclick="reconnectSession('${sessionId}')">
+                    🔄 重新连接
+                </button>
+            </div>
+        `;
+        pane.appendChild(overlay);
     }
+}
+
+// 隐藏断连覆盖层
+function hideDisconnectOverlay(sessionId) {
+    const pane = document.getElementById(sessionId);
+    if (!pane) return;
+    
+    const overlay = pane.querySelector('.disconnect-overlay');
+    if (overlay) {
+        overlay.remove();
+    }
+}
+
+// 重新连接会话
+function reconnectSession(sessionId) {
+    const session = terminals.get(sessionId);
+    if (!session) return;
+    
+    // 清除旧连接
+    if (session.ws) {
+        session.ws.close();
+    }
+    
+    // 清空终端
+    session.term.clear();
+    
+    // 隐藏覆盖层
+    hideDisconnectOverlay(sessionId);
+    
+    // 重新连接
+    connectSSH(sessionId, session.server);
 }
 
 // 显示添加服务器模态框
@@ -526,4 +579,163 @@ function renderTags() {
             <span class="tag-remove">×</span>
         </span>
     `).join('');
+}
+
+// ==================== 命令记录功能 ====================
+
+// 保存命令到数据库
+async function saveCommand(serverId, command) {
+    try {
+        await fetch('/api/command/save', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                server_id: serverId,
+                command: command
+            })
+        });
+        
+        // 如果当前显示的是该服务器，刷新命令列表
+        const session = terminals.get(activeSessionId);
+        if (session && session.server.ID === serverId) {
+            loadCommandHistory(serverId, session.server.name);
+        }
+    } catch (error) {
+        console.error('保存命令失败:', error);
+    }
+}
+
+// 加载命令历史
+async function loadCommandHistory(serverId, serverName) {
+    try {
+        const response = await fetch(`/api/commands?server_id=${serverId}&limit=50`);
+        const data = await response.json();
+        
+        if (data.success) {
+            document.getElementById('commandsServerName').textContent = serverName || '未知服务器';
+            renderCommandHistory(data.data || []);
+        }
+    } catch (error) {
+        console.error('加载命令历史失败:', error);
+        renderCommandHistory([]);
+    }
+}
+
+// 渲染命令历史列表
+function renderCommandHistory(commands) {
+    const list = document.getElementById('commandsList');
+    
+    if (commands.length === 0) {
+        list.innerHTML = '<div class="commands-empty"><p>暂无命令记录</p></div>';
+        return;
+    }
+    
+    list.innerHTML = commands.map(cmd => {
+        const date = new Date(cmd.created_at);
+        const timeStr = formatTime(date);
+        
+        return `
+            <div class="command-item">
+                <div class="command-text">${escapeHtml(cmd.command)}</div>
+                <div class="command-meta">
+                    <span class="command-time">⏰ ${timeStr}</span>
+                    <button class="command-copy" onclick="copyCommand('${escapeHtml(cmd.command).replace(/'/g, "\\'")}')">
+                        📋 复制
+                    </button>
+                </div>
+            </div>
+        `;
+    }).join('');
+}
+
+// 清除当前服务器的命令历史
+async function clearCurrentCommands() {
+    const session = terminals.get(activeSessionId);
+    if (!session) {
+        alert('请先选择一个服务器');
+        return;
+    }
+    
+    if (!confirm(`确定要清除"${session.server.name}"的所有命令记录吗？`)) {
+        return;
+    }
+    
+    try {
+        const response = await fetch(`/api/commands/clear?server_id=${session.server.ID}`, {
+            method: 'POST'
+        });
+        const data = await response.json();
+        
+        if (data.success) {
+            loadCommandHistory(session.server.ID, session.server.name);
+        } else {
+            alert(data.error || '清除失败');
+        }
+    } catch (error) {
+        console.error('清除命令历史失败:', error);
+        alert('清除失败');
+    }
+}
+
+// 切换右侧面板标签
+function switchRightTab(tabName) {
+    // 更新标签状态
+    document.querySelectorAll('.right-tab').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.tab === tabName);
+    });
+    
+    // 更新内容显示
+    document.querySelectorAll('.right-panel-content').forEach(content => {
+        content.classList.remove('active');
+    });
+    
+    if (tabName === 'ai') {
+        document.getElementById('aiPanel').classList.add('active');
+    } else if (tabName === 'commands') {
+        document.getElementById('commandsPanel').classList.add('active');
+    }
+}
+
+// 复制命令到剪贴板
+function copyCommand(command) {
+    navigator.clipboard.writeText(command).then(() => {
+        // 可以添加一个提示
+        console.log('命令已复制:', command);
+    }).catch(err => {
+        console.error('复制失败:', err);
+    });
+}
+
+// 格式化时间
+function formatTime(date) {
+    const now = new Date();
+    const diff = now - date;
+    
+    // 小于1分钟
+    if (diff < 60000) {
+        return '刚刚';
+    }
+    
+    // 小于1小时
+    if (diff < 3600000) {
+        return Math.floor(diff / 60000) + '分钟前';
+    }
+    
+    // 小于24小时
+    if (diff < 86400000) {
+        return Math.floor(diff / 3600000) + '小时前';
+    }
+    
+    // 今天
+    if (date.toDateString() === now.toDateString()) {
+        return date.toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' });
+    }
+    
+    // 其他
+    return date.toLocaleString('zh-CN', {
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+    });
 }

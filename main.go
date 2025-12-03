@@ -17,13 +17,15 @@ func main() {
 	defer database.Close()
 
 	// 自动迁移模型
-	if err := database.AutoMigrate(&models.Server{}); err != nil {
+	if err := database.AutoMigrate(&models.Server{}, &models.CommandHistory{}); err != nil {
 		log.Fatalf("❌ 数据库迁移失败: %v", err)
 	}
 
 	// 创建仓储和处理器
 	serverRepo := models.NewServerRepository(database.DB)
+	commandRepo := models.NewCommandHistoryRepository(database.DB)
 	serverHandler := handlers.NewServerHandler(serverRepo)
+	commandHandler := handlers.NewCommandHandler(commandRepo)
 	wsHandler := handlers.NewWebSocketHandler(serverRepo)
 
 	// 静态文件服务
@@ -39,13 +41,19 @@ func main() {
 		}
 	})
 
-	// API 路由
+	// API 路由 - 服务器管理
 	http.HandleFunc("/api/servers", serverHandler.GetServers)
 	http.HandleFunc("/api/server", serverHandler.GetServer)
 	http.HandleFunc("/api/server/create", serverHandler.CreateServer)
 	http.HandleFunc("/api/server/update", serverHandler.UpdateServer)
 	http.HandleFunc("/api/server/delete", serverHandler.DeleteServer)
 	http.HandleFunc("/api/servers/search", serverHandler.SearchServers)
+
+	// API 路由 - 命令历史
+	http.HandleFunc("/api/command/save", commandHandler.SaveCommand)
+	http.HandleFunc("/api/commands", commandHandler.GetServerCommands)
+	http.HandleFunc("/api/commands/recent", commandHandler.GetRecentCommands)
+	http.HandleFunc("/api/commands/clear", commandHandler.ClearServerCommands)
 
 	// WebSocket 路由
 	http.HandleFunc("/ws", wsHandler.HandleWebSocket)
