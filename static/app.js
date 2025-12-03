@@ -20,12 +20,16 @@ document.addEventListener('DOMContentLoaded', function() {
 function openLocalTerminal() {
     const sessionId = 'local-' + (++sessionCounter);
     
+    // 隐藏空状态提示，显示终端区域
+    document.getElementById('noSelection').style.display = 'none';
+    document.getElementById('terminalWrapper').style.display = 'flex';
+    
     // 创建终端容器
-    const terminalArea = document.getElementById('terminalArea');
+    const terminalsContainer = document.getElementById('terminalsContainer');
     const terminalPane = document.createElement('div');
     terminalPane.id = sessionId;
     terminalPane.className = 'terminal-pane';
-    terminalArea.appendChild(terminalPane);
+    terminalsContainer.appendChild(terminalPane);
     
     // 创建终端实例
     const term = new Terminal({
