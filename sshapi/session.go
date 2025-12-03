@@ -223,7 +223,8 @@ func (s *Session) detectProcessState(output string, idleTime time.Duration, runn
 	}
 
 	// 检查命令提示符（说明命令完成）
-	if s.detectPrompt(output) {
+	promptDetected := s.detectPrompt(output)
+	if promptDetected {
 		// 提示符出现且空闲超过200ms，认为命令完成
 		if idleTime >= 200*time.Millisecond {
 			return "completed"
@@ -233,6 +234,22 @@ func (s *Session) detectProcessState(output string, idleTime time.Duration, runn
 	// 输出持续变化，还在执行
 	if idleTime < 500*time.Millisecond {
 		return "running"
+	}
+
+	// 空闲时间较长
+	// 如果检测到提示符特征，即使没有强匹配也认为完成
+	if idleTime >= 2*time.Second {
+		// 获取最后一行
+		lines := strings.Split(output, "\n")
+		if len(lines) > 0 {
+			lastLine := strings.TrimSpace(lines[len(lines)-1])
+			// 如果最后一行以# $ >结尾，且空闲2秒以上，认为完成
+			if strings.HasSuffix(lastLine, "#") ||
+				strings.HasSuffix(lastLine, "$") ||
+				strings.HasSuffix(lastLine, ">") {
+				return "completed"
+			}
+		}
 	}
 
 	// 空闲时间较长但没有提示符，可能在等待（下载、安装等）
