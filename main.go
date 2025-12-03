@@ -83,6 +83,7 @@ func main() {
 
 	// WebSocket 路由（需要认证，未登录则重定向）
 	r.GET("/ws", middleware.GinPageAuthMiddleware(), wsHandler.GinHandleWebSocket)
+	r.GET("/ws/local", middleware.GinPageAuthMiddleware(), handlers.GinHandleLocalTerminal)
 
 	// 启动服务器
 	port := config.GetPort()

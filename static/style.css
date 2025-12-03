@@ -47,10 +47,38 @@ body {
 /* Sidebar - 左侧 */
 .sidebar {
     background: #252526;
-    border-right: 1px solid #3e3e42;
+    border-right: 1px solid #3c3c3c;
     display: flex;
     flex-direction: column;
     overflow: hidden;
+}
+
+.local-terminal-btn {
+    padding: 12px;
+    border-bottom: 1px solid #3c3c3c;
+}
+
+.btn-local-terminal {
+    width: 100%;
+    padding: 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.btn-local-terminal:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+}
+
+.btn-local-terminal:active {
+    transform: translateY(0);
 }
 
 .search-box {

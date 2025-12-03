@@ -14,6 +14,144 @@ document.addEventListener('DOMContentLoaded', function() {
     checkAuthStatus();
 });
 
+// ==================== 本地终端功能 ====================
+
+// 打开本地终端
+function openLocalTerminal() {
+    const sessionId = 'local-' + (++sessionCounter);
+    
+    // 创建终端容器
+    const terminalArea = document.getElementById('terminalArea');
+    const terminalPane = document.createElement('div');
+    terminalPane.id = sessionId;
+    terminalPane.className = 'terminal-pane';
+    terminalArea.appendChild(terminalPane);
+    
+    // 创建终端实例
+    const term = new Terminal({
+        cursorBlink: true,
+        fontSize: 14,
+        fontFamily: 'Consolas, Monaco, "Courier New", monospace',
+        theme: {
+            background: '#1e1e1e',
+            foreground: '#d4d4d4',
+            cursor: '#d4d4d4',
+            black: '#000000',
+            red: '#cd3131',
+            green: '#0dbc79',
+            yellow: '#e5e510',
+            blue: '#2472c8',
+            magenta: '#bc3fbc',
+            cyan: '#11a8cd',
+            white: '#e5e5e5',
+            brightBlack: '#666666',
+            brightRed: '#f14c4c',
+            brightGreen: '#23d18b',
+            brightYellow: '#f5f543',
+            brightBlue: '#3b8eea',
+            brightMagenta: '#d670d6',
+            brightCyan: '#29b8db',
+            brightWhite: '#e5e5e5'
+        }
+    });
+    
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(terminalPane);
+    
+    // 保存会话信息（本地终端用特殊server对象）
+    const localServer = {
+        ID: 0,
+        name: '本地终端',
+        host: 'localhost',
+        port: 0,
+        username: 'local'
+    };
+    
+    terminals.set(sessionId, {
+        server: localServer,
+        term: term,
+        fitAddon: fitAddon,
+        ws: null,
+        status: 'connecting',
+        commandBuffer: ''
+    });
+    
+    // 切换到新标签
+    activeSessionId = sessionId;
+    renderTabs();
+    switchTab(sessionId);
+    
+    // 连接本地终端
+    connectLocalTerminal(sessionId);
+}
+
+// 连接本地终端
+function connectLocalTerminal(sessionId) {
+    const session = terminals.get(sessionId);
+    const term = session.term;
+    
+    updateStatusLight('connecting');
+    
+    // 建立 WebSocket 连接（本地终端）
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws/local`);
+    
+    ws.binaryType = 'arraybuffer';
+    
+    ws.onopen = () => {
+        session.status = 'connected';
+        updateStatusLight('connected');
+    };
+    
+    ws.onmessage = (event) => {
+        if (typeof event.data === 'string') {
+            term.write(event.data);
+        } else {
+            const uint8Array = new Uint8Array(event.data);
+            term.write(uint8Array);
+        }
+    };
+    
+    ws.onerror = (error) => {
+        console.error('WebSocket 错误:', error);
+        session.status = 'disconnected';
+        updateStatusLight('disconnected');
+        showDisconnectOverlay(sessionId, '连接错误', '本地终端连接失败');
+    };
+    
+    ws.onclose = () => {
+        session.status = 'disconnected';
+        updateStatusLight('disconnected');
+        showDisconnectOverlay(sessionId, '连接已断开', '本地终端已关闭');
+    };
+    
+    // 监听终端输入
+    session.term.onData(data => {
+        if (ws && ws.readyState === WebSocket.OPEN) {
+            ws.send(data);
+            
+            // 捕获命令（检测回车键）
+            if (data === '\r' || data === '\n') {
+                const command = session.commandBuffer.trim();
+                if (command && command.length > 0) {
+                    // 保存命令到数据库（server_id=0表示本地终端）
+                    saveCommand(0, command);
+                }
+                session.commandBuffer = '';
+            } else if (data === '\u007F' || data === '\b') {
+                // 退格键
+                session.commandBuffer = session.commandBuffer.slice(0, -1);
+            } else if (data >= ' ' && data <= '~') {
+                // 可打印字符
+                session.commandBuffer += data;
+            }
+        }
+    });
+    
+    session.ws = ws;
+}
+
 // 检查认证状态
 async function checkAuthStatus() {
     try {
@@ -644,7 +782,8 @@ async function loadCommandHistory(serverId, serverName) {
         const data = await response.json();
         
         if (data.success) {
-            document.getElementById('commandsServerName').textContent = serverName || '未知服务器';
+            const displayName = serverId === 0 ? '💻 本地终端' : serverName || '未知服务器';
+            document.getElementById('commandsServerName').textContent = displayName;
             renderCommandHistory(data.data || []);
         }
     } catch (error) {
