@@ -5,6 +5,8 @@ import { showToast } from './utils.js';
 import { loadServers, searchServers, deleteServer, renderServerList } from './server.js';
 import { createTerminal, connectSSH, openLocalTerminal } from './terminal.js';
 import { loadCommandHistory, clearCurrentCommands, saveCommandToHistory } from './commands.js';
+import { initFileTree, setCurrentServer } from './filetree.js';
+import { openFileEditor } from './editor.js';
 
 // 页面加载
 document.addEventListener('DOMContentLoaded', function() {
@@ -91,6 +93,9 @@ window.selectServer = async function(id) {
         
         connectSSH(sessionId, server);
         loadCommandHistory(server.ID, server.name);
+        
+        // 初始化文件树
+        setCurrentServer(server.ID);
     } catch (error) {
         console.error('连接失败:', error);
         alert('连接失败');
@@ -316,6 +321,22 @@ window.showRightPanel = function(tabName) {
         document.getElementById('aiPanel').classList.add('active');
     } else if (tabName === 'commands') {
         document.getElementById('commandsPanel').classList.add('active');
+    }
+};
+
+// 文件侧边栏折叠
+window.toggleFileSidebar = function() {
+    const sidebar = document.getElementById('fileSidebar');
+    const toggleBtn = sidebar.querySelector('.sidebar-toggle');
+    
+    if (sidebar.classList.contains('collapsed')) {
+        sidebar.classList.remove('collapsed');
+        toggleBtn.textContent = '◀';
+        toggleBtn.title = '折叠';
+    } else {
+        sidebar.classList.add('collapsed');
+        toggleBtn.textContent = '▶';
+        toggleBtn.title = '展开';
     }
 };
 

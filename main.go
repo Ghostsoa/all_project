@@ -35,6 +35,7 @@ func main() {
 	serverHandler := handlers.NewServerHandler(serverRepo)
 	commandHandler := handlers.NewCommandHandler(commandRepo)
 	wsHandler := handlers.NewWebSocketHandler(serverRepo)
+	fileHandler := handlers.NewFileHandler()
 
 	// 设置Gin为发布模式（生产环境）
 	gin.SetMode(gin.ReleaseMode)
@@ -79,6 +80,14 @@ func main() {
 		api.GET("/commands", commandHandler.GinGetServerCommands)
 		api.GET("/commands/recent", commandHandler.GinGetRecentCommands)
 		api.POST("/commands/clear", commandHandler.GinClearServerCommands)
+
+		// 文件管理
+		api.GET("/files/list", fileHandler.ListFiles)
+		api.GET("/files/read", fileHandler.ReadFile)
+		api.POST("/files/save", fileHandler.SaveFile)
+		api.POST("/files/create", fileHandler.CreateFile)
+		api.POST("/files/delete", fileHandler.DeleteFile)
+		api.POST("/files/rename", fileHandler.RenameFile)
 	}
 
 	// WebSocket 路由（需要认证，未登录则重定向）
