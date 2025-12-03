@@ -21,6 +21,14 @@ window.openLocalTerminal = openLocalTerminal;
 window.clearCurrentCommands = clearCurrentCommands;
 window.showToast = showToast;
 
+// 服务器卡片展开/折叠
+window.toggleServerExpand = function(serverId) {
+    const serverItem = document.getElementById(`server-${serverId}`);
+    if (serverItem) {
+        serverItem.classList.toggle('expanded');
+    }
+};
+
 // 认证检查
 async function checkAuthStatus() {
     try {
