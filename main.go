@@ -92,11 +92,12 @@ func runInteractiveTerminal() {
 
 func waitAndDisplay(baseURL, sessionID string) {
 	maxWait := 30 * time.Second
-	checkInterval := 300 * time.Millisecond
+	checkInterval := 100 * time.Millisecond // 更快的检查频率
 	elapsed := time.Duration(0)
 
 	lastState := ""
 	stableCount := 0
+	lastProgressTime := time.Now()
 
 	for elapsed < maxWait {
 		time.Sleep(checkInterval)
@@ -116,14 +117,19 @@ func waitAndDisplay(baseURL, sessionID string) {
 			stableCount++
 		}
 
-		// 状态稳定3次（约1秒）才判断
-		if stableCount >= 3 {
+		// 状态稳定判断：completed只需1次确认，waiting_input需要2次确认
+		minStableCount := 1
+		if screen.ProcessState == "waiting_input" {
+			minStableCount = 2
+		}
+
+		if stableCount >= minStableCount {
 			switch screen.ProcessState {
 			case "completed":
 				// 命令执行完成
 				fmt.Println("─────────────────────────────────────────")
 				displayScreenContent(screen)
-				fmt.Printf("✓ 命令完成 (耗时: %.1fs)\n", elapsed.Seconds())
+				fmt.Printf("✓ 命令完成 (耗时: %.2fs)\n", elapsed.Seconds())
 				return
 
 			case "waiting_input":
@@ -141,13 +147,16 @@ func waitAndDisplay(baseURL, sessionID string) {
 				sendInput(baseURL, sessionID, strings.TrimSpace(input))
 				stableCount = 0
 				lastState = ""
+				elapsed = 0
+				lastProgressTime = time.Now()
 				continue
 			}
 		}
 
 		// 显示进度（每3秒）
-		if int(elapsed.Seconds())%3 == 0 && stableCount == 0 {
+		if time.Since(lastProgressTime) >= 3*time.Second && screen.ProcessState == "running" {
 			fmt.Printf("  ... 执行中 (%.0fs)\n", elapsed.Seconds())
+			lastProgressTime = time.Now()
 		}
 	}
 

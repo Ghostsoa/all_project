@@ -217,97 +217,171 @@ func (s *Session) detectProcessState(output string, idleTime time.Duration, runn
 		return "completed"
 	}
 
-	// 空闲时间小于1秒，可能还在输出
-	if idleTime < 1*time.Second {
-		return "running"
-	}
-
-	// 检查是否需要输入
-	if s.detectInputNeeded(output, idleTime) {
+	// 优先检查交互式提示（立即识别，不等待）
+	if s.detectInputNeeded(output) {
 		return "waiting_input"
 	}
 
-	// 检查是否有提示符（命令可能已完成）
+	// 检查命令提示符（说明命令完成）
 	if s.detectPrompt(output) {
-		return "completed"
-	}
-
-	// 默认认为还在运行
-	return "running"
-}
-
-// detectInputNeeded 检测是否需要输入
-func (s *Session) detectInputNeeded(output string, idleTime time.Duration) bool {
-	// 空闲时间小于2秒，可能还在执行
-	if idleTime < 2*time.Second {
-		return false
-	}
-
-	// 检查常见的输入提示模式
-	patterns := []string{
-		"(y/n)",
-		"(yes/no)",
-		"[Y/n]",
-		"[y/N]",
-		"password:",
-		"Password:",
-		"continue?",
-		"Continue?",
-		"是否",
-		"请输入",
-		"Enter",
-		"Input",
-	}
-
-	lowerOutput := strings.ToLower(output)
-	for _, pattern := range patterns {
-		if strings.Contains(lowerOutput, strings.ToLower(pattern)) {
-			return true
+		// 提示符出现且空闲超过200ms，认为命令完成
+		if idleTime >= 200*time.Millisecond {
+			return "completed"
 		}
 	}
 
-	// 检查是否以问号结尾
-	trimmed := strings.TrimSpace(output)
-	if strings.HasSuffix(trimmed, "?") {
-		return true
+	// 输出持续变化，还在执行
+	if idleTime < 500*time.Millisecond {
+		return "running"
 	}
 
-	return false
+	// 空闲时间较长但没有提示符，可能在等待（下载、安装等）
+	return "running"
 }
 
-// detectPrompt 检测命令提示符
-func (s *Session) detectPrompt(output string) bool {
+// detectInputNeeded 检测是否需要输入（立即检测，不等待）
+func (s *Session) detectInputNeeded(output string) bool {
+	// 获取最后几行输出
 	lines := strings.Split(output, "\n")
 	if len(lines) == 0 {
 		return false
 	}
 
-	// 获取最后几行
+	// 检查最后3行
 	lastLines := ""
 	start := len(lines) - 3
 	if start < 0 {
 		start = 0
 	}
 	for i := start; i < len(lines); i++ {
-		lastLines += lines[i] + "\n"
+		lastLines += lines[i] + " "
 	}
 
-	// 检测常见提示符模式
-	patterns := []string{
-		"# ",
-		"$ ",
-		":~#",
-		":~$",
-		"root@",
+	lowerOutput := strings.ToLower(lastLines)
+
+	// 强匹配模式（高优先级）
+	strongPatterns := []string{
+		"(y/n)",
+		"(yes/no)",
+		"[y/n]",
+		"[y/n]",
+		"password:",
+		"password:",
+		"press enter",
+		"press any key",
 	}
 
-	for _, pattern := range patterns {
-		if strings.Contains(lastLines, pattern) {
+	for _, pattern := range strongPatterns {
+		if strings.Contains(lowerOutput, pattern) {
 			return true
 		}
 	}
 
+	// 弱匹配模式（需要更多验证）
+	weakPatterns := []string{
+		"continue?",
+		"是否",
+		"请输入",
+	}
+
+	for _, pattern := range weakPatterns {
+		if strings.Contains(lowerOutput, pattern) {
+			// 检查是否以问号或冒号结尾
+			trimmed := strings.TrimSpace(lastLines)
+			if strings.HasSuffix(trimmed, "?") || strings.HasSuffix(trimmed, ":") {
+				return true
+			}
+		}
+	}
+
 	return false
+}
+
+// detectPrompt 通用提示符检测
+func (s *Session) detectPrompt(output string) bool {
+	lines := strings.Split(output, "\n")
+	if len(lines) == 0 {
+		return false
+	}
+
+	// 只检查最后一行
+	lastLine := lines[len(lines)-1]
+	trimmed := strings.TrimSpace(lastLine)
+
+	// 空行不是提示符
+	if trimmed == "" {
+		return false
+	}
+
+	// 通用提示符特征检测
+	return s.isLikelyPrompt(trimmed)
+}
+
+// isLikelyPrompt 判断一行是否像提示符（通用算法）
+func (s *Session) isLikelyPrompt(line string) bool {
+	// 特征1: 长度适中（提示符通常不会太长）
+	if len(line) > 200 {
+		return false
+	}
+
+	// 特征2: 以常见提示符结束符结尾
+	promptEndings := []string{
+		"# ", "$ ", "> ", ">> ", ">>> ",
+		"#", "$", ">", ">>", ">>>",
+		"% ", "% ",
+	}
+
+	hasPromptEnding := false
+	for _, ending := range promptEndings {
+		if strings.HasSuffix(line, ending) {
+			hasPromptEnding = true
+			break
+		}
+	}
+
+	if !hasPromptEnding {
+		return false
+	}
+
+	// 特征3: 包含提示符的典型字符或模式
+	// - @ 符号（user@host）
+	// - : 符号（路径分隔符）
+	// - 特殊Unicode字符（如 ▶）
+	// - 包含路径或项目名
+	hasPromptPattern :=
+		strings.Contains(line, "@") || // user@host
+			strings.Contains(line, ":~") || // 路径
+			strings.Contains(line, ":/") || // 绝对路径
+			strings.Contains(line, "▶") || // 特殊提示符
+			strings.Contains(line, "❯") || // 现代shell
+			strings.Contains(line, "λ") || // lambda提示符
+			strings.Contains(line, "⚡") || // 快速提示符
+			len(strings.Fields(line)) <= 5 // 字段少（提示符简洁）
+
+	if !hasPromptPattern {
+		return false
+	}
+
+	// 特征4: 不包含常见的非提示符内容
+	// 排除明显的命令输出
+	excludePatterns := []string{
+		"error:", "Error:", "ERROR:",
+		"warning:", "Warning:", "WARNING:",
+		"failed", "Failed", "FAILED",
+		"total ",                // ls -l 输出
+		"drwxr", "drwx", "-rw-", // 文件权限
+		"Installing", "Downloading", "Building",
+		"100%", // 进度条
+	}
+
+	for _, pattern := range excludePatterns {
+		if strings.Contains(line, pattern) {
+			return false
+		}
+	}
+
+	// 通过所有检测，认为是提示符
+	return true
 }
 
 // GetInfo 获取会话信息

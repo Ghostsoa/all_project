@@ -45,18 +45,32 @@ func (t *Terminal) Write(p []byte) (n int, err error) {
 	t.mu.Lock()
 	defer t.mu.Unlock()
 
-	// 保存原始输出
-	t.lastOutput.Write(p)
 	t.lastUpdate = time.Now()
 
-	// 简化版本：直接处理可打印字符
-	for _, b := range p {
+	// 过滤ANSI转义序列后保存到lastOutput
+	cleaned := t.stripANSI(p)
+	t.lastOutput.Write(cleaned)
+
+	// 处理输出到屏幕缓冲区
+	i := 0
+	for i < len(p) {
+		b := p[i]
+
+		// 检测ANSI转义序列
+		if b == 0x1B && i+1 < len(p) { // ESC
+			consumed := t.handleANSI(p[i:])
+			if consumed > 0 {
+				i += consumed
+				continue
+			}
+		}
+
+		// 处理普通字符
 		switch b {
 		case '\n':
 			t.cursorRow++
 			t.cursorCol = 0
 			if t.cursorRow >= t.height {
-				// 滚动屏幕
 				t.scroll()
 			}
 		case '\r':
@@ -67,8 +81,13 @@ func (t *Terminal) Write(p []byte) (n int, err error) {
 			}
 		case '\t':
 			t.cursorCol = (t.cursorCol + 8) &^ 7
+			if t.cursorCol >= t.width {
+				t.cursorCol = t.width - 1
+			}
+		case 0x07: // BEL
+			// 忽略响铃
 		default:
-			if b >= 32 && b < 127 { // 可打印字符
+			if b >= 32 && b < 127 { // 可打印ASCII字符
 				if t.cursorRow >= t.height {
 					t.scroll()
 				}
@@ -78,9 +97,87 @@ func (t *Terminal) Write(p []byte) (n int, err error) {
 				}
 			}
 		}
+		i++
 	}
 
 	return len(p), nil
+}
+
+// handleANSI 处理ANSI转义序列，返回消耗的字节数
+func (t *Terminal) handleANSI(p []byte) int {
+	if len(p) < 2 {
+		return 0
+	}
+
+	// ESC [ - CSI序列
+	if p[1] == '[' {
+		return t.handleCSI(p)
+	}
+
+	// ESC ] - OSC序列 (操作系统命令)
+	if p[1] == ']' {
+		return t.handleOSC(p)
+	}
+
+	// 其他ESC序列，跳过2个字节
+	return 2
+}
+
+// handleCSI 处理CSI (Control Sequence Introducer) 序列
+func (t *Terminal) handleCSI(p []byte) int {
+	// 查找结束字符 (A-Za-z)
+	for i := 2; i < len(p); i++ {
+		c := p[i]
+		if (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') {
+			// 可以在这里解析具体的CSI命令
+			// 比如光标移动、清屏等
+			return i + 1
+		}
+		// 参数字符: 0-9 ; ? 等
+		if !((c >= '0' && c <= '9') || c == ';' || c == '?') {
+			break
+		}
+	}
+	return 2
+}
+
+// handleOSC 处理OSC (Operating System Command) 序列
+func (t *Terminal) handleOSC(p []byte) int {
+	// OSC以 ESC ] 开始，以 BEL (0x07) 或 ST (ESC \) 结束
+	for i := 2; i < len(p); i++ {
+		if p[i] == 0x07 { // BEL
+			return i + 1
+		}
+		if p[i] == 0x1B && i+1 < len(p) && p[i+1] == '\\' { // ST
+			return i + 2
+		}
+	}
+	return 2
+}
+
+// stripANSI 去除ANSI转义序列
+func (t *Terminal) stripANSI(p []byte) []byte {
+	result := make([]byte, 0, len(p))
+	i := 0
+	for i < len(p) {
+		b := p[i]
+
+		// 检测ANSI转义序列
+		if b == 0x1B && i+1 < len(p) {
+			consumed := t.handleANSI(p[i:])
+			if consumed > 0 {
+				i += consumed
+				continue
+			}
+		}
+
+		// 保留可打印字符和换行符
+		if (b >= 32 && b < 127) || b == '\n' || b == '\r' || b == '\t' {
+			result = append(result, b)
+		}
+		i++
+	}
+	return result
 }
 
 // scroll 滚动屏幕
