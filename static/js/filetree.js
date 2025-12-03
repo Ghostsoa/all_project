@@ -184,7 +184,7 @@ window.createNewFile = async function(basePath) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                server_id: String(currentServerID),
+                session_id: currentSessionID,
                 path: filePath,
                 is_dir: false
             })
@@ -213,7 +213,7 @@ window.createNewFolder = async function(basePath) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                server_id: String(currentServerID),
+                session_id: currentSessionID,
                 path: folderPath,
                 is_dir: true
             })
@@ -268,7 +268,7 @@ window.renameFile = async function(oldPath) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                server_id: String(currentServerID),
+                session_id: currentSessionID,
                 old_path: oldPath,
                 new_path: newPath
             })
@@ -294,7 +294,7 @@ window.deleteFile = async function(path) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                server_id: String(currentServerID),
+                session_id: currentSessionID,
                 path: path
             })
         });

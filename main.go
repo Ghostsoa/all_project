@@ -35,7 +35,7 @@ func main() {
 	serverHandler := handlers.NewServerHandler(serverRepo)
 	commandHandler := handlers.NewCommandHandler(commandRepo)
 	wsHandler := handlers.NewWebSocketHandler(serverRepo)
-	fileHandler := handlers.NewFileHandler(serverRepo)
+	fileHandler := handlers.NewFileHandler()
 
 	// 设置Gin为发布模式（生产环境）
 	gin.SetMode(gin.ReleaseMode)

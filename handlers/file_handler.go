@@ -1,30 +1,22 @@
 package handlers
 
 import (
-	"all_project/models"
-	"fmt"
 	"io"
 	"net/http"
 	"path/filepath"
-	"strconv"
 	"strings"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/sftp"
-	"golang.org/x/crypto/ssh"
 )
 
 // FileHandler 文件操作处理器
 type FileHandler struct {
-	serverRepo *models.ServerRepository
 }
 
 // NewFileHandler 创建文件处理器
-func NewFileHandler(serverRepo *models.ServerRepository) *FileHandler {
-	return &FileHandler{
-		serverRepo: serverRepo,
-	}
+func NewFileHandler() *FileHandler {
+	return &FileHandler{}
 }
 
 // ListFiles 列出目录
@@ -76,34 +68,22 @@ func (h *FileHandler) ListFiles(c *gin.Context) {
 
 // ReadFile 读取文件内容
 func (h *FileHandler) ReadFile(c *gin.Context) {
-	serverIDStr := c.Query("server_id")
+	sessionID := c.Query("session_id")
 	path := c.Query("path")
 
-	if serverIDStr == "" || path == "" {
+	if sessionID == "" || path == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少参数"})
 		return
 	}
 
-	serverID, _ := strconv.ParseUint(serverIDStr, 10, 64)
-	server, err := h.serverRepo.GetByID(uint(serverID))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "服务器不存在"})
+	// 从会话管理器获取SFTP客户端
+	session := GetSessionManager().GetSession(sessionID)
+	if session == nil || session.SFTPClient == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "SSH会话不存在或已断开"})
 		return
 	}
 
-	sshClient, err := h.connectSSH(server)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "SSH连接失败"})
-		return
-	}
-	defer sshClient.Close()
-
-	sftpClient, err := sftp.NewClient(sshClient)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "SFTP初始化失败"})
-		return
-	}
-	defer sftpClient.Close()
+	sftpClient := session.SFTPClient
 
 	file, err := sftpClient.Open(path)
 	if err != nil {
@@ -127,9 +107,9 @@ func (h *FileHandler) ReadFile(c *gin.Context) {
 // SaveFile 保存文件
 func (h *FileHandler) SaveFile(c *gin.Context) {
 	var req struct {
-		ServerID string `json:"server_id"`
-		Path     string `json:"path"`
-		Content  string `json:"content"`
+		SessionID string `json:"session_id"`
+		Path      string `json:"path"`
+		Content   string `json:"content"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -137,26 +117,13 @@ func (h *FileHandler) SaveFile(c *gin.Context) {
 		return
 	}
 
-	serverID, _ := strconv.ParseUint(req.ServerID, 10, 64)
-	server, err := h.serverRepo.GetByID(uint(serverID))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "服务器不存在"})
+	session := GetSessionManager().GetSession(req.SessionID)
+	if session == nil || session.SFTPClient == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "SSH会话不存在或已断开"})
 		return
 	}
 
-	sshClient, err := h.connectSSH(server)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "SSH连接失败"})
-		return
-	}
-	defer sshClient.Close()
-
-	sftpClient, err := sftp.NewClient(sshClient)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "SFTP初始化失败"})
-		return
-	}
-	defer sftpClient.Close()
+	sftpClient := session.SFTPClient
 
 	file, err := sftpClient.Create(req.Path)
 	if err != nil {
@@ -180,9 +147,9 @@ func (h *FileHandler) SaveFile(c *gin.Context) {
 // CreateFile 创建文件或目录
 func (h *FileHandler) CreateFile(c *gin.Context) {
 	var req struct {
-		ServerID string `json:"server_id"`
-		Path     string `json:"path"`
-		IsDir    bool   `json:"is_dir"`
+		SessionID string `json:"session_id"`
+		Path      string `json:"path"`
+		IsDir     bool   `json:"is_dir"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -190,26 +157,14 @@ func (h *FileHandler) CreateFile(c *gin.Context) {
 		return
 	}
 
-	serverID, _ := strconv.ParseUint(req.ServerID, 10, 64)
-	server, err := h.serverRepo.GetByID(uint(serverID))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "服务器不存在"})
+	session := GetSessionManager().GetSession(req.SessionID)
+	if session == nil || session.SFTPClient == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "SSH会话不存在或已断开"})
 		return
 	}
 
-	sshClient, err := h.connectSSH(server)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "SSH连接失败"})
-		return
-	}
-	defer sshClient.Close()
-
-	sftpClient, err := sftp.NewClient(sshClient)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "SFTP初始化失败"})
-		return
-	}
-	defer sftpClient.Close()
+	sftpClient := session.SFTPClient
+	var err error
 
 	if req.IsDir {
 		err = sftpClient.Mkdir(req.Path)
@@ -234,8 +189,8 @@ func (h *FileHandler) CreateFile(c *gin.Context) {
 // DeleteFile 删除文件或目录
 func (h *FileHandler) DeleteFile(c *gin.Context) {
 	var req struct {
-		ServerID string `json:"server_id"`
-		Path     string `json:"path"`
+		SessionID string `json:"session_id"`
+		Path      string `json:"path"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -243,26 +198,13 @@ func (h *FileHandler) DeleteFile(c *gin.Context) {
 		return
 	}
 
-	serverID, _ := strconv.ParseUint(req.ServerID, 10, 64)
-	server, err := h.serverRepo.GetByID(uint(serverID))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "服务器不存在"})
+	session := GetSessionManager().GetSession(req.SessionID)
+	if session == nil || session.SFTPClient == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "SSH会话不存在或已断开"})
 		return
 	}
 
-	sshClient, err := h.connectSSH(server)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "SSH连接失败"})
-		return
-	}
-	defer sshClient.Close()
-
-	sftpClient, err := sftp.NewClient(sshClient)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "SFTP初始化失败"})
-		return
-	}
-	defer sftpClient.Close()
+	sftpClient := session.SFTPClient
 
 	stat, err := sftpClient.Stat(req.Path)
 	if err != nil {
@@ -290,9 +232,9 @@ func (h *FileHandler) DeleteFile(c *gin.Context) {
 // RenameFile 重命名文件或目录
 func (h *FileHandler) RenameFile(c *gin.Context) {
 	var req struct {
-		ServerID string `json:"server_id"`
-		OldPath  string `json:"old_path"`
-		NewPath  string `json:"new_path"`
+		SessionID string `json:"session_id"`
+		OldPath   string `json:"old_path"`
+		NewPath   string `json:"new_path"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -300,28 +242,15 @@ func (h *FileHandler) RenameFile(c *gin.Context) {
 		return
 	}
 
-	serverID, _ := strconv.ParseUint(req.ServerID, 10, 64)
-	server, err := h.serverRepo.GetByID(uint(serverID))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "服务器不存在"})
+	session := GetSessionManager().GetSession(req.SessionID)
+	if session == nil || session.SFTPClient == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "SSH会话不存在或已断开"})
 		return
 	}
 
-	sshClient, err := h.connectSSH(server)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "SSH连接失败"})
-		return
-	}
-	defer sshClient.Close()
+	sftpClient := session.SFTPClient
 
-	sftpClient, err := sftp.NewClient(sshClient)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "SFTP初始化失败"})
-		return
-	}
-	defer sftpClient.Close()
-
-	err = sftpClient.Rename(req.OldPath, req.NewPath)
+	err := sftpClient.Rename(req.OldPath, req.NewPath)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "重命名失败: " + err.Error()})
 		return
@@ -331,26 +260,6 @@ func (h *FileHandler) RenameFile(c *gin.Context) {
 		"success": true,
 		"message": "重命名成功",
 	})
-}
-
-// connectSSH 连接SSH服务器
-func (h *FileHandler) connectSSH(server *models.Server) (*ssh.Client, error) {
-	config := &ssh.ClientConfig{
-		User: server.Username,
-		Auth: []ssh.AuthMethod{
-			ssh.Password(server.Password),
-		},
-		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		Timeout:         10 * time.Second,
-	}
-
-	address := fmt.Sprintf("%s:%d", server.Host, server.Port)
-	client, err := ssh.Dial("tcp", address, config)
-	if err != nil {
-		return nil, err
-	}
-
-	return client, nil
 }
 
 // removeDir 递归删除目录

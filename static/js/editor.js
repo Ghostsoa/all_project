@@ -228,7 +228,7 @@ window.saveFile = async function(tabId) {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-                server_id: String(fileInfo.serverID),
+                session_id: fileInfo.sessionID,
                 path: filePath,
                 content: content
             })
