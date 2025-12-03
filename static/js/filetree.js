@@ -4,6 +4,7 @@ import { showToast } from './utils.js';
 import { openFileEditor } from './editor.js';
 
 let currentServerID = null;
+let currentSessionID = null; // 当前会话ID
 let currentPath = '/root';
 
 export function initFileTree() {
@@ -14,10 +15,30 @@ export function initFileTree() {
     loadDirectory(currentPath);
 }
 
-export function setCurrentServer(serverID) {
+export function setCurrentServer(serverID, sessionID) {
     currentServerID = serverID;
+    currentSessionID = sessionID;
+    
+    // 本地终端特殊处理 (ID为0)
+    if (serverID === 0 || serverID === '0') {
+        showLocalFileWarning();
+        return;
+    }
+    
     currentPath = '/root'; // 默认根目录
     loadDirectory(currentPath);
+}
+
+function showLocalFileWarning() {
+    const fileTreeContainer = document.getElementById('fileTree');
+    fileTreeContainer.innerHTML = `
+        <div class="file-tree-empty">
+            <p>本地终端暂不支持文件浏览</p>
+            <p style="font-size: 10px; margin-top: 8px; color: rgba(255,255,255,0.3);">
+                使用远程SSH连接可浏览文件
+            </p>
+        </div>
+    `;
 }
 
 export async function loadDirectory(path) {
@@ -26,18 +47,31 @@ export async function loadDirectory(path) {
         return;
     }
     
+    // 显示加载状态
+    const fileTreeContainer = document.getElementById('fileTree');
+    fileTreeContainer.innerHTML = '<div class="file-tree-empty">📂 加载中...</div>';
+    
     try {
-        const response = await fetch(`/api/files/list?server_id=${currentServerID}&path=${encodeURIComponent(path)}`);
+        const response = await fetch(`/api/files/list?session_id=${currentSessionID}&path=${encodeURIComponent(path)}`);
         const data = await response.json();
         
         if (data.success) {
             renderFileTree(data.files, path);
         } else {
             showToast('加载目录失败: ' + data.error, 'error');
+            fileTreeContainer.innerHTML = `
+                <div class="file-tree-empty">
+                    <p>❌ 加载失败</p>
+                    <p style="font-size: 10px; margin-top: 8px; color: rgba(255,255,255,0.3);">
+                        ${data.error || '未知错误'}
+                    </p>
+                </div>
+            `;
         }
     } catch (error) {
         console.error('加载目录失败:', error);
         showToast('加载目录失败', 'error');
+        fileTreeContainer.innerHTML = '<div class="file-tree-empty">❌ 网络错误</div>';
     }
 }
 

@@ -54,7 +54,7 @@ export function connectSSH(sessionId, server) {
     
     updateStatusLight('connecting');
     
-    const ws = new WebSocket(`${config.WS_PROTOCOL}//${config.WS_HOST}/ws?server_id=${server.ID}`);
+    const ws = new WebSocket(`${config.WS_PROTOCOL}//${config.WS_HOST}/ws?server_id=${server.ID}&session_id=${sessionId}`);
     ws.binaryType = 'arraybuffer';
     
     ws.onopen = () => {

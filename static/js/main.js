@@ -94,8 +94,8 @@ window.selectServer = async function(id) {
         connectSSH(sessionId, server);
         loadCommandHistory(server.ID, server.name);
         
-        // 初始化文件树
-        setCurrentServer(server.ID);
+        // 初始化文件树（传入sessionID）
+        setCurrentServer(server.ID, sessionId);
     } catch (error) {
         console.error('连接失败:', error);
         alert('连接失败');
@@ -137,8 +137,8 @@ window.switchTab = function(sessionId) {
         setTimeout(() => session.fitAddon.fit(), 100);
         loadCommandHistory(session.server.ID, session.server.name);
         
-        // 同步更新文件树到当前服务器
-        setCurrentServer(session.server.ID);
+        // 同步更新文件树到当前服务器（传入sessionID）
+        setCurrentServer(session.server.ID, sessionId);
     }
 };
 

@@ -29,34 +29,22 @@ func NewFileHandler(serverRepo *models.ServerRepository) *FileHandler {
 
 // ListFiles 列出目录
 func (h *FileHandler) ListFiles(c *gin.Context) {
-	serverIDStr := c.Query("server_id")
+	sessionID := c.Query("session_id")
 	path := c.Query("path")
 
-	if serverIDStr == "" || path == "" {
+	if sessionID == "" || path == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少参数"})
 		return
 	}
 
-	serverID, _ := strconv.ParseUint(serverIDStr, 10, 64)
-	server, err := h.serverRepo.GetByID(uint(serverID))
-	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{"error": "服务器不存在"})
+	// 从会话管理器获取SFTP客户端（复用现有连接）
+	session := GetSessionManager().GetSession(sessionID)
+	if session == nil || session.SFTPClient == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "SSH会话不存在或已断开，请重新连接"})
 		return
 	}
 
-	sshClient, err := h.connectSSH(server)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "SSH连接失败: " + err.Error()})
-		return
-	}
-	defer sshClient.Close()
-
-	sftpClient, err := sftp.NewClient(sshClient)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{"error": "SFTP初始化失败: " + err.Error()})
-		return
-	}
-	defer sftpClient.Close()
+	sftpClient := session.SFTPClient
 
 	files, err := sftpClient.ReadDir(path)
 	if err != nil {

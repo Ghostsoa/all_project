@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
+	"github.com/pkg/sftp"
 	"golang.org/x/crypto/ssh"
 )
 
@@ -66,6 +67,26 @@ func (h *WebSocketHandler) GinHandleWebSocket(c *gin.Context) {
 		return
 	}
 	defer sshClient.Close()
+
+	// 创建 SFTP 客户端（复用SSH连接）
+	sftpClient, err := sftp.NewClient(sshClient)
+	if err != nil {
+		log.Println("创建 SFTP 客户端失败:", err)
+		// SFTP失败不影响终端使用，继续
+		sftpClient = nil
+	} else {
+		defer sftpClient.Close()
+		log.Println("SFTP 客户端创建成功")
+	}
+
+	// 从URL获取sessionID（前端需要传递）
+	sessionID := c.Query("session_id")
+	if sessionID != "" && sftpClient != nil {
+		// 保存到会话管理器
+		GetSessionManager().AddSession(sessionID, sshClient, sftpClient)
+		defer GetSessionManager().RemoveSession(sessionID)
+		log.Printf("会话已保存: %s", sessionID)
+	}
 
 	// 创建 SSH 会话
 	session, err := sshClient.NewSession()
