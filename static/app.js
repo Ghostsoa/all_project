@@ -1,10 +1,11 @@
 // 全局变量
 let servers = [];
-let currentServer = null;
-let term = null;
-let fitAddon = null;
-let ws = null;
 let currentTags = [];
+
+// 多窗口管理
+let terminals = new Map(); // sessionId -> { server, term, fitAddon, ws, status }
+let activeSessionId = null;
+let sessionCounter = 0;
 
 // 页面加载完成
 document.addEventListener('DOMContentLoaded', function() {
@@ -76,143 +77,266 @@ async function searchServers() {
     }
 }
 
-// 选择服务器
+// 选择服务器 - 创建新窗口
 function selectServer(id) {
     const server = servers.find(s => s.ID === id);
     if (!server) return;
     
-    currentServer = server;
+    // 检查是否已经打开了该服务器
+    for (let [sessionId, session] of terminals) {
+        if (session.server.ID === id) {
+            switchTab(sessionId);
+            return;
+        }
+    }
     
-    // 更新UI
-    document.querySelectorAll('.server-item').forEach(item => {
-        item.classList.remove('active');
-    });
-    event.currentTarget.classList.add('active');
-    
-    // 显示终端
-    document.getElementById('noSelection').style.display = 'none';
-    document.getElementById('terminalWrapper').style.display = 'flex';
-    document.getElementById('terminalTitle').textContent = `${server.name} (${server.username}@${server.host})`;
-    
-    // 连接SSH
-    connectSSH(server);
+    // 创建新会话
+    createNewSession(server);
 }
 
-// 连接SSH
-function connectSSH(server) {
-    updateStatus('正在连接...', '');
+// ==================== 多窗口终端管理 ====================
+
+// 创建新会话
+function createNewSession(server) {
+    const sessionId = `session-${++sessionCounter}`;
     
-    // 创建终端
-    if (!term) {
-        term = new Terminal({
-            cursorBlink: true,
-            fontSize: 14,
-            fontFamily: '"Cascadia Code", Consolas, "Courier New", monospace',
-            theme: {
-                background: '#1e1e1e',
-                foreground: '#d4d4d4',
-                cursor: '#ffffff',
-                selection: '#264f78',
-                black: '#000000',
-                red: '#cd3131',
-                green: '#0dbc79',
-                yellow: '#e5e510',
-                blue: '#2472c8',
-                magenta: '#bc3fbc',
-                cyan: '#11a8cd',
-                white: '#e5e5e5',
-                brightBlack: '#666666',
-                brightRed: '#f14c4c',
-                brightGreen: '#23d18b',
-                brightYellow: '#f5f543',
-                brightBlue: '#3b8eea',
-                brightMagenta: '#d670d6',
-                brightCyan: '#29b8db',
-                brightWhite: '#ffffff'
+    // 显示终端区域
+    document.getElementById('noSelection').style.display = 'none';
+    document.getElementById('terminalWrapper').style.display = 'flex';
+    
+    // 创建终端容器
+    const terminalPane = document.createElement('div');
+    terminalPane.className = 'terminal-pane';
+    terminalPane.id = sessionId;
+    document.getElementById('terminalsContainer').appendChild(terminalPane);
+    
+    // 创建终端实例
+    const term = new Terminal({
+        cursorBlink: true,
+        fontSize: 14,
+        fontFamily: '"Cascadia Code", Consolas, "Courier New", monospace',
+        theme: {
+            background: '#1e1e1e',
+            foreground: '#d4d4d4',
+            cursor: '#ffffff',
+            selection: '#264f78',
+            black: '#000000',
+            red: '#cd3131',
+            green: '#0dbc79',
+            yellow: '#e5e510',
+            blue: '#2472c8',
+            magenta: '#bc3fbc',
+            cyan: '#11a8cd',
+            white: '#e5e5e5',
+            brightBlack: '#666666',
+            brightRed: '#f14c4c',
+            brightGreen: '#23d18b',
+            brightYellow: '#f5f543',
+            brightBlue: '#3b8eea',
+            brightMagenta: '#d670d6',
+            brightCyan: '#29b8db',
+            brightWhite: '#ffffff'
+        }
+    });
+    
+    const fitAddon = new FitAddon.FitAddon();
+    term.loadAddon(fitAddon);
+    term.open(terminalPane);
+    
+    // 保存会话信息
+    terminals.set(sessionId, {
+        server: server,
+        term: term,
+        fitAddon: fitAddon,
+        ws: null,
+        status: 'connecting'
+    });
+    
+    // 切换到新标签
+    activeSessionId = sessionId;
+    renderTabs();
+    switchTab(sessionId);
+    
+    // 连接 SSH
+    connectSSH(sessionId, server);
+    
+    // 窗口大小变化时调整终端
+    window.addEventListener('resize', () => {
+        if (activeSessionId) {
+            const session = terminals.get(activeSessionId);
+            if (session && session.fitAddon) {
+                setTimeout(() => session.fitAddon.fit(), 100);
             }
-        });
-        
-        fitAddon = new FitAddon.FitAddon();
-        term.loadAddon(fitAddon);
-        term.open(document.getElementById('terminal-container'));
-        fitAddon.fit();
-        
-        // 监听窗口大小变化
-        window.addEventListener('resize', () => {
-            if (fitAddon) fitAddon.fit();
-        });
-    } else {
-        term.clear();
-    }
+        }
+    });
+}
+
+// 连接 SSH
+function connectSSH(sessionId, server) {
+    const session = terminals.get(sessionId);
+    if (!session) return;
+    
+    updateStatusLight('connecting', '正在连接...');
     
     // 建立 WebSocket 连接
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    ws = new WebSocket(`${protocol}//${window.location.host}/ws?server_id=${server.ID}`);
+    const ws = new WebSocket(`${protocol}//${window.location.host}/ws?server_id=${server.ID}`);
     
     ws.onopen = () => {
-        updateStatus(`已连接到 ${server.name}`, 'connected');
+        session.status = 'connected';
+        updateStatusLight('connected', `已连接到 ${server.name}`);
+        setTimeout(() => session.fitAddon.fit(), 100);
     };
     
     ws.onmessage = (event) => {
         if (event.data instanceof Blob) {
             event.data.arrayBuffer().then(buffer => {
-                term.write(new Uint8Array(buffer));
+                session.term.write(new Uint8Array(buffer));
             });
         } else {
             if (event.data.startsWith('SSH 连接失败')) {
-                updateStatus(event.data, 'error');
+                session.status = 'disconnected';
+                updateStatusLight('disconnected', event.data);
             } else {
-                term.write(event.data);
+                session.term.write(event.data);
             }
         }
     };
     
     ws.onerror = (error) => {
-        updateStatus('WebSocket 错误', 'error');
+        session.status = 'disconnected';
+        updateStatusLight('disconnected', 'WebSocket 错误');
         console.error('WebSocket error:', error);
     };
     
     ws.onclose = () => {
-        updateStatus('连接已断开', 'error');
+        session.status = 'disconnected';
+        if (sessionId === activeSessionId) {
+            updateStatusLight('disconnected', '连接已断开 - 点击重新连接');
+        }
     };
     
     // 监听终端输入
-    term.onData(data => {
+    session.term.onData(data => {
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(data);
         }
     });
+    
+    session.ws = ws;
 }
 
-// 关闭终端
-function closeTerminal() {
-    if (ws) {
-        ws.close();
-        ws = null;
-    }
+// 切换标签页
+function switchTab(sessionId) {
+    if (!terminals.has(sessionId)) return;
     
-    if (term) {
-        term.dispose();
-        term = null;
-        fitAddon = null;
-    }
+    activeSessionId = sessionId;
     
-    currentServer = null;
-    document.getElementById('noSelection').style.display = 'flex';
-    document.getElementById('terminalWrapper').style.display = 'none';
-    
-    // 取消选中
-    document.querySelectorAll('.server-item').forEach(item => {
-        item.classList.remove('active');
+    // 更新标签状态
+    document.querySelectorAll('.tab-item').forEach(tab => {
+        tab.classList.toggle('active', tab.dataset.sessionId === sessionId);
     });
+    
+    // 更新终端显示
+    document.querySelectorAll('.terminal-pane').forEach(pane => {
+        pane.classList.toggle('active', pane.id === sessionId);
+    });
+    
+    // 调整终端大小
+    const session = terminals.get(sessionId);
+    setTimeout(() => session.fitAddon.fit(), 100);
+    
+    // 更新状态灯
+    const statusMap = {
+        'connecting': ['connecting', '正在连接...'],
+        'connected': ['connected', `已连接到 ${session.server.name}`],
+        'disconnected': ['disconnected', '连接已断开 - 点击重新连接']
+    };
+    const [lightClass, message] = statusMap[session.status] || ['disconnected', '未知状态'];
+    updateStatusLight(lightClass, message);
 }
 
-// 更新状态
-function updateStatus(message, status) {
-    const statusEl = document.getElementById('terminalStatus');
-    const statusText = document.getElementById('statusText');
-    statusText.textContent = message;
-    statusEl.className = 'terminal-status ' + status;
+// 关闭标签页
+function closeTab(sessionId) {
+    const session = terminals.get(sessionId);
+    if (!session) return;
+    
+    // 关闭 WebSocket
+    if (session.ws) {
+        session.ws.close();
+    }
+    
+    // 销毁终端
+    session.term.dispose();
+    
+    // 删除 DOM
+    const pane = document.getElementById(sessionId);
+    if (pane) pane.remove();
+    
+    // 删除会话
+    terminals.delete(sessionId);
+    
+    // 如果是当前活动标签
+    if (activeSessionId === sessionId) {
+        if (terminals.size > 0) {
+            // 切换到第一个标签
+            const firstSessionId = terminals.keys().next().value;
+            switchTab(firstSessionId);
+        } else {
+            // 没有标签了，显示空状态
+            activeSessionId = null;
+            document.getElementById('noSelection').style.display = 'flex';
+            document.getElementById('terminalWrapper').style.display = 'none';
+        }
+    }
+    
+    renderTabs();
+}
+
+// 渲染标签栏
+function renderTabs() {
+    const tabsList = document.getElementById('tabsList');
+    tabsList.innerHTML = '';
+    
+    for (let [sessionId, session] of terminals) {
+        const tab = document.createElement('div');
+        tab.className = 'tab-item';
+        tab.dataset.sessionId = sessionId;
+        if (sessionId === activeSessionId) {
+            tab.classList.add('active');
+        }
+        
+        tab.innerHTML = `
+            <span class="tab-name">${escapeHtml(session.server.name)}</span>
+            <span class="tab-close" onclick="event.stopPropagation(); closeTab('${sessionId}')">×</span>
+        `;
+        
+        tab.onclick = () => switchTab(sessionId);
+        tabsList.appendChild(tab);
+    }
+}
+
+// 更新状态灯带
+function updateStatusLight(status, message) {
+    const light = document.getElementById('statusLight');
+    const messageEl = document.getElementById('statusMessage');
+    
+    light.className = 'status-light ' + status;
+    messageEl.textContent = message;
+    
+    // 如果断开连接，添加重连功能
+    if (status === 'disconnected' && activeSessionId) {
+        messageEl.style.cursor = 'pointer';
+        messageEl.onclick = () => {
+            const session = terminals.get(activeSessionId);
+            if (session) {
+                connectSSH(activeSessionId, session.server);
+            }
+        };
+    } else {
+        messageEl.style.cursor = 'default';
+        messageEl.onclick = null;
+    }
 }
 
 // 显示添加服务器模态框
