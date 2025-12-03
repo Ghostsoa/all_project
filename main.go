@@ -27,7 +27,7 @@ func main() {
 	time.Sleep(500 * time.Millisecond)
 	fmt.Println("╔══════════════════════════════════════════╗")
 	fmt.Println("║    本地终端API服务 - 交互式测试工具      ║")
-	fmt.Println("║    API Server: http://localhost:8080     ║")
+	fmt.Println("║    API Server: http://localhost:28080    ║")
 	fmt.Println("╚══════════════════════════════════════════╝")
 	fmt.Println()
 
@@ -36,7 +36,7 @@ func main() {
 }
 
 func runInteractiveTerminal() {
-	baseURL := "http://localhost:8080"
+	baseURL := "http://localhost:28080"
 
 	// 创建本地Shell会话
 	fmt.Println("正在创建本地Shell会话...")
