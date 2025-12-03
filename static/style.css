@@ -5,34 +5,104 @@
 }
 
 body {
-    font-family: 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
-    background: #1e1e1e;
-    color: #d4d4d4;
+    font-family: 'Inter', 'Segoe UI', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 25%, #f093fb 50%, #4facfe 75%, #00f2fe 100%);
+    background-size: 400% 400%;
+    animation: gradientShift 15s ease infinite;
+    color: #e0e0e0;
     height: 100vh;
     display: flex;
     flex-direction: column;
     overflow: hidden;
 }
 
-/* Header */
+@keyframes gradientShift {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+}
+
+/* Header - 玻璃态效果 */
 .header {
-    background: #252526;
-    padding: 12px 20px;
-    border-bottom: 1px solid #3e3e42;
+    background: rgba(255, 255, 255, 0.1);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 4px 30px rgba(0, 0, 0, 0.1);
+    padding: 16px 24px;
     display: flex;
     justify-content: space-between;
     align-items: center;
 }
 
 .header h1 {
-    font-size: 18px;
-    font-weight: 500;
-    color: #cccccc;
+    font-size: 20px;
+    font-weight: 700;
+    background: linear-gradient(120deg, #ffffff 0%, #e0e0e0 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    letter-spacing: -0.5px;
 }
 
 .header-actions {
     display: flex;
-    gap: 10px;
+    gap: 12px;
+}
+
+/* 现代化按钮 */
+.btn {
+    padding: 10px 20px;
+    border: none;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translate(-50%, -50%);
+    transition: width 0.6s, height 0.6s;
+}
+
+.btn:hover::before {
+    width: 300px;
+    height: 300px;
+}
+
+.btn-primary {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: #ffffff;
+    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+}
+
+.btn-primary:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.6);
+}
+
+.btn-secondary {
+    background: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(10px);
+    color: #ffffff;
+    border: 1px solid rgba(255, 255, 255, 0.3);
+}
+
+.btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.3);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: translateY(-2px);
 }
 
 /* Main Container - 三栏布局 */
@@ -44,13 +114,18 @@ body {
     gap: 0;
 }
 
-/* Sidebar - 左侧 */
+/* Sidebar - 左侧玻璃态卡片 */
 .sidebar {
-    background: #252526;
-    border-right: 1px solid #3c3c3c;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-right: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    margin: 8px;
+    border-radius: 16px;
 }
 
 .local-terminal-btn {
@@ -60,25 +135,42 @@ body {
 
 .btn-local-terminal {
     width: 100%;
-    padding: 12px;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 14px;
+    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
     color: #fff;
     border: none;
-    border-radius: 6px;
-    font-size: 14px;
-    font-weight: 600;
+    border-radius: 12px;
+    font-size: 15px;
+    font-weight: 700;
     cursor: pointer;
-    transition: all 0.3s;
-    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+    transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+    box-shadow: 0 4px 20px rgba(240, 147, 251, 0.4);
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-local-terminal::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    transition: left 0.5s;
+}
+
+.btn-local-terminal:hover::before {
+    left: 100%;
 }
 
 .btn-local-terminal:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+    transform: translateY(-3px) scale(1.02);
+    box-shadow: 0 8px 30px rgba(240, 147, 251, 0.6);
 }
 
 .btn-local-terminal:active {
-    transform: translateY(0);
+    transform: translateY(-1px) scale(0.98);
 }
 
 .search-box {
@@ -145,6 +237,28 @@ body {
     margin-top: 8px;
 }
 
+.command-action {
+    padding: 6px 14px;
+    font-size: 12px;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    border: none;
+    border-radius: 8px;
+    color: #fff;
+    cursor: pointer;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-weight: 600;
+    box-shadow: 0 2px 8px rgba(102, 126, 234, 0.3);
+}
+
+.command-action:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.5);
+}
+
+.command-action:active {
+    transform: translateY(0);
+}
+
 .btn-small {
     padding: 4px 8px;
     font-size: 11px;
@@ -163,12 +277,18 @@ body {
     color: #f48771;
 }
 
-/* Terminal Area - 中间 */
+/* Terminal Area - 中间玻璃态卡片 */
 .terminal-area {
     display: flex;
     flex-direction: column;
-    background: #1e1e1e;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
     overflow: hidden;
+    margin: 8px;
+    border-radius: 16px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
 .no-selection {
@@ -411,13 +531,18 @@ body {
     transform: translateY(0);
 }
 
-/* Right Panel - 右侧面板 */
+/* Right Panel - 右侧面板 - 玻璃态卡片 */
 .right-panel {
-    background: #252526;
-    border-left: 1px solid #3e3e42;
+    background: rgba(255, 255, 255, 0.08);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-left: 1px solid rgba(255, 255, 255, 0.15);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
     display: flex;
     flex-direction: column;
     overflow: hidden;
+    margin: 8px;
+    border-radius: 16px;
 }
 
 .right-panel-tabs {
@@ -478,6 +603,30 @@ body {
     color: #858585;
 }
 
+/* Toast 提示 */
+.toast {
+    position: fixed;
+    bottom: 30px;
+    right: 30px;
+    background: rgba(0, 0, 0, 0.9);
+    backdrop-filter: blur(10px);
+    color: #ffffff;
+    padding: 16px 24px;
+    border-radius: 12px;
+    font-size: 14px;
+    font-weight: 500;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    z-index: 10000;
+    opacity: 0;
+    transform: translateY(20px);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.toast.show {
+    opacity: 1;
+    transform: translateY(0);
+}
+
 /* 命令记录 */
 .commands-header {
     padding: 12px 16px;
@@ -524,17 +673,18 @@ body {
 }
 
 .command-item {
-    background: #2d2d30;
-    border: 1px solid #3e3e42;
-    border-radius: 4px;
-    padding: 10px 12px;
-    margin-bottom: 8px;
-    transition: all 0.2s;
+    padding: 14px 16px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    border-radius: 8px;
+    margin: 4px 8px;
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .command-item:hover {
-    background: #333333;
-    border-color: #4e4e4e;
+    background: rgba(255, 255, 255, 0.08);
+    transform: translateX(4px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
 
 .command-text {
@@ -551,6 +701,12 @@ body {
     align-items: center;
     font-size: 11px;
     color: #858585;
+    gap: 8px;
+}
+
+.command-meta > div {
+    display: flex;
+    gap: 8px;
 }
 
 .command-time {

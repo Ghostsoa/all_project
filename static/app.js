@@ -839,15 +839,21 @@ function renderCommandHistory(commands) {
     list.innerHTML = commands.map(cmd => {
         const date = new Date(cmd.created_at);
         const timeStr = formatTime(date);
+        const escapedCmd = escapeHtml(cmd.command).replace(/'/g, "\\'");
         
         return `
             <div class="command-item">
                 <div class="command-text">${escapeHtml(cmd.command)}</div>
                 <div class="command-meta">
                     <span class="command-time">⏰ ${timeStr}</span>
-                    <button class="command-copy" onclick="copyCommand('${escapeHtml(cmd.command).replace(/'/g, "\\'")}')">
-                        📋 复制
-                    </button>
+                    <div>
+                        <button class="command-action" onclick="writeCommandToTerminal('${escapedCmd}')" title="填充到终端">
+                            ⚡ 填充
+                        </button>
+                        <button class="command-action" onclick="copyCommand('${escapedCmd}')" title="复制到剪贴板">
+                            📋 复制
+                        </button>
+                    </div>
                 </div>
             </div>
         `;
@@ -905,11 +911,53 @@ function switchRightTab(tabName) {
 // 复制命令到剪贴板
 function copyCommand(command) {
     navigator.clipboard.writeText(command).then(() => {
-        // 可以添加一个提示
-        console.log('命令已复制:', command);
+        showToast('✅ 已复制到剪贴板');
     }).catch(err => {
         console.error('复制失败:', err);
+        showToast('❌ 复制失败');
     });
+}
+
+// 回写命令到当前终端
+function writeCommandToTerminal(command) {
+    if (!activeSessionId) {
+        showToast('⚠️ 请先打开一个终端');
+        return;
+    }
+    
+    const session = terminals.get(activeSessionId);
+    if (!session || !session.ws || session.ws.readyState !== WebSocket.OPEN) {
+        showToast('⚠️ 终端未连接');
+        return;
+    }
+    
+    // 发送命令到终端（不自动执行，用户需要手动按回车）
+    session.ws.send(command);
+    showToast('✅ 已填充到终端');
+}
+
+// 显示提示消息（Toast）
+function showToast(message) {
+    // 移除旧的toast
+    const oldToast = document.querySelector('.toast');
+    if (oldToast) {
+        oldToast.remove();
+    }
+    
+    // 创建新toast
+    const toast = document.createElement('div');
+    toast.className = 'toast';
+    toast.textContent = message;
+    document.body.appendChild(toast);
+    
+    // 显示动画
+    setTimeout(() => toast.classList.add('show'), 10);
+    
+    // 3秒后消失
+    setTimeout(() => {
+        toast.classList.remove('show');
+        setTimeout(() => toast.remove(), 300);
+    }, 3000);
 }
 
 // 格式化时间
