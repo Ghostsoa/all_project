@@ -465,7 +465,6 @@
     font-size: 13px;
     word-wrap: break-word;
     overflow-wrap: break-word;
-    word-break: break-word;
     max-width: 100%;
 }
 
@@ -477,6 +476,8 @@
     padding: 8px 12px;
     font-size: 13px;
     max-width: 80%;
+    word-break: keep-all;
+    overflow-wrap: normal;
 }
 
 /* Markdown样式 */

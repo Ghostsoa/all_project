@@ -421,7 +421,12 @@ function createMessageElement(role, content, reasoning = null) {
     // 然后添加正文内容
     const contentDiv = document.createElement('div');
     contentDiv.className = 'message-content';
-    contentDiv.innerHTML = formatMessageContent(content);
+    // 用户消息只做简单转义，AI消息应用Markdown渲染
+    if (role === 'user') {
+        contentDiv.innerHTML = escapeHtml(content).replace(/\n/g, '<br>');
+    } else {
+        contentDiv.innerHTML = formatMessageContent(content);
+    }
     
     contentWrapper.appendChild(contentDiv);
     
