@@ -26,6 +26,7 @@ window.deleteServer = deleteServer;
 window.openLocalTerminal = openLocalTerminal;
 window.clearCurrentCommands = clearCurrentCommands;
 window.showToast = showToast;
+window.setCurrentServer = setCurrentServer; // 暴露文件树加载函数
 
 // 服务器卡片展开/折叠
 window.toggleServerExpand = function(serverId) {
