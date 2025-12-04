@@ -11,15 +11,32 @@ let commandSaveTimer = null;
 let loadHistoryTimer = null;
 
 export function saveCommandToHistory(serverId, command) {
-    // 1. 立即更新内存缓存
-    const cached = commandCache.get(serverId) || [];
-    const newCommand = {
-        id: Date.now(),
-        server_id: serverId,
-        command: command,
-        created_at: new Date().toISOString()
-    };
-    cached.unshift(newCommand); // 添加到开头
+    // 1. 立即更新内存缓存（去重：相同命令更新时间并移到最前）
+    let cached = commandCache.get(serverId) || [];
+    
+    // 查找是否已存在相同命令
+    const existingIndex = cached.findIndex(c => c.command === command);
+    
+    if (existingIndex >= 0) {
+        // 已存在：更新时间并移到最前
+        const existing = cached[existingIndex];
+        existing.created_at = new Date().toISOString();
+        
+        // 从原位置删除
+        cached = [...cached.slice(0, existingIndex), ...cached.slice(existingIndex + 1)];
+        // 添加到最前
+        cached.unshift(existing);
+    } else {
+        // 不存在：创建新命令并添加到最前
+        const newCommand = {
+            id: Date.now(),
+            server_id: serverId,
+            command: command,
+            created_at: new Date().toISOString()
+        };
+        cached.unshift(newCommand);
+    }
+    
     commandCache.set(serverId, cached);
     
     // 2. 立即更新UI（无延迟）

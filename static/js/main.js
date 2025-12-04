@@ -8,6 +8,9 @@ import { loadCommandHistory, clearCurrentCommands, saveCommandToHistory } from '
 import { initFileTree, setCurrentServer } from './filetree.js';
 import { openFileEditor } from './editor.js';
 
+// 保存每个服务器的content-tabs状态
+const serverContentTabs = new Map(); // sessionId -> HTML string
+
 // 页面加载
 document.addEventListener('DOMContentLoaded', function() {
     loadServers();
@@ -177,6 +180,14 @@ window.switchToTerminal = function(sessionId) {
 
 // 切换SSH服务器标签（顶部tabs-bar）
 window.switchTab = function(sessionId) {
+    const prevSessionId = state.activeSessionId;
+    
+    // 保存当前服务器的content-tabs状态
+    if (prevSessionId) {
+        const contentTabsList = document.getElementById('contentTabsList');
+        serverContentTabs.set(prevSessionId, contentTabsList.innerHTML);
+    }
+    
     state.activeSessionId = sessionId;
     
     // 切换终端pane显示
@@ -190,27 +201,41 @@ window.switchTab = function(sessionId) {
         tab.classList.remove('active');
     });
     
-    // 隐藏所有editor-pane（切换服务器时回到终端）
+    // 隐藏所有editor-pane
     document.querySelectorAll('.editor-pane').forEach(pane => {
         pane.classList.remove('active');
     });
     
-    // 重置content-tabs-bar为该服务器的终端标签
+    // 恢复该服务器的content-tabs状态
     const contentTabsList = document.getElementById('contentTabsList');
-    contentTabsList.innerHTML = `
-        <div class="content-tab-item active" data-session-id="${sessionId}" data-type="terminal" onclick="window.switchToTerminal('${sessionId}')">
-            <span class="tab-icon">💻</span>
-            <span class="tab-name">终端</span>
-        </div>
-    `;
+    if (serverContentTabs.has(sessionId)) {
+        // 恢复保存的状态
+        contentTabsList.innerHTML = serverContentTabs.get(sessionId);
+        
+        // 激活终端标签
+        contentTabsList.querySelectorAll('.content-tab-item').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        contentTabsList.querySelector('.content-tab-item[data-type="terminal"]')?.classList.add('active');
+    } else {
+        // 首次，创建终端标签
+        contentTabsList.innerHTML = `
+            <div class="content-tab-item active" data-session-id="${sessionId}" data-type="terminal" onclick="window.switchToTerminal('${sessionId}')">
+                <span class="tab-icon">💻</span>
+                <span class="tab-name">终端</span>
+            </div>
+        `;
+    }
     
     const session = state.terminals.get(sessionId);
     if (session) {
         setTimeout(() => session.fitAddon.fit(), 100);
         loadCommandHistory(session.server.ID, session.server.name);
         
-        // 同步更新文件树到当前服务器（传入sessionID）
-        setCurrentServer(session.server.ID, sessionId);
+        // 只在首次切换或上次sessionID不同时更新文件树（避免闪烁）
+        if (!prevSessionId || prevSessionId !== sessionId) {
+            setCurrentServer(session.server.ID, sessionId);
+        }
     }
     
     // 更新renderTabs以高亮当前tab
@@ -223,6 +248,9 @@ window.closeTab = function(sessionId) {
     
     document.getElementById(sessionId)?.remove();
     state.terminals.delete(sessionId);
+    
+    // 清理保存的content-tabs状态
+    serverContentTabs.delete(sessionId);
     
     if (state.activeSessionId === sessionId) {
         const remaining = Array.from(state.terminals.keys());

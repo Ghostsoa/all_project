@@ -272,6 +272,11 @@ function markAsUnmodified(tabId) {
     }
 }
 
+// 保存当前content-tabs状态（供main.js调用）
+export function saveCurrentContentTabsState() {
+    return document.getElementById('contentTabsList')?.innerHTML || '';
+}
+
 // 全局函数 - 内容标签切换（只处理文件标签）
 window.switchContentTab = function(id) {
     const pane = document.querySelector(`.editor-pane[data-tab-id="${id}"]`);
@@ -304,10 +309,23 @@ window.closeContentTab = function(id) {
         if (filePath) {
             openFiles.delete(filePath);
         }
+        
+        // 检查是否还有文件标签
+        const remainingFileTabs = document.querySelectorAll('.content-tab-item[data-tab-id]');
+        if (remainingFileTabs.length === 0) {
+            // 没有文件标签了，自动切回终端
+            const terminalTab = document.querySelector('.content-tab-item[data-type="terminal"]');
+            if (terminalTab) {
+                const sessionId = terminalTab.dataset.sessionId;
+                if (sessionId && window.switchToTerminal) {
+                    window.switchToTerminal(sessionId);
+                }
+            }
+        }
     } 
-    // 如果是终端标签（暂时不实现关闭）
+    // 如果是终端标签（不允许关闭）
     else {
-        // TODO: 实现终端关闭
+        // 终端标签不可关闭
     }
 };
 
