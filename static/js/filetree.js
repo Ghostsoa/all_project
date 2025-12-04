@@ -150,6 +150,12 @@ export async function setCurrentServer(serverID, sessionID) {
     currentSessionID = sessionID;
     isLocalTerminal = false; // 设置为SSH模式
     
+    // 立即清空文件树，显示加载中
+    const fileTreeContainer = document.getElementById('fileTree');
+    if (fileTreeContainer) {
+        fileTreeContainer.innerHTML = '<div class="file-tree-empty"><p>⏳ 加载中...</p></div>';
+    }
+    
     // 显示文件树头部（如果之前隐藏了）
     const headerContainer = document.getElementById('fileTreeHeader');
     if (headerContainer && !headerContainer.querySelector('.filetree-header')) {
@@ -170,6 +176,12 @@ export async function setLocalTerminal() {
     isLocalTerminal = true;
     currentServerID = null;
     currentSessionID = 'local'; // 本地标识
+    
+    // 立即清空文件树，显示加载中
+    const fileTreeContainer = document.getElementById('fileTree');
+    if (fileTreeContainer) {
+        fileTreeContainer.innerHTML = '<div class="file-tree-empty"><p>⏳ 加载本地文件...</p></div>';
+    }
     
     // 设置API端点getter
     fileCache.setApiEndpointGetter(getApiEndpoint);
@@ -203,18 +215,6 @@ function showLocalFileWarning() {
     `;
 }
 
-// 加载本地文件列表
-async function loadLocalFiles(path) {
-    const response = await fetch(`/api/local/files/list?path=${encodeURIComponent(path)}`);
-    const data = await response.json();
-    
-    if (!data.success) {
-        throw new Error(data.error || '加载失败');
-    }
-    
-    return data.files || [];
-}
-
 export async function loadDirectory(path, retryCount = 0) {
     
     const fileTreeContainer = document.getElementById('fileTree');
@@ -240,13 +240,8 @@ export async function loadDirectory(path, retryCount = 0) {
     
     try {
         let files;
-        if (isLocalTerminal) {
-            // 本地终端：直接加载本地文件
-            files = await loadLocalFiles(path);
-        } else {
-            // SSH终端：使用缓存管理器
-            files = await fileCache.getOrLoad(currentSessionID, path);
-        }
+        // 统一使用缓存管理器实现静默刷新（本地和SSH都用）
+        files = await fileCache.getOrLoad(currentSessionID, path);
         renderFileTree(files, path);
         
         // 加载成功，显示成功状态

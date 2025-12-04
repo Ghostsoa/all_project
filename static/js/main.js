@@ -57,6 +57,11 @@ document.addEventListener('DOMContentLoaded', function() {
     checkAuthStatus();
     initFileTree(); // 初始化文件树
     initDragUpload(); // 初始化拖拽上传
+    
+    // 自动打开本地终端作为默认
+    setTimeout(() => {
+        openLocalTerminal();
+    }, 500);
 });
 
 // 暴露全局函数供HTML调用
