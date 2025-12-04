@@ -7,110 +7,74 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"sync"
 
 	"github.com/creack/pty"
 	"github.com/gin-gonic/gin"
 	"github.com/gorilla/websocket"
 )
 
-// GinHandleLocalTerminal 处理本地终端 WebSocket 连接
-func GinHandleLocalTerminal(c *gin.Context) {
-	// 升级到 WebSocket
-	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
-	if err != nil {
-		log.Println("WebSocket 升级失败:", err)
-		return
-	}
-	defer ws.Close()
+// 全局本地终端实例
+var (
+	globalLocalTerminal *LocalTerminalSession
+	localTerminalMutex  sync.RWMutex
+)
 
-	// 根据操作系统选择Shell
+// LocalTerminalSession 本地终端会话
+type LocalTerminalSession struct {
+	cmd       *exec.Cmd
+	ptmx      *os.File
+	clients   map[*websocket.Conn]bool
+	clientsMu sync.RWMutex
+	input     chan []byte
+}
+
+// InitGlobalLocalTerminal 初始化全局本地终端（服务启动时调用）
+func InitGlobalLocalTerminal() error {
+	localTerminalMutex.Lock()
+	defer localTerminalMutex.Unlock()
+
+	if globalLocalTerminal != nil {
+		return nil // 已初始化
+	}
+
 	var cmd *exec.Cmd
 	switch runtime.GOOS {
 	case "windows":
-		// Windows: PowerShell
 		cmd = exec.Command("powershell.exe")
 	case "linux", "darwin":
-		// Linux/Mac: Bash
 		shell := os.Getenv("SHELL")
 		if shell == "" {
 			shell = "/bin/bash"
 		}
 		cmd = exec.Command(shell)
 	default:
-		ws.WriteMessage(websocket.TextMessage, []byte("不支持的操作系统"))
-		return
+		return fmt.Errorf("不支持的操作系统: %s", runtime.GOOS)
 	}
 
-	// 设置环境变量
 	cmd.Env = append(os.Environ(),
 		"TERM=xterm-256color",
 		"COLORTERM=truecolor",
 	)
 
+	session := &LocalTerminalSession{
+		cmd:     cmd,
+		clients: make(map[*websocket.Conn]bool),
+		input:   make(chan []byte, 100),
+	}
+
 	// Windows使用管道，Linux/Mac使用PTY
 	if runtime.GOOS == "windows" {
-		handleWindowsTerminal(ws, cmd)
-	} else {
-		handleUnixTerminal(ws, cmd)
+		return fmt.Errorf("Windows本地终端暂不支持全局模式")
 	}
-}
 
-// handleWindowsTerminal Windows终端处理（使用管道）
-func handleWindowsTerminal(ws *websocket.Conn, cmd *exec.Cmd) {
-	stdin, _ := cmd.StdinPipe()
-	stdout, _ := cmd.StdoutPipe()
-	stderr, _ := cmd.StderrPipe()
-
-	if err := cmd.Start(); err != nil {
-		log.Println("启动Shell失败:", err)
-		ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("启动Shell失败: %v", err)))
-		return
-	}
-	defer cmd.Process.Kill()
-
-	log.Printf("本地终端启动成功: PowerShell on Windows")
-
-	done := make(chan bool)
-
-	// stdout → WebSocket
-	go func() {
-		io.Copy(&wsWriter{ws: ws}, stdout)
-		done <- true
-	}()
-
-	// stderr → WebSocket
-	go func() {
-		io.Copy(&wsWriter{ws: ws}, stderr)
-	}()
-
-	// WebSocket → stdin
-	go func() {
-		for {
-			_, data, err := ws.ReadMessage()
-			if err != nil {
-				done <- true
-				return
-			}
-			stdin.Write(data)
-		}
-	}()
-
-	<-done
-	log.Println("本地终端会话结束")
-}
-
-// handleUnixTerminal Unix终端处理（使用PTY）
-func handleUnixTerminal(ws *websocket.Conn, cmd *exec.Cmd) {
-	// 创建PTY
+	// 启动PTY
 	ptmx, err := pty.Start(cmd)
 	if err != nil {
-		log.Println("启动PTY失败:", err)
-		ws.WriteMessage(websocket.TextMessage, []byte(fmt.Sprintf("启动PTY失败: %v", err)))
-		return
+		return fmt.Errorf("启动PTY失败: %v", err)
 	}
-	defer ptmx.Close()
 
-	log.Printf("本地终端启动成功: %s on %s", cmd.Path, runtime.GOOS)
+	session.ptmx = ptmx
 
 	// 设置终端大小
 	pty.Setsize(ptmx, &pty.Winsize{
@@ -118,62 +82,115 @@ func handleUnixTerminal(ws *websocket.Conn, cmd *exec.Cmd) {
 		Cols: 120,
 	})
 
-	done := make(chan bool)
+	// 从PTY读取并广播给所有客户端
+	go session.broadcastOutput()
 
-	// PTY → WebSocket (优化：32KB缓冲)
-	go func() {
-		buffer := make([]byte, 32768) // 32KB缓冲
-		for {
-			n, err := ptmx.Read(buffer)
-			if err != nil {
-				if err != io.EOF {
-					log.Println("读取PTY失败:", err)
-				}
-				done <- true
-				return
-			}
-			if n > 0 {
-				if err := ws.WriteMessage(websocket.BinaryMessage, buffer[:n]); err != nil {
-					log.Println("写入WebSocket失败:", err)
-					done <- true
-					return
-				}
-			}
-		}
-	}()
+	// 从input channel写入PTY
+	go session.handleInput()
 
-	// WebSocket → PTY
-	go func() {
-		for {
-			_, data, err := ws.ReadMessage()
-			if err != nil {
-				log.Println("读取WebSocket失败:", err)
-				done <- true
-				return
-			}
-			if _, err := ptmx.Write(data); err != nil {
-				log.Println("写入PTY失败:", err)
-				done <- true
-				return
-			}
-		}
-	}()
+	globalLocalTerminal = session
+	log.Println("✅ 全局本地终端已启动")
 
-	// 等待进程结束
-	<-done
-	cmd.Process.Kill()
-	log.Println("本地终端会话结束")
+	return nil
 }
 
-// wsWriter WebSocket写入器（用于io.Copy）
-type wsWriter struct {
-	ws *websocket.Conn
-}
+// broadcastOutput 从PTY读取并广播给所有客户端
+func (s *LocalTerminalSession) broadcastOutput() {
+	buffer := make([]byte, 32768)
+	for {
+		n, err := s.ptmx.Read(buffer)
+		if err != nil {
+			if err != io.EOF {
+				log.Println("读取PTY失败:", err)
+			}
+			break
+		}
+		if n > 0 {
+			data := make([]byte, n)
+			copy(data, buffer[:n])
 
-func (w *wsWriter) Write(p []byte) (n int, err error) {
-	err = w.ws.WriteMessage(websocket.BinaryMessage, p)
-	if err != nil {
-		return 0, err
+			s.clientsMu.RLock()
+			for client := range s.clients {
+				// 异步发送，避免阻塞
+				go func(c *websocket.Conn) {
+					if err := c.WriteMessage(websocket.BinaryMessage, data); err != nil {
+						log.Println("发送到客户端失败:", err)
+					}
+				}(client)
+			}
+			s.clientsMu.RUnlock()
+		}
 	}
-	return len(p), nil
+}
+
+// handleInput 处理输入
+func (s *LocalTerminalSession) handleInput() {
+	for data := range s.input {
+		if _, err := s.ptmx.Write(data); err != nil {
+			log.Println("写入PTY失败:", err)
+		}
+	}
+}
+
+// addClient 添加客户端
+func (s *LocalTerminalSession) addClient(ws *websocket.Conn) {
+	s.clientsMu.Lock()
+	s.clients[ws] = true
+	s.clientsMu.Unlock()
+	log.Printf("本地终端客户端已连接，当前客户端数: %d", len(s.clients))
+}
+
+// removeClient 移除客户端
+func (s *LocalTerminalSession) removeClient(ws *websocket.Conn) {
+	s.clientsMu.Lock()
+	delete(s.clients, ws)
+	s.clientsMu.Unlock()
+	log.Printf("本地终端客户端已断开，当前客户端数: %d", len(s.clients))
+}
+
+// sendInput 发送输入
+func (s *LocalTerminalSession) sendInput(data []byte) {
+	select {
+	case s.input <- data:
+	default:
+		log.Println("输入缓冲区已满")
+	}
+}
+
+// GinHandleLocalTerminal 处理本地终端 WebSocket 连接（使用全局实例）
+func GinHandleLocalTerminal(c *gin.Context) {
+	localTerminalMutex.RLock()
+	session := globalLocalTerminal
+	localTerminalMutex.RUnlock()
+
+	if session == nil {
+		c.JSON(500, gin.H{"error": "本地终端未初始化"})
+		return
+	}
+
+	// 升级到 WebSocket
+	ws, err := upgrader.Upgrade(c.Writer, c.Request, nil)
+	if err != nil {
+		log.Println("WebSocket 升级失败:", err)
+		return
+	}
+	defer func() {
+		session.removeClient(ws)
+		ws.Close()
+	}()
+
+	// 添加到客户端列表
+	session.addClient(ws)
+
+	// 持续读取客户端输入并发送到终端
+	for {
+		_, data, err := ws.ReadMessage()
+		if err != nil {
+			if err != io.EOF {
+				log.Println("读取WebSocket失败:", err)
+			}
+			break
+		}
+		session.sendInput(data)
+	}
 }

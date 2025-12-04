@@ -40,6 +40,11 @@ func main() {
 	fileHandler := handlers.NewFileHandler()
 	localFileHandler := handlers.NewLocalFileHandler()
 
+	// 初始化全局本地终端
+	if err := handlers.InitGlobalLocalTerminal(); err != nil {
+		log.Printf("⚠️ 本地终端初始化失败: %v", err)
+	}
+
 	// 设置Gin为发布模式（生产环境）
 	gin.SetMode(gin.ReleaseMode)
 
