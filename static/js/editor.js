@@ -1,15 +1,53 @@
 // Monaco 编辑器管理
 import { state } from './config.js';
 import { showToast } from './utils.js';
+import { showConfirm } from './modal.js';
 
 let editorInstances = new Map(); // 存储编辑器实例
 let openFiles = new Map(); // 存储打开的文件信息
 
-export async function openFileEditor(filePath, serverID, sessionID) {
+// 不可编辑的文件扩展名（二进制文件、可执行文件、压缩包等）
+const NON_EDITABLE_EXTENSIONS = new Set([
+    // 可执行文件
+    'exe', 'dll', 'so', 'dylib', 'bin', 'out', 'o', 'a',
+    // 压缩包
+    'zip', 'tar', 'gz', 'bz2', 'xz', 'rar', '7z', 'tgz', 'tbz2',
+    // 图片
+    'jpg', 'jpeg', 'png', 'gif', 'bmp', 'ico', 'svg', 'webp', 'tiff',
+    // 视频
+    'mp4', 'avi', 'mov', 'wmv', 'flv', 'mkv', 'webm',
+    // 音频
+    'mp3', 'wav', 'flac', 'aac', 'ogg', 'wma',
+    // 其他二进制
+    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
+    'class', 'jar', 'pyc', 'pyo', 'db', 'sqlite'
+]);
+
+// 大文件阈值（5MB）
+const MAX_FILE_SIZE = 5 * 1024 * 1024;
+
+export async function openFileEditor(filePath, serverID, sessionID, fileSize = 0) {
     // 如果文件已打开，切换到该标签
     if (openFiles.has(filePath)) {
         switchToTab(filePath);
         return;
+    }
+    
+    // 检查文件类型
+    const ext = filePath.split('.').pop()?.toLowerCase();
+    if (ext && NON_EDITABLE_EXTENSIONS.has(ext)) {
+        showToast(`无法编辑 .${ext} 文件（二进制/不支持的格式）`, 'error');
+        return;
+    }
+    
+    // 检查文件大小
+    if (fileSize > MAX_FILE_SIZE) {
+        const sizeMB = (fileSize / (1024 * 1024)).toFixed(2);
+        const confirmed = await showConfirm(
+            `文件大小为 ${sizeMB}MB，可能会导致编辑器卡顿。\n\n建议使用命令行工具编辑大文件。\n\n确定要打开吗？`,
+            '大文件警告'
+        );
+        if (!confirmed) return;
     }
     
     // 先创建标签页，显示"加载中"

@@ -253,7 +253,7 @@ function renderFileTree(files, basePath) {
                 <div class="file-item ${file.is_dir ? 'is-dir' : 'is-file'}" 
                      data-path="${file.path}"
                      data-is-dir="${file.is_dir}"
-                     ondblclick="window.handleFileDoubleClick('${file.path}', ${file.is_dir})"
+                     ondblclick="window.handleFileDoubleClick('${file.path}', ${file.is_dir}, ${file.size || 0})"
                      oncontextmenu="window.showFileContextMenu(event, '${file.path}', ${file.is_dir})">
                     <span class="file-icon">${getFileIcon(file)}</span>
                     <span class="file-name">${escapeHtml(file.name)}</span>
@@ -307,13 +307,13 @@ function escapeHtml(text) {
     return div.innerHTML;
 }
 
-// 导出全局函数
-window.handleFileDoubleClick = function(path, isDir) {
+// 双击文件打开编辑器
+window.handleFileDoubleClick = function(filePath, isDir, fileSize = 0) {
     if (isDir) {
-        currentPath = path;
-        loadDirectory(path);
+        loadDirectory(filePath);
     } else {
-        openFileEditor(path, currentServerID, currentSessionID);
+        // 打开文件编辑器，传递文件大小
+        openFileEditor(filePath, currentServerID, currentSessionID, fileSize);
     }
 };
 
@@ -557,12 +557,14 @@ function showBlankContextMenu(event, basePath) {
 
 // 复制文件
 window.copyFile = function(path) {
+    closeAllContextMenus();
     clipboard = { type: 'copy', path };
     showToast('已复制', 'success');
 };
 
 // 剪切文件
 window.cutFile = function(path) {
+    closeAllContextMenus();
     clipboard = { type: 'cut', path };
     showToast('已剪切', 'success');
 };
@@ -635,6 +637,8 @@ window.pasteFile = async function(targetPath) {
 
 // 就地重命名
 window.renameFile = async function(oldPath) {
+    closeAllContextMenus();
+    
     const oldName = oldPath.split('/').pop();
     const parentPath = oldPath.split('/').slice(0, -1).join('/') || '/';
     
@@ -713,6 +717,8 @@ window.renameFile = async function(oldPath) {
 };
 
 window.deleteFile = async function(path) {
+    closeAllContextMenus();
+    
     const fileName = path.split('/').pop();
     const confirmed = await showConfirm(
         `确定要删除 "${fileName}" 吗？此操作不可恢复。`,
