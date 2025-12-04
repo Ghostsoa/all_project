@@ -188,3 +188,125 @@
     color: rgba(255, 255, 255, 0.4);
     flex-shrink: 0;
 }
+
+/* ========== 特殊文件夹颜色标记 ========== */
+
+/* 系统核心目录 - 金色 */
+.file-item.folder-system {
+    background: rgba(255, 215, 0, 0.08);
+    border-left: 2px solid rgba(255, 215, 0, 0.6);
+}
+
+.file-item.folder-system:hover {
+    background: rgba(255, 215, 0, 0.12);
+}
+
+.file-item.folder-system .file-name {
+    color: rgba(255, 215, 0, 0.95);
+    font-weight: 600;
+}
+
+/* 项目目录 - 蓝色 */
+.file-item.folder-project {
+    background: rgba(59, 130, 246, 0.08);
+    border-left: 2px solid rgba(59, 130, 246, 0.6);
+}
+
+.file-item.folder-project:hover {
+    background: rgba(59, 130, 246, 0.12);
+}
+
+.file-item.folder-project .file-name {
+    color: rgba(99, 179, 237, 0.95);
+    font-weight: 600;
+}
+
+/* 数据目录 - 紫色 */
+.file-item.folder-data {
+    background: rgba(168, 85, 247, 0.08);
+    border-left: 2px solid rgba(168, 85, 247, 0.6);
+}
+
+.file-item.folder-data:hover {
+    background: rgba(168, 85, 247, 0.12);
+}
+
+.file-item.folder-data .file-name {
+    color: rgba(196, 181, 253, 0.95);
+    font-weight: 600;
+}
+
+/* 配置/日志目录 - 橙色 */
+.file-item.folder-config {
+    background: rgba(249, 115, 22, 0.08);
+    border-left: 2px solid rgba(249, 115, 22, 0.6);
+}
+
+.file-item.folder-config:hover {
+    background: rgba(249, 115, 22, 0.12);
+}
+
+.file-item.folder-config .file-name {
+    color: rgba(251, 146, 60, 0.95);
+    font-weight: 500;
+}
+
+/* 构建/发布目录 - 灰色 */
+.file-item.folder-build {
+    background: rgba(156, 163, 175, 0.08);
+    border-left: 2px solid rgba(156, 163, 175, 0.6);
+}
+
+.file-item.folder-build:hover {
+    background: rgba(156, 163, 175, 0.12);
+}
+
+.file-item.folder-build .file-name {
+    color: rgba(209, 213, 219, 0.95);
+    font-weight: 500;
+}
+
+/* 临时目录 - 黄色 */
+.file-item.folder-temp {
+    background: rgba(234, 179, 8, 0.08);
+    border-left: 2px solid rgba(234, 179, 8, 0.6);
+}
+
+.file-item.folder-temp:hover {
+    background: rgba(234, 179, 8, 0.12);
+}
+
+.file-item.folder-temp .file-name {
+    color: rgba(250, 204, 21, 0.95);
+    font-weight: 500;
+}
+
+/* 资源目录 - 青色 */
+.file-item.folder-assets {
+    background: rgba(20, 184, 166, 0.08);
+    border-left: 2px solid rgba(20, 184, 166, 0.6);
+}
+
+.file-item.folder-assets:hover {
+    background: rgba(20, 184, 166, 0.12);
+}
+
+.file-item.folder-assets .file-name {
+    color: rgba(94, 234, 212, 0.95);
+    font-weight: 500;
+}
+
+/* 测试/文档目录 - 绿色 */
+.file-item.folder-docs {
+    background: rgba(34, 197, 94, 0.08);
+    border-left: 2px solid rgba(34, 197, 94, 0.6);
+}
+
+.file-item.folder-docs:hover {
+    background: rgba(34, 197, 94, 0.12);
+}
+
+.file-item.folder-docs .file-name {
+    color: rgba(134, 239, 172, 0.95);
+    font-weight: 500;
+}

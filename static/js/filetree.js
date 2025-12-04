@@ -258,8 +258,10 @@ function renderFileTree(files, basePath) {
                     <span class="file-name">..</span>
                 </div>
             ` : ''}
-            ${files.map(file => `
-                <div class="file-item ${file.is_dir ? 'is-dir' : 'is-file'}" 
+            ${files.map(file => {
+                const specialClass = file.is_dir ? getSpecialFolderClass(file.name) : '';
+                return `
+                <div class="file-item ${file.is_dir ? 'is-dir' : 'is-file'} ${specialClass}" 
                      data-path="${file.path}"
                      data-is-dir="${file.is_dir}"
                      ondblclick="window.handleFileDoubleClick('${file.path}', ${file.is_dir}, ${file.size || 0})"
@@ -268,15 +270,124 @@ function renderFileTree(files, basePath) {
                     <span class="file-name">${escapeHtml(file.name)}</span>
                     ${!file.is_dir ? `<span class="file-size">${formatSize(file.size)}</span>` : ''}
                 </div>
-            `).join('')}
+                `;
+            }).join('')}
         </div>
     `;
     
     fileTreeContainer.innerHTML = html;
 }
 
+// 获取特殊文件夹的CSS类
+function getSpecialFolderClass(folderName) {
+    const name = folderName.toLowerCase();
+    
+    // 系统核心目录
+    const systemFolders = ['root', 'home', 'etc', 'usr', 'var', 'opt', 'bin', 'sbin', 'lib', 'boot', 'dev', 'proc', 'sys', 'mnt', 'media'];
+    if (systemFolders.includes(name)) {
+        return 'folder-system';
+    }
+    
+    // 项目目录
+    const projectFolders = ['project', 'projects', 'src', 'source'];
+    if (projectFolders.includes(name)) {
+        return 'folder-project';
+    }
+    
+    // 数据目录
+    const dataFolders = ['data', 'database', 'backup', 'backups'];
+    if (dataFolders.includes(name)) {
+        return 'folder-data';
+    }
+    
+    // 配置/日志目录
+    const configFolders = ['config', 'logs', 'log', '.git', '.vscode', '.idea'];
+    if (configFolders.includes(name)) {
+        return 'folder-config';
+    }
+    
+    // 构建/发布目录
+    const buildFolders = ['dist', 'build', 'node_modules'];
+    if (buildFolders.includes(name)) {
+        return 'folder-build';
+    }
+    
+    // 临时目录
+    const tempFolders = ['tmp', 'temp', 'cache'];
+    if (tempFolders.includes(name)) {
+        return 'folder-temp';
+    }
+    
+    // 资源目录
+    const assetFolders = ['assets', 'static', 'public', 'uploads', 'downloads'];
+    if (assetFolders.includes(name)) {
+        return 'folder-assets';
+    }
+    
+    // 测试/文档目录
+    const docFolders = ['test', 'tests', 'docs', 'doc'];
+    if (docFolders.includes(name)) {
+        return 'folder-docs';
+    }
+    
+    return '';
+}
+
 function getFileIcon(file) {
-    if (file.is_dir) return '📁';
+    if (file.is_dir) {
+        // 特殊系统文件夹
+        const folderName = file.name.toLowerCase();
+        const specialFolders = {
+            // 系统核心目录
+            'root': '👑',
+            'home': '🏠',
+            'tmp': '⏱️',
+            'etc': '⚙️',
+            'var': '📊',
+            'usr': '👤',
+            'opt': '📦',
+            'bin': '🔧',
+            'sbin': '🔨',
+            'lib': '📚',
+            'boot': '🚀',
+            'dev': '💾',
+            'proc': '⚡',
+            'sys': '🖥️',
+            'mnt': '💿',
+            'media': '💿',
+            // 常见项目目录
+            'project': '🎯',
+            'projects': '🎯',
+            'data': '📊',
+            'database': '🗄️',
+            'backup': '💾',
+            'backups': '💾',
+            'config': '⚙️',
+            'logs': '📋',
+            'log': '📋',
+            'src': '📝',
+            'source': '📝',
+            'dist': '📦',
+            'build': '🔨',
+            'test': '🧪',
+            'tests': '🧪',
+            'docs': '📖',
+            'doc': '📖',
+            'assets': '🎨',
+            'static': '🎨',
+            'public': '🌐',
+            'uploads': '📤',
+            'downloads': '📥',
+            'cache': '⚡',
+            'temp': '⏱️',
+            '.git': '🔀',
+            'node_modules': '📦',
+            '.vscode': '💻',
+            '.idea': '💡',
+        };
+        
+        return specialFolders[folderName] || '📁';
+    }
     
     const ext = file.name.split('.').pop().toLowerCase();
     const iconMap = {
