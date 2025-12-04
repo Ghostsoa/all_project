@@ -333,11 +333,23 @@ window.switchTab = function(sessionId) {
     const session = state.terminals.get(sessionId);
     if (session) {
         setTimeout(() => session.fitAddon.fit(), 100);
-        loadCommandHistory(session.server.ID, session.server.name);
+        
+        // 检查是否为本地终端
+        const isLocal = sessionId.startsWith('local');
+        
+        if (!isLocal) {
+            loadCommandHistory(session.server.ID, session.server.name);
+        }
         
         // 只在首次切换或上次sessionID不同时更新文件树（避免闪烁）
         if (!prevSessionId || prevSessionId !== sessionId) {
-            setCurrentServer(session.server.ID, sessionId);
+            if (isLocal) {
+                // 本地终端
+                setLocalTerminal();
+            } else {
+                // SSH终端
+                setCurrentServer(session.server.ID, sessionId);
+            }
         }
     }
     

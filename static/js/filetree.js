@@ -173,9 +173,17 @@ export async function setCurrentServer(serverID, sessionID) {
 
 // 设置为本地终端模式
 export async function setLocalTerminal() {
+    // 如果已经是本地终端模式，无需重复初始化
+    if (isLocalTerminal && currentSessionID === 'local') {
+        console.log('已经是本地终端模式，跳过重复初始化');
+        return;
+    }
+    
     isLocalTerminal = true;
     currentServerID = null;
     currentSessionID = 'local'; // 本地标识
+    
+    console.log('🔄 切换到本地终端模式');
     
     // 立即清空文件树，显示加载中
     const fileTreeContainer = document.getElementById('fileTree');
