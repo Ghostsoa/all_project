@@ -27,7 +27,15 @@ func main() {
 	defer database.Close()
 
 	// 自动迁移模型
-	if err := database.AutoMigrate(&models.Server{}, &models.CommandHistory{}); err != nil {
+	if err := database.AutoMigrate(
+		&models.Server{},
+		&models.CommandHistory{},
+		&models.AIModel{},
+		&models.APIEndpoint{},
+		&models.ModelConfig{},
+		&models.ChatSession{},
+		&models.ChatMessage{},
+	); err != nil {
 		log.Fatalf("❌ 数据库迁移失败: %v", err)
 	}
 
@@ -39,6 +47,8 @@ func main() {
 	wsHandler := handlers.NewWebSocketHandler(serverRepo)
 	fileHandler := handlers.NewFileHandler()
 	localFileHandler := handlers.NewLocalFileHandler()
+	aiHandler := handlers.NewAIHandler(database.DB)
+	aiConfigHandler := handlers.NewAIConfigHandler(database.DB)
 
 	// 初始化全局本地终端
 	if err := handlers.InitGlobalLocalTerminal(); err != nil {
@@ -133,11 +143,42 @@ func main() {
 		api.POST("/local/files/delete", localFileHandler.DeleteLocalFile)
 		api.POST("/local/files/rename", localFileHandler.RenameLocalFile)
 		api.POST("/local/files/copy", localFileHandler.CopyLocalFile)
+
+		// AI模型管理
+		api.GET("/ai/models", aiConfigHandler.GetModels)
+		api.POST("/ai/models/create", aiConfigHandler.CreateModel)
+		api.POST("/ai/models/update", aiConfigHandler.UpdateModel)
+		api.POST("/ai/models/delete", aiConfigHandler.DeleteModel)
+
+		// API接口管理
+		api.GET("/ai/endpoints", aiConfigHandler.GetEndpoints)
+		api.POST("/ai/endpoints/create", aiConfigHandler.CreateEndpoint)
+		api.POST("/ai/endpoints/update", aiConfigHandler.UpdateEndpoint)
+		api.POST("/ai/endpoints/delete", aiConfigHandler.DeleteEndpoint)
+
+		// 模型配置管理
+		api.GET("/ai/configs", aiConfigHandler.GetConfigs)
+		api.GET("/ai/configs/default", aiConfigHandler.GetDefaultConfig)
+		api.POST("/ai/configs/create", aiConfigHandler.CreateConfig)
+		api.POST("/ai/configs/update", aiConfigHandler.UpdateConfig)
+		api.POST("/ai/configs/set-default", aiConfigHandler.SetDefaultConfig)
+		api.POST("/ai/configs/delete", aiConfigHandler.DeleteConfig)
+
+		// AI会话管理
+		api.GET("/ai/sessions", aiHandler.GetSessions)
+		api.GET("/ai/session", aiHandler.GetSession)
+		api.POST("/ai/session/create", aiHandler.CreateSession)
+		api.POST("/ai/session/delete", aiHandler.DeleteSession)
+		api.POST("/ai/session/clear", aiHandler.ClearSession)
+		api.GET("/ai/messages", aiHandler.GetMessages)
 	}
 
 	// WebSocket 路由（需要认证，未登录则重定向）
 	r.GET("/ws", middleware.GinPageAuthMiddleware(), wsHandler.GinHandleWebSocket)
 	r.GET("/ws/local", middleware.GinPageAuthMiddleware(), handlers.GinHandleLocalTerminal)
+	r.GET("/ws/ai", middleware.GinPageAuthMiddleware(), func(c *gin.Context) {
+		aiHandler.ChatStream(c.Writer, c.Request)
+	})
 
 	// 启动服务器
 	port := config.GetPort()

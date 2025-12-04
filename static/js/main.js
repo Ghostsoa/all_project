@@ -8,6 +8,7 @@ import { loadCommandHistory, clearCurrentCommands, saveCommandToHistory } from '
 import { initFileTree, setCurrentServer, setLocalTerminal, loadDirectory, initDragUpload } from './filetree.js';
 import { openFileEditor } from './editor.js';
 import { updateTerminalSnapshot, updateWorkspaceInfo } from './ai-assistant.js';
+import './ai-settings.js'; // AI设置管理
 
 // 导出AI助手函数到window
 window.updateTerminalSnapshot = updateTerminalSnapshot;

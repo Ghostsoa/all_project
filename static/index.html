@@ -18,6 +18,7 @@
     <link rel="stylesheet" href="/static/css/components.css">
     <link rel="stylesheet" href="/static/css/upload-progress.css">
     <link rel="stylesheet" href="/static/css/ai-assistant.css">
+    <link rel="stylesheet" href="/static/css/ai-settings.css">
     <!-- Devicon图标库 - 专业开发者图标 -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/devicons/devicon@latest/devicon.min.css">
     <!-- Font Awesome图标库 - 通用文件图标 -->
@@ -176,12 +177,8 @@
                         </div>
                     </div>
 
-                    <!-- 右侧：模式切换+设置 -->
+                    <!-- 右侧：设置 -->
                     <div class="ai-controls">
-                        <!-- 模式切换按钮（单个） -->
-                        <button class="mode-toggle-btn" onclick="toggleMode()" title="切换模式">
-                            <span id="currentModeText">Chat</span>
-                        </button>
                         <!-- 设置按钮 -->
                         <button class="tool-btn" onclick="openAISettings()" title="设置">
                             <i class="fa-solid fa-gear"></i>
@@ -194,7 +191,7 @@
                     <div class="ai-welcome">
                         <div class="welcome-icon">🤖</div>
                         <h3>AI 助手</h3>
-                        <p>Chat模式：实时终端操作 | Agent模式：项目级分析</p>
+                        <p>开始对话，获取智能帮助</p>
                     </div>
                 </div>
 
@@ -305,6 +302,232 @@
             <div class="modal-footer">
                 <button class="btn btn-secondary" onclick="closeModal()">取消</button>
                 <button class="btn btn-primary" onclick="saveServer()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI设置模态框 -->
+    <div class="modal" id="aiSettingsModal">
+        <div class="modal-content modal-large">
+            <div class="modal-header">
+                <h2>⚙️ AI 设置</h2>
+                <button class="btn-close" onclick="closeAISettings()">✕</button>
+            </div>
+            <div class="modal-body">
+                <!-- 标签页导航 -->
+                <div class="settings-tabs">
+                    <button class="settings-tab active" data-tab="models" onclick="switchSettingsTab('models')">
+                        <i class="fa-solid fa-brain"></i> AI模型
+                    </button>
+                    <button class="settings-tab" data-tab="endpoints" onclick="switchSettingsTab('endpoints')">
+                        <i class="fa-solid fa-plug"></i> API接口
+                    </button>
+                    <button class="settings-tab" data-tab="configs" onclick="switchSettingsTab('configs')">
+                        <i class="fa-solid fa-sliders"></i> 模型配置
+                    </button>
+                </div>
+
+                <!-- 标签页内容 -->
+                <div class="settings-content">
+                    <!-- AI模型管理 -->
+                    <div class="settings-panel active" id="modelsPanel">
+                        <div class="panel-header">
+                            <h3>AI模型列表</h3>
+                            <button class="btn btn-primary btn-sm" onclick="showAddModelForm()">
+                                <i class="fa-solid fa-plus"></i> 添加模型
+                            </button>
+                        </div>
+                        <div class="panel-body">
+                            <div id="modelsList" class="items-list">
+                                <div class="loading">加载中...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- API接口管理 -->
+                    <div class="settings-panel" id="endpointsPanel">
+                        <div class="panel-header">
+                            <h3>API接口列表</h3>
+                            <button class="btn btn-primary btn-sm" onclick="showAddEndpointForm()">
+                                <i class="fa-solid fa-plus"></i> 添加接口
+                            </button>
+                        </div>
+                        <div class="panel-body">
+                            <div id="endpointsList" class="items-list">
+                                <div class="loading">加载中...</div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 模型配置管理 -->
+                    <div class="settings-panel" id="configsPanel">
+                        <div class="panel-header">
+                            <h3>模型配置列表</h3>
+                            <button class="btn btn-primary btn-sm" onclick="showAddConfigForm()">
+                                <i class="fa-solid fa-plus"></i> 添加配置
+                            </button>
+                        </div>
+                        <div class="panel-body">
+                            <div id="configsList" class="items-list">
+                                <div class="loading">加载中...</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeAISettings()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加/编辑AI模型表单模态框 -->
+    <div class="modal" id="modelFormModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modelFormTitle">添加AI模型</h2>
+                <button class="btn-close" onclick="closeModelForm()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="modelForm">
+                    <input type="hidden" id="modelId">
+                    <div class="form-group">
+                        <label>模型名称 *</label>
+                        <input type="text" id="modelName" required placeholder="例如: gpt-4">
+                    </div>
+                    <div class="form-group">
+                        <label>显示名称 *</label>
+                        <input type="text" id="modelDisplayName" required placeholder="例如: GPT-4">
+                    </div>
+                    <div class="form-group">
+                        <label>提供商</label>
+                        <input type="text" id="modelProvider" placeholder="例如: openai">
+                    </div>
+                    <div class="form-group">
+                        <label>描述</label>
+                        <textarea id="modelDescription" rows="3" placeholder="模型描述"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="modelIsActive" checked>
+                            启用此模型
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeModelForm()">取消</button>
+                <button class="btn btn-primary" onclick="saveModel()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加/编辑API接口表单模态框 -->
+    <div class="modal" id="endpointFormModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="endpointFormTitle">添加API接口</h2>
+                <button class="btn-close" onclick="closeEndpointForm()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="endpointForm">
+                    <input type="hidden" id="endpointId">
+                    <div class="form-group">
+                        <label>接口名称 *</label>
+                        <input type="text" id="endpointName" required placeholder="例如: OpenAI Official">
+                    </div>
+                    <div class="form-group">
+                        <label>Base URL *</label>
+                        <input type="text" id="endpointBaseURL" required placeholder="https://api.openai.com/v1">
+                    </div>
+                    <div class="form-group">
+                        <label>API Key *</label>
+                        <input type="password" id="endpointAPIKey" required placeholder="sk-...">
+                    </div>
+                    <div class="form-group">
+                        <label>提供商</label>
+                        <input type="text" id="endpointProvider" placeholder="例如: openai">
+                    </div>
+                    <div class="form-group">
+                        <label>描述</label>
+                        <textarea id="endpointDescription" rows="3" placeholder="接口描述"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="endpointIsActive" checked>
+                            启用此接口
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeEndpointForm()">取消</button>
+                <button class="btn btn-primary" onclick="saveEndpoint()">保存</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加/编辑模型配置表单模态框 -->
+    <div class="modal" id="configFormModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="configFormTitle">添加模型配置</h2>
+                <button class="btn-close" onclick="closeConfigForm()">✕</button>
+            </div>
+            <div class="modal-body">
+                <form id="configForm">
+                    <input type="hidden" id="configId">
+                    <div class="form-group">
+                        <label>配置名称 *</label>
+                        <input type="text" id="configName" required placeholder="例如: 默认配置">
+                    </div>
+                    <div class="form-group">
+                        <label>选择模型 *</label>
+                        <select id="configModelId" required>
+                            <option value="">请选择模型</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>选择API接口 *</label>
+                        <select id="configEndpointId" required>
+                            <option value="">请选择接口</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Temperature (0-2)</label>
+                        <input type="number" id="configTemperature" step="0.1" min="0" max="2" value="0.7">
+                    </div>
+                    <div class="form-group">
+                        <label>Max Tokens</label>
+                        <input type="number" id="configMaxTokens" min="1" value="4096">
+                    </div>
+                    <div class="form-group">
+                        <label>Top P (0-1)</label>
+                        <input type="number" id="configTopP" step="0.1" min="0" max="1" value="1">
+                    </div>
+                    <div class="form-group">
+                        <label>Frequency Penalty (-2 to 2)</label>
+                        <input type="number" id="configFrequencyPenalty" step="0.1" min="-2" max="2" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>Presence Penalty (-2 to 2)</label>
+                        <input type="number" id="configPresencePenalty" step="0.1" min="-2" max="2" value="0">
+                    </div>
+                    <div class="form-group">
+                        <label>系统提示词</label>
+                        <textarea id="configSystemPrompt" rows="4" placeholder="你是一个有帮助的AI助手"></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="configIsDefault">
+                            设为默认配置
+                        </label>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" onclick="closeConfigForm()">取消</button>
+                <button class="btn btn-primary" onclick="saveConfig()">保存</button>
             </div>
         </div>
     </div>

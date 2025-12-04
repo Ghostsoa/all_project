@@ -1,6 +1,5 @@
 // AI 助手功能
 
-let currentAIMode = 'chat';  // 'chat' | 'agent'
 let selectedModelValue = 'gpt-4';
 let selectedModelName = 'GPT-4';
 
@@ -16,21 +15,6 @@ window.toggleHistoryDropdown = function() {
         menu.style.display = 'none';
         trigger.classList.remove('open');
     }
-};
-
-// 切换模式（单按钮切换）
-window.toggleMode = function() {
-    // 在 chat 和 agent 之间切换
-    currentAIMode = currentAIMode === 'chat' ? 'agent' : 'chat';
-    const modeText = currentAIMode === 'chat' ? 'Chat' : 'Agent';
-    
-    // 更新按钮文本
-    const modeBtn = document.getElementById('currentModeText');
-    if (modeBtn) {
-        modeBtn.textContent = modeText;
-    }
-    
-    console.log(`🔄 切换到${modeText}模式`);
 };
 
 // 打开AI设置
@@ -69,7 +53,7 @@ window.sendAIMessage = function() {
         return;
     }
     
-    console.log(`🤖 [${currentAIMode}模式] [${selectedModelName}] 发送:`, message);
+    console.log(`🤖 [${selectedModelName}] 发送:`, message);
     
     // 添加用户消息到界面
     addAIMessage('user', message);
@@ -80,7 +64,7 @@ window.sendAIMessage = function() {
     
     // TODO: 调用AI API
     setTimeout(() => {
-        const response = `模式: ${currentAIMode === 'chat' ? 'Chat' : 'Agent'}\n模型: ${selectedModelName}\n\n收到消息: ${message}\n\n（AI功能开发中...）`;
+        const response = `模型: ${selectedModelName}\n\n收到消息: ${message}\n\n（AI功能开发中...）`;
         addAIMessage('assistant', response);
     }, 500);
 };
