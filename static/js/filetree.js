@@ -22,16 +22,24 @@ export function initFileTree() {
     const fileTreeContainer = document.getElementById('fileTree');
     if (!fileTreeContainer) return;
     
+    console.log('🔧 初始化文件树...');
+    
     // 显示隐藏文件勾选框事件
     const showHiddenCheckbox = document.getElementById('showHiddenFiles');
     if (showHiddenCheckbox) {
+        console.log('✅ 绑定显示隐藏文件勾选框事件');
         showHiddenCheckbox.addEventListener('change', toggleHiddenFiles);
+    } else {
+        console.warn('❌ 未找到showHiddenFiles元素');
     }
     
     // 刷新按钮事件
     const refreshBtn = document.getElementById('refreshBtn');
     if (refreshBtn) {
+        console.log('✅ 绑定刷新按钮事件');
         refreshBtn.addEventListener('click', refreshCurrentDirectory);
+    } else {
+        console.warn('❌ 未找到refreshBtn元素');
     }
     
     // 添加F5刷新快捷键
@@ -60,7 +68,12 @@ export function initFileTree() {
 
 // 手动刷新当前目录
 async function refreshCurrentDirectory() {
-    if (!currentSessionID || !currentPath) return;
+    console.log('🔄 刷新按钮点击', { currentSessionID, currentPath });
+    
+    if (!currentSessionID || !currentPath) {
+        console.warn('⚠️ 未连接服务器或无当前路径');
+        return;
+    }
     
     try {
         const files = await fileCache.refresh(currentSessionID, currentPath);
@@ -74,12 +87,18 @@ async function refreshCurrentDirectory() {
 // 切换显示隐藏文件
 function toggleHiddenFiles() {
     const checkbox = document.getElementById('showHiddenFiles');
-    setShowHiddenFiles(checkbox.checked);
+    const checked = checkbox.checked;
+    console.log('👁️ 切换显示隐藏文件:', checked, { currentSessionID, currentPath });
+    
+    setShowHiddenFiles(checked);
     
     // 清除缓存，重新加载当前目录
     if (currentSessionID && currentPath) {
+        console.log('🗑️ 清除缓存并重新加载');
         fileCache.cache.clear();
         loadDirectory(currentPath);
+    } else {
+        console.warn('⚠️ 未连接服务器或无当前路径，无法重新加载');
     }
 }
 
