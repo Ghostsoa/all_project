@@ -310,6 +310,11 @@ async function streamChat(sessionId, message, thinkingId) {
                         updateMessageContent(messageElement, assistantMessage);
                     }
                     
+                    // 收到第一条正文内容时，自动折叠思维链
+                    if (reasoningContent && assistantMessage.length <= data.content.length) {
+                        updateReasoningContent(messageElement, reasoningContent, true);
+                    }
+                    
                     scrollToBottom();
                     
                 } else if (data.type === 'reasoning') {
@@ -399,25 +404,26 @@ function createMessageElement(role, content, reasoning = null) {
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'message-content-wrapper';
     
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-    contentDiv.innerHTML = formatMessageContent(content);
-    
-    contentWrapper.appendChild(contentDiv);
-    
-    // 如果有思维链内容
+    // 如果有思维链内容，先添加思维链
     if (reasoning) {
         const reasoningDiv = document.createElement('div');
         reasoningDiv.className = 'message-reasoning';
         reasoningDiv.innerHTML = `
-            <div class="reasoning-header">
-                <i class="fa-solid fa-brain"></i>
-                <span>思考过程</span>
+            <div class="reasoning-header" onclick="toggleReasoning(this)">
+                <span>Thought</span>
+                <span class="reasoning-arrow">▼</span>
             </div>
             <div class="reasoning-content">${escapeHtml(reasoning)}</div>
         `;
         contentWrapper.appendChild(reasoningDiv);
     }
+    
+    // 然后添加正文内容
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    contentDiv.innerHTML = formatMessageContent(content);
+    
+    contentWrapper.appendChild(contentDiv);
     
     messageDiv.appendChild(avatar);
     messageDiv.appendChild(contentWrapper);
@@ -439,29 +445,38 @@ function updateMessageContent(messageElement, content) {
 }
 
 // 更新思维链内容
-function updateReasoningContent(messageElement, reasoning) {
+function updateReasoningContent(messageElement, reasoning, autoCollapse = false) {
     let reasoningDiv = messageElement.querySelector('.message-reasoning');
     
     if (!reasoningDiv) {
         reasoningDiv = document.createElement('div');
         reasoningDiv.className = 'message-reasoning';
         reasoningDiv.innerHTML = `
-            <div class="reasoning-header">
-                <i class="fa-solid fa-brain"></i>
-                <span>思考过程</span>
+            <div class="reasoning-header" onclick="toggleReasoning(this)">
+                <span>Thought</span>
+                <span class="reasoning-arrow">▼</span>
             </div>
             <div class="reasoning-content"></div>
         `;
-        
         const contentWrapper = messageElement.querySelector('.message-content-wrapper');
         if (contentWrapper) {
-            contentWrapper.appendChild(reasoningDiv);
+            contentWrapper.insertBefore(reasoningDiv, contentWrapper.firstChild);
         }
     }
     
-    const reasoningContentDiv = reasoningDiv.querySelector('.reasoning-content');
-    if (reasoningContentDiv) {
-        reasoningContentDiv.textContent = reasoning;
+    const reasoningContent = reasoningDiv.querySelector('.reasoning-content');
+    if (reasoningContent) {
+        reasoningContent.textContent = reasoning;
+    }
+    
+    // 自动折叠
+    if (autoCollapse) {
+        const header = reasoningDiv.querySelector('.reasoning-header');
+        const content = reasoningDiv.querySelector('.reasoning-content');
+        if (header && content) {
+            header.classList.add('collapsed');
+            content.classList.add('collapsed');
+        }
     }
 }
 
@@ -586,6 +601,15 @@ window.toggleHistoryDropdown = function() {
         menu.style.display = 'block';
         if (trigger) trigger.classList.add('open');
     }
+};
+
+// 切换思维链展开/折叠
+window.toggleReasoning = function(headerElement) {
+    const content = headerElement.nextElementSibling;
+    if (!content) return;
+    
+    headerElement.classList.toggle('collapsed');
+    content.classList.toggle('collapsed');
 };
 
 // 点击其他地方关闭下拉菜单
