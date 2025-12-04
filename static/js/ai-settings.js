@@ -461,10 +461,23 @@ window.closeConfigForm = function() {
 // 保存配置
 window.saveConfig = async function() {
     const id = document.getElementById('configId').value;
+    const modelId = parseInt(document.getElementById('configModelId').value);
+    const endpointId = parseInt(document.getElementById('configEndpointId').value);
+
+    // 验证必填字段
+    if (!modelId || isNaN(modelId)) {
+        alert('请选择AI模型');
+        return;
+    }
+    if (!endpointId || isNaN(endpointId)) {
+        alert('请选择API接口');
+        return;
+    }
+
     const data = {
         name: document.getElementById('configName').value,
-        model_id: parseInt(document.getElementById('configModelId').value),
-        endpoint_id: parseInt(document.getElementById('configEndpointId').value),
+        model_id: modelId,
+        endpoint_id: endpointId,
         temperature: parseFloat(document.getElementById('configTemperature').value),
         max_tokens: parseInt(document.getElementById('configMaxTokens').value),
         top_p: parseFloat(document.getElementById('configTopP').value),
@@ -475,16 +488,18 @@ window.saveConfig = async function() {
     };
 
     try {
+        let savedId = id;
         if (id) {
             data.id = parseInt(id);
             await apiRequest('/api/ai/configs/update', 'POST', data);
         } else {
-            await apiRequest('/api/ai/configs/create', 'POST', data);
+            const result = await apiRequest('/api/ai/configs/create', 'POST', data);
+            savedId = result.data?.id;
         }
 
         // 如果设置为默认，需要调用设置默认接口
-        if (data.is_default) {
-            await apiRequest(`/api/ai/configs/set-default?id=${id || data.id}`, 'POST');
+        if (data.is_default && savedId) {
+            await apiRequest(`/api/ai/configs/set-default?id=${savedId}`, 'POST');
         }
 
         closeConfigForm();
