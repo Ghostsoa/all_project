@@ -33,6 +33,13 @@ class FileTreeCache {
         this.currentPath = path;
     }
     
+    // 清空预加载队列（切换服务器时调用）
+    clearPreloadQueue() {
+        this.preloadQueue = [];
+        this.preloading = false;
+        console.log('🧹 已清空预加载队列');
+    }
+    
     // 主方法：获取或加载目录
     async getOrLoad(sessionID, path) {
         const key = this.makeKey(sessionID, path);

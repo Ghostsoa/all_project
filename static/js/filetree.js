@@ -150,6 +150,9 @@ export async function setCurrentServer(serverID, sessionID) {
     currentSessionID = sessionID;
     isLocalTerminal = false; // 设置为SSH模式
     
+    // 清空预加载队列，避免旧session的任务继续执行
+    fileCache.clearPreloadQueue();
+    
     // 立即清空文件树，显示加载中
     const fileTreeContainer = document.getElementById('fileTree');
     if (fileTreeContainer) {
@@ -184,6 +187,9 @@ export async function setLocalTerminal() {
     currentSessionID = 'local'; // 本地标识
     
     console.log('🔄 切换到本地终端模式');
+    
+    // 清空预加载队列，避免SSH session的任务继续执行
+    fileCache.clearPreloadQueue();
     
     // 立即清空文件树，显示加载中
     const fileTreeContainer = document.getElementById('fileTree');
