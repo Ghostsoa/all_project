@@ -232,6 +232,9 @@
     max-height: 108px; /* 6行高度 (18px * 6) */
     overflow-y: auto;
     margin-bottom: 6px;
+    word-break: keep-all;
+    white-space: pre-wrap;
+    overflow-wrap: normal;
 }
 
 .input-box textarea::placeholder {
@@ -458,6 +461,13 @@
     overflow: hidden;
 }
 
+/* 用户消息wrapper：右对齐，自适应宽度 */
+.ai-message.user .message-content-wrapper {
+    display: flex;
+    justify-content: flex-end;
+    max-width: 100%;
+}
+
 /* AI消息：无气泡样式 */
 .message-content {
     color: rgba(255, 255, 255, 0.9);
@@ -476,6 +486,7 @@
     padding: 8px 12px;
     font-size: 13px;
     max-width: 80%;
+    width: fit-content;
     word-break: keep-all;
     word-wrap: break-word;
     overflow-wrap: break-word;

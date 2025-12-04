@@ -283,8 +283,7 @@ async function streamChat(sessionId, message, thinkingId) {
         
         chatWebSocket.onopen = () => {
             console.log('✅ WebSocket连接已建立');
-            // 移除思考状态
-            removeThinking(thinkingId);
+            // 不删除thinking，等收到消息后无缝切换
             
             // 发送消息到后端
             const payload = {
@@ -306,7 +305,13 @@ async function streamChat(sessionId, message, thinkingId) {
                     assistantMessage += data.content;
                     
                     if (!messageElement) {
-                        messageElement = createMessageElement('assistant', assistantMessage);
+                        // 第一条消息：将thinking元素转换为正式消息
+                        messageElement = convertThinkingToMessage(thinkingId);
+                        if (!messageElement) {
+                            messageElement = createMessageElement('assistant', assistantMessage);
+                        } else {
+                            updateMessageContent(messageElement, assistantMessage);
+                        }
                     } else {
                         updateMessageContent(messageElement, assistantMessage);
                     }
@@ -329,9 +334,12 @@ async function streamChat(sessionId, message, thinkingId) {
                     // 思维链内容
                     reasoningContent += data.content;
                     
-                    // 如果还没有消息元素，先创建一个空的
+                    // 如果还没有消息元素，将thinking转换为正式消息
                     if (!messageElement) {
-                        messageElement = createMessageElement('assistant', '');
+                        messageElement = convertThinkingToMessage(thinkingId);
+                        if (!messageElement) {
+                            messageElement = createMessageElement('assistant', '');
+                        }
                     }
                     
                     // 更新思维链，第一次创建时带流光
@@ -353,11 +361,18 @@ async function streamChat(sessionId, message, thinkingId) {
                         updateMessageContent(messageElement, '');
                     }
                     
+                    // 清理可能残留的thinking元素
+                    removeThinking(thinkingId);
+                    
                     resolve();
                     
                 } else if (data.type === 'error') {
                     // 错误
                     console.error('❌ 对话错误:', data.content);
+                    
+                    // 清理thinking元素
+                    removeThinking(thinkingId);
+                    
                     if (!messageElement) {
                         appendMessage('assistant', '抱歉，发生了错误: ' + data.content);
                     }
@@ -522,7 +537,7 @@ function showThinking() {
         <div class="message-avatar">🤖</div>
         <div class="message-content-wrapper">
             <div class="message-content">
-                <span class="typing-indicator shimmer-text">running</span>
+                <span class="typing-indicator shimmer-text">Running</span>
             </div>
         </div>
     `;
@@ -541,6 +556,26 @@ function removeThinking(thinkingId) {
             thinkingDiv.remove();
         }
     }
+}
+
+// 将thinking元素转换为正式消息元素（无缝切换）
+function convertThinkingToMessage(thinkingId) {
+    if (!thinkingId) return null;
+    
+    const thinkingDiv = document.getElementById(thinkingId);
+    if (!thinkingDiv) return null;
+    
+    // 移除thinking类和id
+    thinkingDiv.classList.remove('thinking');
+    thinkingDiv.removeAttribute('id');
+    
+    // 清空内容，保留结构
+    const contentDiv = thinkingDiv.querySelector('.message-content');
+    if (contentDiv) {
+        contentDiv.innerHTML = '';
+    }
+    
+    return thinkingDiv;
 }
 
 // 格式化消息内容（完整Markdown支持）
