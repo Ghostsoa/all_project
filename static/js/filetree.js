@@ -840,7 +840,8 @@ window.pasteFile = async function(targetPath) {
             const data = await response.json();
             if (data.success) {
                 showToast('复制成功', 'success');
-                await loadDirectory(targetPath); // 刷新目录
+                // 刷新当前目录
+                await loadDirectory(currentPath);
             } else {
                 showToast('复制失败: ' + data.error, 'error');
             }
@@ -860,8 +861,8 @@ window.pasteFile = async function(targetPath) {
             if (data.success) {
                 showToast('移动成功', 'success');
                 
-                // 刷新目标目录
-                await loadDirectory(targetPath);
+                // 刷新当前目录
+                await loadDirectory(currentPath);
                 
                 clipboard = null; // 清空剪贴板
             } else {

@@ -8,6 +8,8 @@ import (
 	"all_project/models"
 	"fmt"
 	"log"
+	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
@@ -43,8 +45,30 @@ func main() {
 	// 创建Gin路由
 	r := gin.Default()
 
-	// 静态文件服务（不需要认证）
-	r.Static("/static", "./static")
+	// 静态文件服务（不需要认证，添加缓存支持）
+	staticGroup := r.Group("/static")
+	staticGroup.Use(func(c *gin.Context) {
+		path := c.Request.URL.Path
+
+		// 根据文件类型设置不同的缓存策略
+		if strings.HasSuffix(path, ".css") || strings.HasSuffix(path, ".js") {
+			// CSS/JS文件：缓存7天
+			c.Header("Cache-Control", "public, max-age=604800")
+		} else if strings.HasSuffix(path, ".woff") || strings.HasSuffix(path, ".woff2") ||
+			strings.HasSuffix(path, ".ttf") || strings.HasSuffix(path, ".eot") ||
+			strings.HasSuffix(path, ".svg") || strings.HasSuffix(path, ".png") ||
+			strings.HasSuffix(path, ".jpg") || strings.HasSuffix(path, ".gif") ||
+			strings.HasSuffix(path, ".ico") {
+			// 字体文件和图片：缓存30天
+			c.Header("Cache-Control", "public, max-age=2592000")
+		} else {
+			// 其他文件：缓存1天
+			c.Header("Cache-Control", "public, max-age=86400")
+		}
+
+		c.Next()
+	})
+	staticGroup.StaticFS("/", http.Dir("./static"))
 
 	// 登录页面（不需要认证）
 	r.GET("/login", func(c *gin.Context) {
