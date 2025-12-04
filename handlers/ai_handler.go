@@ -282,12 +282,16 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 			}
 
 			// 注入实时信息（带来源标记）
-			parts = append(parts, "\n\n---\n## 用户当前操作环境快照\n")
+			parts = append(parts, "\n\n---\n## 【实时环境信息】用户终端当前状态\n")
 			if sourceInfo != "" {
 				parts = append(parts, "**来源**: "+sourceInfo+"\n\n")
 			}
-			parts = append(parts, "**说明**: 以下是用户当前正在查看的终端界面的最近输出（终端缓冲区快照），包含最近执行的命令和输出结果。你可以根据这些信息理解用户的操作上下文。\n\n")
-			parts = append(parts, "```\n"+realTimeInfo+"\n```")
+			parts = append(parts, "**重要说明**: \n")
+			parts = append(parts, "- 这是**系统自动捕获**的用户终端实时快照（最近50行输出）\n")
+			parts = append(parts, "- **每次对话都会重新获取最新内容**，不是历史数据\n")
+			parts = append(parts, "- 包含用户刚刚执行的命令和最新输出结果\n")
+			parts = append(parts, "- 你可以直接引用这些内容回答用户问题，这就是用户**现在**看到的终端界面\n\n")
+			parts = append(parts, "**终端输出内容**:\n```\n"+realTimeInfo+"\n```")
 
 			systemPrompt = strings.Join(parts, "")
 			log.Printf("📝 终端快照已注入系统提示词")
@@ -315,12 +319,16 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 					// 拼接指针信息到用户消息（带来源标记）
 					var cursorParts []string
 					cursorParts = append(cursorParts, historyMessages[i].Content)
-					cursorParts = append(cursorParts, "\n\n---\n## 用户当前编辑器上下文\n")
+					cursorParts = append(cursorParts, "\n\n---\n## 【实时环境信息】用户编辑器当前状态\n")
 					if sourceInfo != "" {
 						cursorParts = append(cursorParts, "**来源**: "+sourceInfo+"\n\n")
 					}
-					cursorParts = append(cursorParts, "**说明**: 以下是用户当前正在查看/编辑的文件的光标位置和周围代码上下文。箭头(→)标记的是光标所在行。\n\n")
-					cursorParts = append(cursorParts, "```\n"+cursorInfo+"\n```")
+					cursorParts = append(cursorParts, "**重要说明**:\n")
+					cursorParts = append(cursorParts, "- 这是**系统自动捕获**的用户编辑器实时状态\n")
+					cursorParts = append(cursorParts, "- 包含用户**当前光标位置**和周围代码上下文（前后10行）\n")
+					cursorParts = append(cursorParts, "- 箭头(→)标记的是光标所在行\n")
+					cursorParts = append(cursorParts, "- 你可以直接引用这些代码回答问题，这就是用户**正在查看**的代码\n\n")
+					cursorParts = append(cursorParts, "**代码上下文**:\n```\n"+cursorInfo+"\n```")
 
 					historyMessages[i].Content = strings.Join(cursorParts, "")
 					log.Printf("📝 编辑器上下文已注入用户消息")
