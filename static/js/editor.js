@@ -6,6 +6,11 @@ import { showConfirm } from './modal.js';
 let editorInstances = new Map(); // 存储编辑器实例
 let openFiles = new Map(); // 存储打开的文件信息
 
+// Office文档格式（需要特殊提示）
+const OFFICE_EXTENSIONS = new Set([
+    'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'
+]);
+
 // 不可编辑的文件扩展名（二进制文件、可执行文件、压缩包等）
 const NON_EDITABLE_EXTENSIONS = new Set([
     // 可执行文件
@@ -35,6 +40,17 @@ export async function openFileEditor(filePath, serverID, sessionID, fileSize = 0
     
     // 检查文件类型
     const ext = filePath.split('.').pop()?.toLowerCase();
+    
+    // Office文档特殊提示
+    if (ext && OFFICE_EXTENSIONS.has(ext)) {
+        const confirmed = await showConfirm(
+            `📄 Office文档（.${ext}）无法在浏览器中编辑。\n\n建议：\n• 使用sftp下载到本地后编辑\n• 或在服务器上使用命令行工具\n\n如果是CSV等文本格式，请修改为.csv扩展名。\n\n是否要查看原始内容？（可能是乱码）`,
+            'Office文档提示'
+        );
+        if (!confirmed) return;
+    }
+    
+    // 其他二进制文件直接拒绝
     if (ext && NON_EDITABLE_EXTENSIONS.has(ext)) {
         showToast(`无法编辑 .${ext} 文件（二进制/不支持的格式）`, 'error');
         return;

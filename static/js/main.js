@@ -10,6 +10,7 @@ import { openFileEditor } from './editor.js';
 
 // 保存每个服务器的content-tabs状态
 const serverContentTabs = new Map(); // sessionId -> HTML string
+const serverActivePane = new Map(); // sessionId -> { type: 'terminal'|'editor', id: string }
 
 // 页面加载
 document.addEventListener('DOMContentLoaded', function() {
@@ -183,49 +184,71 @@ window.switchToTerminal = function(sessionId) {
 window.switchTab = function(sessionId) {
     const prevSessionId = state.activeSessionId;
     
-    // 保存当前服务器的content-tabs状态
+    // 保存当前服务器的状态
     if (prevSessionId) {
         const contentTabsList = document.getElementById('contentTabsList');
         serverContentTabs.set(prevSessionId, contentTabsList.innerHTML);
+        
+        // 保存当前激活的pane
+        const activeTerminal = document.querySelector('.terminal-pane.active');
+        const activeEditor = document.querySelector('.editor-pane.active');
+        if (activeTerminal) {
+            serverActivePane.set(prevSessionId, { type: 'terminal', id: activeTerminal.id });
+        } else if (activeEditor) {
+            const tabId = activeEditor.dataset.tabId;
+            const path = activeEditor.dataset.path;
+            serverActivePane.set(prevSessionId, { type: 'editor', id: tabId, path });
+        }
     }
     
     state.activeSessionId = sessionId;
     
-    // 切换终端pane显示
+    // 隐藏所有pane
     document.querySelectorAll('.terminal-pane').forEach(pane => {
         pane.classList.remove('active');
     });
-    document.getElementById(sessionId)?.classList.add('active');
+    document.querySelectorAll('.editor-pane').forEach(pane => {
+        pane.classList.remove('active');
+    });
     
     // 切换顶部tab-item高亮
     document.querySelectorAll('.tab-item').forEach(tab => {
         tab.classList.remove('active');
     });
     
-    // 隐藏所有editor-pane
-    document.querySelectorAll('.editor-pane').forEach(pane => {
-        pane.classList.remove('active');
-    });
-    
     // 恢复该服务器的content-tabs状态
     const contentTabsList = document.getElementById('contentTabsList');
     if (serverContentTabs.has(sessionId)) {
-        // 恢复保存的状态
+        // 恢复保存的标签HTML
         contentTabsList.innerHTML = serverContentTabs.get(sessionId);
         
-        // 激活终端标签
-        contentTabsList.querySelectorAll('.content-tab-item').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        contentTabsList.querySelector('.content-tab-item[data-type="terminal"]')?.classList.add('active');
+        // 恢复激活状态
+        const savedActive = serverActivePane.get(sessionId);
+        if (savedActive) {
+            if (savedActive.type === 'terminal') {
+                // 激活终端
+                document.getElementById(savedActive.id)?.classList.add('active');
+                contentTabsList.querySelector('.content-tab-item[data-type="terminal"]')?.classList.add('active');
+            } else if (savedActive.type === 'editor') {
+                // 激活编辑器
+                const editorPane = document.querySelector(`.editor-pane[data-tab-id="${savedActive.id}"]`);
+                editorPane?.classList.add('active');
+                contentTabsList.querySelector(`.content-tab-item[data-tab-id="${savedActive.id}"]`)?.classList.add('active');
+            }
+        } else {
+            // 没有保存的状态，默认激活终端
+            document.getElementById(sessionId)?.classList.add('active');
+            contentTabsList.querySelector('.content-tab-item[data-type="terminal"]')?.classList.add('active');
+        }
     } else {
-        // 首次，创建终端标签
+        // 首次，创建终端标签并激活
         contentTabsList.innerHTML = `
             <div class="content-tab-item active" data-session-id="${sessionId}" data-type="terminal" onclick="window.switchToTerminal('${sessionId}')">
                 <span class="tab-icon">💻</span>
                 <span class="tab-name">终端</span>
             </div>
         `;
+        document.getElementById(sessionId)?.classList.add('active');
     }
     
     const session = state.terminals.get(sessionId);
@@ -250,8 +273,9 @@ window.closeTab = function(sessionId) {
     document.getElementById(sessionId)?.remove();
     state.terminals.delete(sessionId);
     
-    // 清理保存的content-tabs状态
+    // 清理保存的状态
     serverContentTabs.delete(sessionId);
+    serverActivePane.delete(sessionId);
     
     if (state.activeSessionId === sessionId) {
         const remaining = Array.from(state.terminals.keys());

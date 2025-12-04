@@ -324,6 +324,8 @@ window.navigateUp = function(currentPath) {
 
 // 就地创建文件
 window.createNewFile = async function(basePath) {
+    closeAllContextMenus();
+    
     const fileList = document.querySelector('.file-list');
     if (!fileList) return;
     
@@ -410,6 +412,8 @@ window.createNewFile = async function(basePath) {
 
 // 就地创建文件夹
 window.createNewFolder = async function(basePath) {
+    closeAllContextMenus();
+    
     const fileList = document.querySelector('.file-list');
     if (!fileList) return;
     
