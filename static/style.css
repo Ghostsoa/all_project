@@ -1239,6 +1239,28 @@ body {
     font-weight: 500;
 }
 
+.file-item.editing {
+    background: rgba(59, 130, 246, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.file-name-input {
+    flex: 1;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(59, 130, 246, 0.5);
+    border-radius: 3px;
+    padding: 2px 6px;
+    color: white;
+    outline: none;
+    font-size: 12px;
+    font-family: inherit;
+}
+
+.file-name-input:focus {
+    background: rgba(255, 255, 255, 0.15);
+    border-color: rgba(59, 130, 246, 0.8);
+}
+
 .file-icon {
     font-size: 14px;
     flex-shrink: 0;

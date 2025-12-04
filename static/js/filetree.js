@@ -29,7 +29,7 @@ export function initFileTree() {
     // 空白区域右键菜单
     fileTreeContainer.addEventListener('contextmenu', (e) => {
         // 如果点击的是文件项，让文件项自己处理
-        if (e.target.closest('.file-tree-item')) return;
+        if (e.target.closest('.file-item')) return;
         
         e.preventDefault();
         showBlankContextMenu(e, currentPath);
@@ -231,86 +231,176 @@ window.navigateUp = function(currentPath) {
     loadDirectory(parentPath);
 };
 
+// 就地创建文件
 window.createNewFile = async function(basePath) {
-    const fileName = prompt('请输入文件名:');
-    if (!fileName) return;
+    const fileList = document.querySelector('.file-list');
+    if (!fileList) return;
     
-    const filePath = basePath + '/' + fileName;
+    // 创建临时文件项（带输入框的完整文件项）
+    const tempDiv = document.createElement('div');
+    tempDiv.className = 'file-item editing is-file';
+    tempDiv.innerHTML = `
+        <span class="file-icon">📄</span>
+        <input type="text" class="file-name-input" value="未命名文件.txt" autofocus>
+    `;
     
-    // 乐观更新：立即添加到UI
-    const newFile = {
-        name: fileName,
-        path: filePath,
-        is_dir: false,
-        size: 0,
-        mod_time: new Date().toISOString()
-    };
-    fileCache.optimisticCreate(currentSessionID, basePath, newFile);
+    // 插入到列表开头（跳过..返回项）
+    const firstRealItem = Array.from(fileList.children).find(child => 
+        !child.textContent.includes('..')
+    );
+    if (firstRealItem) {
+        fileList.insertBefore(tempDiv, firstRealItem);
+    } else {
+        fileList.appendChild(tempDiv);
+    }
     
-    try {
-        const response = await fetch('/api/files/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                session_id: currentSessionID,
-                path: filePath,
-                is_dir: false
-            })
-        });
+    const input = tempDiv.querySelector('.file-name-input');
+    input.focus();
+    input.select(); // 全选文件名
+    
+    // 处理创建
+    const handleCreate = async () => {
+        const fileName = input.value.trim();
+        if (!fileName) {
+            tempDiv.remove();
+            return;
+        }
         
-        const data = await response.json();
-        if (data.success) {
-            showToast('文件创建成功', 'success');
-        } else {
-            showToast('创建失败: ' + data.error, 'error');
-            // 失败，回滚
+        const filePath = basePath + '/' + fileName;
+        
+        // 移除临时项，添加到缓存
+        tempDiv.remove();
+        const newFile = {
+            name: fileName,
+            path: filePath,
+            is_dir: false,
+            size: 0,
+            mod_time: new Date().toISOString()
+        };
+        fileCache.optimisticCreate(currentSessionID, basePath, newFile);
+        
+        try {
+            const response = await fetch('/api/files/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: currentSessionID,
+                    path: filePath,
+                    is_dir: false
+                })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                showToast('文件创建成功', 'success');
+            } else {
+                showToast('创建失败: ' + data.error, 'error');
+                await fileCache.rollback(currentSessionID, basePath);
+            }
+        } catch (error) {
+            showToast('创建失败', 'error');
             await fileCache.rollback(currentSessionID, basePath);
         }
-    } catch (error) {
-        showToast('创建失败', 'error');
-        // 失败，回滚
-        await fileCache.rollback(currentSessionID, basePath);
-    }
+    };
+    
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleCreate();
+        } else if (e.key === 'Escape') {
+            tempDiv.remove(); // 取消创建，删除临时项
+        }
+    });
+    
+    input.addEventListener('blur', () => {
+        setTimeout(() => handleCreate(), 100);
+    });
 };
 
+// 就地创建文件夹
 window.createNewFolder = async function(basePath) {
-    const folderName = prompt('请输入文件夹名:');
-    if (!folderName) return;
+    const fileList = document.querySelector('.file-list');
+    if (!fileList) return;
     
-    const folderPath = basePath + '/' + folderName;
+    // 创建临时文件夹项（带输入框的完整文件夹项）
+    const tempDiv = document.createElement('div');
+    tempDiv.className = 'file-item editing is-dir';
+    tempDiv.innerHTML = `
+        <span class="file-icon">📁</span>
+        <input type="text" class="file-name-input" value="新建文件夹" autofocus>
+    `;
     
-    // 乐观更新：立即添加到UI
-    const newFolder = {
-        name: folderName,
-        path: folderPath,
-        is_dir: true,
-        size: 0,
-        mod_time: new Date().toISOString()
-    };
-    fileCache.optimisticCreate(currentSessionID, basePath, newFolder);
+    // 插入到列表开头（跳过..返回项）
+    const firstRealItem = Array.from(fileList.children).find(child => 
+        !child.textContent.includes('..')
+    );
+    if (firstRealItem) {
+        fileList.insertBefore(tempDiv, firstRealItem);
+    } else {
+        fileList.appendChild(tempDiv);
+    }
     
-    try {
-        const response = await fetch('/api/files/create', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                session_id: currentSessionID,
-                path: folderPath,
-                is_dir: true
-            })
-        });
+    const input = tempDiv.querySelector('.file-name-input');
+    input.focus();
+    input.select(); // 全选文件夹名
+    
+    // 处理创建
+    const handleCreate = async () => {
+        const folderName = input.value.trim();
+        if (!folderName) {
+            tempDiv.remove();
+            return;
+        }
         
-        const data = await response.json();
-        if (data.success) {
-            showToast('文件夹创建成功', 'success');
-        } else {
-            showToast('创建失败: ' + data.error, 'error');
+        const folderPath = basePath + '/' + folderName;
+        
+        // 移除临时项，添加到缓存
+        tempDiv.remove();
+        const newFolder = {
+            name: folderName,
+            path: folderPath,
+            is_dir: true,
+            size: 0,
+            mod_time: new Date().toISOString()
+        };
+        fileCache.optimisticCreate(currentSessionID, basePath, newFolder);
+        
+        try {
+            const response = await fetch('/api/files/create', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: currentSessionID,
+                    path: folderPath,
+                    is_dir: true
+                })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                showToast('文件夹创建成功', 'success');
+            } else {
+                showToast('创建失败: ' + data.error, 'error');
+                await fileCache.rollback(currentSessionID, basePath);
+            }
+        } catch (error) {
+            showToast('创建失败', 'error');
             await fileCache.rollback(currentSessionID, basePath);
         }
-    } catch (error) {
-        showToast('创建失败', 'error');
-        await fileCache.rollback(currentSessionID, basePath);
-    }
+    };
+    
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleCreate();
+        } else if (e.key === 'Escape') {
+            tempDiv.remove(); // 取消创建，删除临时项
+        }
+    });
+    
+    input.addEventListener('blur', () => {
+        setTimeout(() => handleCreate(), 100);
+    });
 };
 
 window.showFileContextMenu = function(event, path, isDir) {
@@ -458,39 +548,83 @@ window.pasteFile = async function(targetPath) {
     }
 };
 
+// 就地重命名
 window.renameFile = async function(oldPath) {
     const oldName = oldPath.split('/').pop();
-    const newName = prompt('请输入新名称:', oldName);
-    if (!newName || newName === oldName) return;
-    
     const parentPath = oldPath.split('/').slice(0, -1).join('/') || '/';
-    const newPath = parentPath + '/' + newName;
     
-    // 乐观更新：立即重命名
-    fileCache.optimisticRename(currentSessionID, parentPath, oldPath, newPath, newName);
+    // 找到对应的文件项
+    const fileItem = document.querySelector(`[data-path="${oldPath}"]`);
+    if (!fileItem) return;
     
-    try {
-        const response = await fetch('/api/files/rename', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                session_id: currentSessionID,
-                old_path: oldPath,
-                new_path: newPath
-            })
-        });
+    const nameSpan = fileItem.querySelector('.file-name');
+    if (!nameSpan) return;
+    
+    // 创建输入框
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.className = 'file-name-input';
+    input.value = oldName;
+    input.style.cssText = 'flex: 1; background: rgba(255,255,255,0.1); border: 1px solid rgba(59,130,246,0.5); border-radius: 3px; padding: 2px 6px; color: white; outline: none;';
+    
+    // 替换名称为输入框
+    nameSpan.replaceWith(input);
+    input.focus();
+    input.select();
+    
+    // 处理重命名
+    const handleRename = async () => {
+        const newName = input.value.trim();
+        if (!newName || newName === oldName) {
+            input.replaceWith(nameSpan);
+            return;
+        }
         
-        const data = await response.json();
-        if (data.success) {
-            showToast('重命名成功', 'success');
-        } else {
-            showToast('重命名失败: ' + data.error, 'error');
+        const newPath = parentPath + '/' + newName;
+        
+        // 替换回名称
+        nameSpan.textContent = newName;
+        input.replaceWith(nameSpan);
+        
+        // 乐观更新
+        fileCache.optimisticRename(currentSessionID, parentPath, oldPath, newPath, newName);
+        
+        try {
+            const response = await fetch('/api/files/rename', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: currentSessionID,
+                    old_path: oldPath,
+                    new_path: newPath
+                })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                showToast('重命名成功', 'success');
+            } else {
+                showToast('重命名失败: ' + data.error, 'error');
+                await fileCache.rollback(currentSessionID, parentPath);
+            }
+        } catch (error) {
+            showToast('重命名失败', 'error');
             await fileCache.rollback(currentSessionID, parentPath);
         }
-    } catch (error) {
-        showToast('重命名失败', 'error');
-        await fileCache.rollback(currentSessionID, parentPath);
-    }
+    };
+    
+    input.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            handleRename();
+        } else if (e.key === 'Escape') {
+            input.replaceWith(nameSpan);
+        }
+    });
+    
+    input.addEventListener('blur', () => {
+        setTimeout(() => handleRename(), 100);
+    });
 };
 
 window.deleteFile = async function(path) {
