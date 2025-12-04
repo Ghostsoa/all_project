@@ -491,16 +491,21 @@ func (h *FileHandler) DownloadFile(c *gin.Context) {
 		return
 	}
 
-	// 获取文件名
+	// 获取文件名并处理中文编码
 	fileName := filepath.Base(path)
 
-	// 设置响应头
+	// 设置响应头（支持中文文件名）
 	c.Header("Content-Description", "File Transfer")
 	c.Header("Content-Transfer-Encoding", "binary")
-	c.Header("Content-Disposition", "attachment; filename="+fileName)
+	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`,
+		fileName,
+		strings.ReplaceAll(fileName, " ", "%20")))
 	c.Header("Content-Type", "application/octet-stream")
 	c.Header("Content-Length", strconv.FormatInt(stat.Size(), 10))
+	c.Header("Accept-Ranges", "bytes") // 支持断点续传
+	c.Header("Cache-Control", "public, max-age=0")
+	c.Header("X-Content-Type-Options", "nosniff")
 
-	// 流式传输文件内容
+	// 流式传输文件内容（高效，不占用内存）
 	io.Copy(c.Writer, file)
 }

@@ -1065,14 +1065,23 @@ async function uploadSingleFile(file, targetPath, taskId) {
         }
         
         // 上传成功
+        console.log('Upload success, updating UI and refreshing directory:', targetPath);
         updateUploadProgress(taskId, 100, file.size, 0, 'success');
+        
+        // 刷新当前目录
+        try {
+            await loadDirectory(targetPath);
+            console.log('Directory refreshed successfully');
+        } catch (refreshError) {
+            console.error('Failed to refresh directory:', refreshError);
+            showToast('上传成功，但刷新列表失败', 'warning');
+        }
+        
+        // 延迟移除进度UI
         setTimeout(() => {
             removeUploadProgress(taskId);
             uploadTasks.delete(taskId);
         }, 2000);
-        
-        // 刷新当前目录
-        await loadDirectory(targetPath);
         
     } catch (error) {
         if (error.name === 'AbortError' || error.message === '已取消') {
@@ -1120,21 +1129,44 @@ async function uploadFileComplete(file, filePath, taskId, task, startTime) {
             }
         };
         
+        // 上传完成，等待服务器处理
+        xhr.upload.onload = () => {
+            console.log('Upload data sent, waiting for server response...');
+            const speedSpan = document.querySelector(`#upload-${taskId} .upload-speed`);
+            if (speedSpan) {
+                speedSpan.textContent = '服务器处理中...';
+            }
+        };
+        
         xhr.onload = () => {
+            console.log('Upload complete, status:', xhr.status);
             if (xhr.status === 200) {
-                const data = JSON.parse(xhr.responseText);
-                if (data.success) {
-                    resolve();
-                } else {
-                    reject(new Error(data.error || '上传失败'));
+                try {
+                    const data = JSON.parse(xhr.responseText);
+                    console.log('Upload response:', data);
+                    if (data.success) {
+                        resolve();
+                    } else {
+                        reject(new Error(data.error || '上传失败'));
+                    }
+                } catch (e) {
+                    console.error('Parse response error:', e, xhr.responseText);
+                    reject(new Error('解析响应失败'));
                 }
             } else {
+                console.error('Upload failed with status:', xhr.status, xhr.responseText);
                 reject(new Error(`上传失败: HTTP ${xhr.status}`));
             }
         };
         
-        xhr.onerror = () => reject(new Error('网络错误'));
-        xhr.onabort = () => reject(new Error('已取消'));
+        xhr.onerror = () => {
+            console.error('Upload network error');
+            reject(new Error('网络错误'));
+        };
+        xhr.onabort = () => {
+            console.log('Upload aborted');
+            reject(new Error('已取消'));
+        };
         
         // 支持取消
         task.xhr = xhr;
