@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/sftp"
@@ -324,6 +325,9 @@ func (h *FileHandler) UploadFile(c *gin.Context) {
 	}
 	defer uploadedFile.Close()
 
+	// 记录开始时间
+	startTime := time.Now()
+
 	// 创建远程文件
 	remoteFile, err := sftpClient.Create(path)
 	if err != nil {
@@ -332,11 +336,20 @@ func (h *FileHandler) UploadFile(c *gin.Context) {
 	}
 	defer remoteFile.Close()
 
-	// 直接流式复制（不加载到内存，支持大文件）
-	if _, err := io.Copy(remoteFile, uploadedFile); err != nil {
+	// 使用带缓冲的复制提升性能
+	buf := make([]byte, 1024*1024) // 1MB缓冲区
+	written, err := io.CopyBuffer(remoteFile, uploadedFile, buf)
+	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "写入文件失败: " + err.Error()})
 		return
 	}
+
+	// 记录上传耗时
+	elapsed := time.Since(startTime)
+	sizeMB := float64(written) / (1024 * 1024)
+	speedMBs := sizeMB / elapsed.Seconds()
+	fmt.Printf("✅ 上传完成: %s (%.2f MB) 耗时: %v 速度: %.2f MB/s\n",
+		filepath.Base(path), sizeMB, elapsed, speedMBs)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
