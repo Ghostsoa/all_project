@@ -63,18 +63,33 @@ window.selectServer = async function(id) {
         }
         
         const server = data.data;
-        const sessionId = 'ssh-' + (++state.sessionCounter);
+        
+        // 检查是否已经有该服务器的会话
+        let existingSession = null;
+        for (const [sid, sess] of state.terminals.entries()) {
+            if (sess.server.ID === server.ID) {
+                existingSession = sid;
+                break;
+            }
+        }
+        
+        if (existingSession) {
+            // 已有会话，直接切换
+            window.switchContentTab(existingSession);
+            return;
+        }
+        
+        const sessionId = 'ssh-' + server.ID; // 使用服务器ID作为sessionId
         
         document.getElementById('noSelection').style.display = 'none';
         document.getElementById('terminalWrapper').style.display = 'flex';
         
-        // 创建内容标签
+        // 创建内容标签（终端标签，不可关闭）
         const tabsList = document.getElementById('contentTabsList');
         const tabHTML = `
-            <div class="content-tab-item active" data-session-id="${sessionId}" onclick="window.switchContentTab('${sessionId}')">
+            <div class="content-tab-item active" data-session-id="${sessionId}" data-type="terminal" onclick="window.switchContentTab('${sessionId}')">
                 <span class="tab-icon">💻</span>
                 <span class="tab-name">${server.name}</span>
-                <span class="tab-close" onclick="event.stopPropagation(); window.closeContentTab('${sessionId}')">×</span>
             </div>
         `;
         tabsList.insertAdjacentHTML('beforeend', tabHTML);

@@ -61,13 +61,13 @@ export function connectSSH(sessionId, server) {
         session.status = 'connected';
         updateStatusLight('connected');
         
-        // WebSocket连接成功后，延迟加载文件树（等待SFTP创建）
-        // 增加延迟确保后端SFTP已就绪
+        // WebSocket连接成功后，延迟加载文件树
+        // 使用较短延迟+重试逻辑处理SFTP未就绪情况
         setTimeout(() => {
             if (window.setCurrentServer) {
                 window.setCurrentServer(server.ID, sessionId);
             }
-        }, 1500); // 增加到1.5秒，确保SFTP完全就绪
+        }, 500); // 500ms初始延迟，如果未就绪会自动重试
     };
     
     ws.onmessage = (event) => {
@@ -119,13 +119,12 @@ export function openLocalTerminal() {
     document.getElementById('noSelection').style.display = 'none';
     document.getElementById('terminalWrapper').style.display = 'flex';
     
-    // 创建内容标签
+    // 创建内容标签（不可关闭）
     const tabsList = document.getElementById('contentTabsList');
     const tabHTML = `
-        <div class="content-tab-item active" data-session-id="${sessionId}" onclick="window.switchContentTab('${sessionId}')">
+        <div class="content-tab-item active" data-session-id="${sessionId}" data-type="terminal" onclick="window.switchContentTab('${sessionId}')">
             <span class="tab-icon">💻</span>
             <span class="tab-name">本地终端</span>
-            <span class="tab-close" onclick="event.stopPropagation(); window.closeContentTab('${sessionId}')">×</span>
         </div>
     `;
     tabsList.insertAdjacentHTML('beforeend', tabHTML);

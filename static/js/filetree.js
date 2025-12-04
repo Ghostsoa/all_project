@@ -78,7 +78,7 @@ function showLocalFileWarning() {
     `;
 }
 
-export async function loadDirectory(path) {
+export async function loadDirectory(path, retryCount = 0) {
     if (!currentServerID) {
         console.log('未连接服务器');
         return;
@@ -99,6 +99,25 @@ export async function loadDirectory(path) {
         renderFileTree(files, path);
     } catch (error) {
         console.error('加载目录失败:', error);
+        
+        // 如果是SFTP未就绪，且重试次数少于3次，则等待后重试
+        if (error.message && error.message.includes('SSH会话不存在') && retryCount < 3) {
+            console.log(`SFTP未就绪，${1 + retryCount * 0.5}秒后重试 (${retryCount + 1}/3)`);
+            fileTreeContainer.innerHTML = `
+                <div class="file-tree-empty">
+                    <p>⏳ 等待连接...</p>
+                    <p style="font-size: 10px; margin-top: 8px; color: rgba(255,255,255,0.5);">
+                        正在建立SFTP连接 (${retryCount + 1}/3)
+                    </p>
+                </div>
+            `;
+            setTimeout(() => {
+                loadDirectory(path, retryCount + 1);
+            }, 1000 + retryCount * 500); // 1s, 1.5s, 2s
+            return;
+        }
+        
+        // 超过重试次数或其他错误
         showToast('加载目录失败: ' + error.message, 'error');
         fileTreeContainer.innerHTML = `
             <div class="file-tree-empty">
@@ -106,6 +125,9 @@ export async function loadDirectory(path) {
                 <p style="font-size: 10px; margin-top: 8px; color: rgba(255,255,255,0.3);">
                     ${error.message || '未知错误'}
                 </p>
+                <button onclick="window.refreshCurrentDirectory()" style="margin-top: 10px; padding: 6px 12px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 4px; color: white; cursor: pointer;">
+                    🔄 重试
+                </button>
             </div>
         `;
     }

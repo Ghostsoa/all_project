@@ -1328,6 +1328,11 @@ body {
     opacity: 1;
 }
 
+/* 终端标签不显示关闭按钮 */
+.content-tab-item[data-type="terminal"] .tab-close {
+    display: none;
+}
+
 .content-container {
     flex: 1;
     position: relative;
