@@ -239,19 +239,6 @@
             window.hljs = hljs;
             console.log('✅ hljs已加载');
         }
-        
-        // 注册Service Worker缓存CDN资源
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/static/sw.js')
-                    .then(reg => {
-                        console.log('✅ Service Worker已注册，CDN资源将被缓存到浏览器本地');
-                    })
-                    .catch(err => {
-                        console.log('❌ Service Worker注册失败:', err);
-                    });
-            });
-        }
     </script>
     <script type="module" src="/static/js/main.js"></script>
 </body>
