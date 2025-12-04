@@ -367,15 +367,17 @@
 }
 
 .sidebar.collapsed .sidebar-header {
-    padding: 8px;
+    padding: 8px 0;
     display: flex;
     justify-content: center;
+    align-items: center;
 }
 
 .sidebar.collapsed .btn-add-server {
     width: 44px;
     height: 44px;
     padding: 0;
+    margin: 0;
     font-size: 20px;
     display: flex;
     align-items: center;
@@ -388,15 +390,17 @@
 }
 
 .sidebar.collapsed .local-terminal-btn {
-    padding: 8px;
+    padding: 8px 0;
     display: flex;
     justify-content: center;
+    align-items: center;
 }
 
 .sidebar.collapsed .btn-local-terminal {
     width: 44px;
     height: 44px;
     padding: 0;
+    margin: 0;
     font-size: 20px;
     display: flex;
     align-items: center;
@@ -410,15 +414,17 @@
 
 /* 折叠状态下的底部按钮 */
 .sidebar.collapsed .sidebar-footer {
-    padding: 8px;
+    padding: 8px 0;
     display: flex;
     justify-content: center;
+    align-items: center;
 }
 
 .sidebar.collapsed .sidebar-toggle {
     width: 44px;
     height: 44px;
     padding: 0;
+    margin: 0;
     border-radius: 50%;
 }
 
@@ -435,7 +441,7 @@
 }
 
 .sidebar.collapsed .server-list {
-    padding: 8px;
+    padding: 0;
     gap: 8px;
     display: flex;
     flex-direction: column;
@@ -444,11 +450,14 @@
 
 .sidebar.collapsed .server-item {
     padding: 0;
+    margin: 0;
     width: 44px;
     flex-direction: column;
     align-items: center;
     justify-content: center;
     height: auto;
+    background: transparent;
+    border: none;
 }
 
 .sidebar.collapsed .server-compact {
