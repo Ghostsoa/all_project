@@ -580,21 +580,24 @@ function switchToTab(filePath) {
     });
     document.querySelector(`.content-tab-item[data-tab-id="${fileInfo.tabId}"]`)?.classList.add('active');
     
-    // 隐藏所有terminal-pane和editor-pane
-    document.querySelectorAll('.terminal-pane').forEach(pane => {
-        pane.classList.remove('active');
-    });
-    document.querySelectorAll('.editor-pane').forEach(pane => {
+    // 隐藏所有面板（终端、编辑器、媒体查看器）
+    document.querySelectorAll('.terminal-pane, .editor-pane, .media-viewer').forEach(pane => {
         pane.classList.remove('active');
     });
     
-    // 显示当前editor-pane
-    document.querySelector(`.editor-pane[data-tab-id="${fileInfo.tabId}"]`)?.classList.add('active');
-    
-    // 刷新编辑器布局
-    const editor = editorInstances.get(fileInfo.tabId);
-    if (editor) {
-        setTimeout(() => editor.layout(), 0);
+    // 根据文件类型显示对应面板
+    if (fileInfo.type === 'media') {
+        // 媒体文件，显示媒体查看器
+        document.querySelector(`.media-viewer[data-tab-id="${fileInfo.tabId}"]`)?.classList.add('active');
+    } else {
+        // 文本文件，显示编辑器
+        document.querySelector(`.editor-pane[data-tab-id="${fileInfo.tabId}"]`)?.classList.add('active');
+        
+        // 刷新编辑器布局
+        const editor = editorInstances.get(fileInfo.tabId);
+        if (editor) {
+            setTimeout(() => editor.layout(), 0);
+        }
     }
 }
 
@@ -625,23 +628,31 @@ export function saveCurrentContentTabsState() {
 
 // 全局函数 - 内容标签切换（只处理文件标签）
 window.switchContentTab = function(id) {
-    // 查找编辑器面板或媒体查看器
-    const pane = document.querySelector(`.editor-pane[data-tab-id="${id}"], .media-viewer[data-tab-id="${id}"]`);
-    if (!pane) return;
-    
-    const filePath = pane.dataset.path;
+    // 更新标签状态
+    document.querySelectorAll('.content-tab-item').forEach(t => t.classList.remove('active'));
+    const tab = document.querySelector(`.content-tab-item[data-tab-id="${id}"]`);
+    if (tab) {
+        tab.classList.add('active');
+    }
     
     // 隐藏所有面板
     document.querySelectorAll('.terminal-pane, .editor-pane, .media-viewer').forEach(p => {
         p.classList.remove('active');
     });
     
-    // 显示选中的面板
-    pane.classList.add('active');
-    
-    // 更新标签状态
-    document.querySelectorAll('.content-tab-item').forEach(t => t.classList.remove('active'));
-    document.querySelector(`.content-tab-item[data-tab-id="${id}"]`)?.classList.add('active');
+    // 查找并显示对应的面板
+    const pane = document.querySelector(`.editor-pane[data-tab-id="${id}"], .media-viewer[data-tab-id="${id}"], .terminal-pane[data-session-id="${id}"]`);
+    if (pane) {
+        pane.classList.add('active');
+        
+        // 如果是编辑器，刷新布局
+        if (pane.classList.contains('editor-pane')) {
+            const editor = editorInstances.get(id);
+            if (editor) {
+                setTimeout(() => editor.layout(), 0);
+            }
+        }
+    }
 };
 
 window.closeContentTab = function(id) {
