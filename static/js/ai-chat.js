@@ -282,13 +282,14 @@ async function streamChat(sessionId, message, thinkingId) {
         let messageElement = null;
         
         chatWebSocket.onopen = () => {
-            console.log('✅ WebSocket连接已建立');
+            console.log('✅ WebSocket连接已建立, URL:', wsUrl);
             // 移除思考状态
             removeThinking(thinkingId);
         };
         
         chatWebSocket.onmessage = (event) => {
             try {
+                console.log('📥 收到消息:', event.data);
                 const data = JSON.parse(event.data);
                 
                 if (data.type === 'content') {
@@ -325,7 +326,7 @@ async function streamChat(sessionId, message, thinkingId) {
                     reject(new Error(data.content));
                 }
             } catch (error) {
-                console.error('解析消息失败:', error, event.data);
+                console.error('解析消息失败:', error, '原始数据:', event.data);
             }
         };
         
@@ -335,8 +336,9 @@ async function streamChat(sessionId, message, thinkingId) {
             reject(error);
         };
         
-        chatWebSocket.onclose = () => {
+        chatWebSocket.onclose = (event) => {
             console.log('🔌 WebSocket连接已关闭');
+            console.log('关闭代码:', event.code, '原因:', event.reason, '是否正常:', event.wasClean);
             chatWebSocket = null;
         };
     });
