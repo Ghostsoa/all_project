@@ -13,6 +13,17 @@ let isLocalTerminal = false; // 是否为本地终端
 // 剪贴板
 let clipboard = null; // {type: 'copy'|'cut', path: '...'}
 
+// Helper: 获取正确的API端点
+export function getApiEndpoint(action) {
+    const prefix = isLocalTerminal ? '/api/local/files' : '/api/files';
+    return `${prefix}/${action}`;
+}
+
+// 获取当前sessionID（供其他模块使用）
+export function getCurrentSessionID() {
+    return currentSessionID;
+}
+
 // 是否显示隐藏文件
 export let showHiddenFiles = false;
 export function setShowHiddenFiles(value) {
@@ -629,7 +640,7 @@ window.createNewFile = async function(basePath) {
         fileCache.optimisticCreate(currentSessionID, basePath, newFile);
         
         try {
-            const response = await fetch('/api/files/create', {
+            const response = await fetch(getApiEndpoint('create'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -717,7 +728,7 @@ window.createNewFolder = async function(basePath) {
         fileCache.optimisticCreate(currentSessionID, basePath, newFolder);
         
         try {
-            const response = await fetch('/api/files/create', {
+            const response = await fetch(getApiEndpoint('create'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -862,7 +873,7 @@ window.pasteFile = async function(targetPath) {
     try {
         if (clipboard.type === 'copy') {
             // 复制：在SSH服务器上直接执行cp命令
-            const response = await fetch('/api/files/copy', {
+            const response = await fetch(getApiEndpoint('copy'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -882,7 +893,7 @@ window.pasteFile = async function(targetPath) {
             }
         } else if (clipboard.type === 'cut') {
             // 剪切：重命名（移动）
-            const response = await fetch('/api/files/rename', {
+            const response = await fetch(getApiEndpoint('rename'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -953,7 +964,7 @@ window.renameFile = async function(oldPath) {
         fileCache.optimisticRename(currentSessionID, parentPath, oldPath, newPath, newName);
         
         try {
-            const response = await fetch('/api/files/rename', {
+            const response = await fetch(getApiEndpoint('rename'), {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -1006,7 +1017,7 @@ window.deleteFile = async function(path) {
     fileCache.optimisticDelete(currentSessionID, parentPath, path);
     
     try {
-        const response = await fetch('/api/files/delete', {
+        const response = await fetch(getApiEndpoint('delete'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -1216,7 +1227,7 @@ async function uploadFileComplete(file, filePath, taskId, task, startTime) {
         // 支持取消
         task.xhr = xhr;
         
-        xhr.open('POST', '/api/files/upload', true);
+        xhr.open('POST', getApiEndpoint('upload'), true);
         xhr.send(formData);
     });
 }
@@ -1244,7 +1255,7 @@ async function uploadFileInChunks(file, filePath, taskId, task, startTime) {
         const chunkBase64 = await readFileAsBase64Blob(chunk);
         
         // 上传分片
-        const response = await fetch('/api/files/upload-chunk', {
+        const response = await fetch(getApiEndpoint('upload-chunk'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({

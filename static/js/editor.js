@@ -2,6 +2,7 @@
 import { state } from './config.js';
 import { showToast } from './utils.js';
 import { showConfirm } from './modal.js';
+import { getApiEndpoint, getCurrentSessionID } from './filetree.js';
 
 let editorInstances = new Map(); // 存储编辑器实例
 let openFiles = new Map(); // 存储打开的文件信息
@@ -190,7 +191,7 @@ export async function openFileEditor(filePath, serverID, sessionID, fileSize = 0
     
     try {
         // 读取文件内容
-        const response = await fetch(`/api/files/read?session_id=${sessionID}&path=${encodeURIComponent(filePath)}`);
+        const response = await fetch(`${getApiEndpoint('read')}?session_id=${sessionID}&path=${encodeURIComponent(filePath)}`);
         const data = await response.json();
         
         if (!data.success) {
@@ -732,7 +733,7 @@ window.saveFile = async function(tabId) {
     }
     
     try {
-        const response = await fetch('/api/files/save', {
+        const response = await fetch(getApiEndpoint('save'), {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -812,7 +813,7 @@ window.openMediaViewer = async function(filePath, serverID, sessionID, mediaType
     
     // 创建媒体查看器面板（插入到content-container，与terminal-pane和editor-pane并列）
     const contentContainer = document.getElementById('contentContainer');
-    const mediaURL = `/api/files/download?session_id=${sessionID}&path=${encodeURIComponent(filePath)}`;
+    const mediaURL = `${getApiEndpoint('download')}?session_id=${sessionID}&path=${encodeURIComponent(filePath)}`;
     
     let mediaHTML = '';
     if (mediaType === 'image') {
@@ -1048,7 +1049,7 @@ function getMediaIcon(mediaType, fileName) {
 
 // 下载文件
 window.downloadFile = function(filePath, sessionID) {
-    const url = `/api/files/download?session_id=${sessionID}&path=${encodeURIComponent(filePath)}`;
+    const url = `${getApiEndpoint('download')}?session_id=${sessionID}&path=${encodeURIComponent(filePath)}`;
     const a = document.createElement('a');
     a.href = url;
     a.download = filePath.split('/').pop();
