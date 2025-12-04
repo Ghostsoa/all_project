@@ -24,9 +24,16 @@ var (
 type LocalTerminalSession struct {
 	cmd       *exec.Cmd
 	ptmx      *os.File
-	clients   map[*websocket.Conn]bool
+	clients   map[*websocket.Conn]*clientInfo
 	clientsMu sync.RWMutex
 	input     chan []byte
+}
+
+// clientInfo 客户端信息
+type clientInfo struct {
+	ws     *websocket.Conn
+	output chan []byte
+	closed bool
 }
 
 // InitGlobalLocalTerminal 初始化全局本地终端（服务启动时调用）
@@ -59,7 +66,7 @@ func InitGlobalLocalTerminal() error {
 
 	session := &LocalTerminalSession{
 		cmd:     cmd,
-		clients: make(map[*websocket.Conn]bool),
+		clients: make(map[*websocket.Conn]*clientInfo),
 		input:   make(chan []byte, 100),
 	}
 
@@ -109,14 +116,17 @@ func (s *LocalTerminalSession) broadcastOutput() {
 			data := make([]byte, n)
 			copy(data, buffer[:n])
 
+			// 通过channel发送，每个客户端有独立的writer goroutine处理
 			s.clientsMu.RLock()
-			for client := range s.clients {
-				// 异步发送，避免阻塞
-				go func(c *websocket.Conn) {
-					if err := c.WriteMessage(websocket.BinaryMessage, data); err != nil {
-						log.Println("发送到客户端失败:", err)
+			for _, client := range s.clients {
+				if !client.closed {
+					select {
+					case client.output <- data:
+					default:
+						// 缓冲区满，跳过此帧
+						log.Println("客户端输出缓冲区满，跳过数据")
 					}
-				}(client)
+				}
 			}
 			s.clientsMu.RUnlock()
 		}
@@ -134,16 +144,38 @@ func (s *LocalTerminalSession) handleInput() {
 
 // addClient 添加客户端
 func (s *LocalTerminalSession) addClient(ws *websocket.Conn) {
+	client := &clientInfo{
+		ws:     ws,
+		output: make(chan []byte, 100), // 100帧缓冲
+		closed: false,
+	}
+
 	s.clientsMu.Lock()
-	s.clients[ws] = true
+	s.clients[ws] = client
 	s.clientsMu.Unlock()
+
+	// 启动独立的writer goroutine（避免并发写入WebSocket）
+	go func() {
+		for data := range client.output {
+			if err := ws.WriteMessage(websocket.BinaryMessage, data); err != nil {
+				log.Println("写入WebSocket失败:", err)
+				client.closed = true
+				return
+			}
+		}
+	}()
+
 	log.Printf("本地终端客户端已连接，当前客户端数: %d", len(s.clients))
 }
 
 // removeClient 移除客户端
 func (s *LocalTerminalSession) removeClient(ws *websocket.Conn) {
 	s.clientsMu.Lock()
-	delete(s.clients, ws)
+	if client, ok := s.clients[ws]; ok {
+		client.closed = true
+		close(client.output) // 关闭channel，终止writer goroutine
+		delete(s.clients, ws)
+	}
 	s.clientsMu.Unlock()
 	log.Printf("本地终端客户端已断开，当前客户端数: %d", len(s.clients))
 }
