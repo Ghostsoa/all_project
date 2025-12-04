@@ -5,6 +5,15 @@ import { showConfirm } from './modal.js';
 
 let editorInstances = new Map(); // 存储编辑器实例
 let openFiles = new Map(); // 存储打开的文件信息
+let monacoConfigured = false; // Monaco是否已配置
+
+// 配置Monaco Editor（只配置一次）
+function ensureMonacoConfigured() {
+    if (!monacoConfigured && typeof require !== 'undefined') {
+        require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+        monacoConfigured = true;
+    }
+}
 
 // Office文档格式（需要特殊提示）
 const OFFICE_EXTENSIONS = new Set([
@@ -198,7 +207,7 @@ function initializeMarkdownEditor(tabId, filePath, content) {
     
     // 初始化Monaco编辑器
     const fileName = filePath.split('/').pop();
-    require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+    ensureMonacoConfigured();
     require(['vs/editor/editor.main'], function() {
         const editor = monaco.editor.create(document.getElementById(`${tabId}-editor`), {
             value: content,
@@ -306,7 +315,7 @@ function initializeEditor(tabId, filePath, content) {
     
     // 初始化Monaco编辑器
     const fileName = filePath.split('/').pop();
-    require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+    ensureMonacoConfigured();
     require(['vs/editor/editor.main'], function() {
         const editor = monaco.editor.create(container, {
             value: content,
@@ -368,7 +377,7 @@ function createEditorTab(filePath, serverID, sessionID, content) {
     terminalsContainer.insertAdjacentHTML('beforeend', editorHTML);
     
     // 初始化Monaco编辑器
-    require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+    ensureMonacoConfigured();
     require(['vs/editor/editor.main'], function() {
         const editor = monaco.editor.create(document.getElementById(tabId), {
             value: content,
