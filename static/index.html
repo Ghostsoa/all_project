@@ -63,6 +63,7 @@
                     <div class="file-sidebar" id="fileSidebar">
                         <div class="file-sidebar-header">
                             <span>文件浏览</span>
+                            <button class="refresh-btn" onclick="window.refreshCurrentDirectory()" title="刷新 (F5)">🔄</button>
                         </div>
                         <div class="file-tree" id="fileTree">
                             <div class="file-tree-empty">连接服务器后显示文件</div>
@@ -71,6 +72,11 @@
 
                     <!-- 主内容区 -->
                     <div class="main-content">
+                        <!-- 编辑器标签栏 -->
+                        <div class="editor-tabs-bar" id="editorTabsBar" style="display: none;">
+                            <div class="editor-tabs-list" id="editorTabsList"></div>
+                        </div>
+                        
                         <!-- 终端容器 -->
                         <div class="terminals-container" id="terminalsContainer"></div>
                     </div>
