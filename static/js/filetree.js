@@ -336,7 +336,7 @@ function getSpecialFolderClass(folderName) {
 function getFileIcon(file) {
     if (file.is_dir) {
         // 文件夹图标
-        return '<i class="devicon-folder-plain colored"></i>';
+        return '<i class="fa-solid fa-folder" style="color: #fbbf24;"></i>';
     }
     
     const ext = file.name.split('.').pop().toLowerCase();
