@@ -186,6 +186,8 @@ window.selectServer = async function(id) {
         terminalPane.className = 'terminal-pane active';
         contentContainer.appendChild(terminalPane);
         
+        console.log(`[创建终端] sessionId=${sessionId}, pane已创建，ID=${terminalPane.id}`);
+        
         const { term, fitAddon } = createTerminal();
         term.open(terminalPane);
         fitAddon.fit();
@@ -332,6 +334,9 @@ window.switchTab = function(sessionId) {
     
     const session = state.terminals.get(sessionId);
     if (session) {
+        console.log(`[切换] sessionId=${sessionId}, pane元素=`, document.getElementById(sessionId));
+        console.log(`[切换] 当前active的pane=`, document.querySelector('.terminal-pane.active'));
+        
         setTimeout(() => session.fitAddon.fit(), 100);
         
         // 检查是否为本地终端
