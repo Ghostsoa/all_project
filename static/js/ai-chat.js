@@ -28,17 +28,39 @@ export async function loadSessions() {
 // 渲染会话列表
 function renderSessionList() {
     const container = document.getElementById('aiConversationHistory');
+    const triggerEl = document.querySelector('.history-trigger');
+    const titleEl = document.getElementById('currentConversationTitle');
+    const arrowEl = document.querySelector('.history-arrow');
+    
     if (!container) return;
 
     if (sessions.length === 0) {
-        container.innerHTML = `
-            <div class="empty-history">
-                <button class="btn btn-primary btn-sm" onclick="createNewAISession(); toggleHistoryDropdown();">
-                    <i class="fa-solid fa-plus"></i> 创建新对话
-                </button>
-            </div>
-        `;
+        // 没有对话历史：显示"开始新的对话 +"
+        if (titleEl) titleEl.textContent = '开始新的对话';
+        if (arrowEl) arrowEl.textContent = '+';
+        
+        // 修改点击行为：直接创建新对话
+        if (triggerEl) {
+            triggerEl.onclick = function() {
+                createNewAISession();
+            };
+        }
+        
+        // 清空下拉内容
+        container.innerHTML = '';
         return;
+    }
+
+    // 有对话历史：显示"对话历史 ▼"
+    const currentTitle = currentSession?.title || '对话历史';
+    if (titleEl) titleEl.textContent = currentTitle;
+    if (arrowEl) arrowEl.textContent = '▼';
+    
+    // 恢复点击行为：展开/收起列表
+    if (triggerEl) {
+        triggerEl.onclick = function() {
+            toggleHistoryDropdown();
+        };
     }
 
     container.innerHTML = `
@@ -61,14 +83,6 @@ function renderSessionList() {
             </button>
         </div>
     `).join('');
-    
-    // 更新标题显示
-    if (currentSession) {
-        const titleEl = document.getElementById('currentConversationTitle');
-        if (titleEl) {
-            titleEl.textContent = currentSession.title || '对话历史';
-        }
-    }
 }
 
 // 选择会话
@@ -127,6 +141,8 @@ window.createNewAISession = async function() {
         });
         
         currentSession = data.data;
+        
+        // 重新加载会话列表
         await loadSessions();
         
         // 清空消息区域，显示欢迎信息
@@ -142,6 +158,10 @@ window.createNewAISession = async function() {
         }
         
         showChatArea();
+        
+        // 关闭下拉菜单
+        const menu = document.getElementById('historyDropdownMenu');
+        if (menu) menu.style.display = 'none';
     } catch (error) {
         console.error('创建会话失败:', error);
         alert('创建会话失败: ' + error.message);
@@ -156,7 +176,7 @@ window.deleteAISession = async function(sessionId) {
         await apiRequest(`/api/ai/session/delete?id=${sessionId}`, 'POST');
         
         // 如果删除的是当前会话，清空当前会话
-        if (currentSession?.ID === sessionId) {
+        if (currentSession?.ID === sessionId || currentSession?.id === sessionId) {
             currentSession = null;
             const messagesContainer = document.getElementById('aiMessages');
             if (messagesContainer) {
@@ -170,6 +190,7 @@ window.deleteAISession = async function(sessionId) {
             }
         }
         
+        // 重新加载会话列表
         await loadSessions();
     } catch (error) {
         console.error('删除会话失败:', error);
