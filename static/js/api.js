@@ -1,6 +1,29 @@
 // API 请求模块
 import { config } from './config.js';
 
+// 通用API请求函数
+export async function apiRequest(url, method = 'GET', data = null) {
+    const options = {
+        method,
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    };
+
+    if (data && method !== 'GET') {
+        options.body = JSON.stringify(data);
+    }
+
+    const response = await fetch(url, options);
+    
+    if (!response.ok) {
+        const error = await response.json().catch(() => ({ error: response.statusText }));
+        throw new Error(error.error || `请求失败: ${response.status}`);
+    }
+
+    return response.json();
+}
+
 export const api = {
     // 服务器相关
     async getServers() {
