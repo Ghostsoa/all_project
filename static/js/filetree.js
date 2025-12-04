@@ -335,130 +335,147 @@ function getSpecialFolderClass(folderName) {
 
 function getFileIcon(file) {
     if (file.is_dir) {
-        // 所有文件夹统一用📁图标
-        return '📁';
+        // 文件夹图标
+        return '<i class="devicon-folder-plain colored"></i>';
     }
     
     const ext = file.name.split('.').pop().toLowerCase();
-    const iconMap = {
-        // JavaScript/TypeScript
-        'js': '🟨',      // JavaScript - 黄色方块
-        'jsx': '⚛️',     // React
-        'ts': '🔷',      // TypeScript - 蓝色菱形
-        'tsx': '⚛️',     // React + TypeScript
-        'vue': '💚',     // Vue - 绿心
-        'mjs': '🟨',     // ES Module
-        
-        // Web
-        'html': '🌐',    // HTML
-        'htm': '🌐',
-        'css': '🎨',     // CSS
-        'scss': '💅',    // Sass
-        'sass': '💅',
-        'less': '📐',    // Less
-        
-        // 后端语言
-        'py': '🐍',      // Python
-        'java': '☕',    // Java - 咖啡
-        'class': '☕',
-        'go': '🔷',      // Golang - 蓝色菱形
-        'cpp': '⚙️',     // C++
-        'cc': '⚙️',
-        'cxx': '⚙️',
-        'c': '⚙️',       // C
-        'h': '⚙️',       // Header
-        'hpp': '⚙️',
-        'rs': '🦀',      // Rust - 螃蟹
-        'rb': '💎',      // Ruby - 宝石
-        'php': '🐘',     // PHP - 大象
-        'swift': '🦅',   // Swift - 老鹰
-        'kt': '🎯',      // Kotlin
-        'scala': '🔺',   // Scala
-        'lua': '🌙',     // Lua - 月亮
-        
-        // 配置文件
-        'json': '📋',    // JSON
-        'xml': '📋',     // XML
-        'yaml': '⚙️',    // YAML
-        'yml': '⚙️',
-        'toml': '⚙️',    // TOML
-        'ini': '⚙️',     // INI
-        'conf': '⚙️',    // Config
-        'config': '⚙️',
-        'env': '🔐',     // Environment
-        
-        // 文档
-        'md': '📝',      // Markdown
-        'markdown': '📝',
-        'txt': '📄',     // Text
-        'pdf': '📕',     // PDF
-        'doc': '📘',     // Word
-        'docx': '📘',
-        'xls': '📗',     // Excel
-        'xlsx': '📗',
-        'ppt': '📙',     // PowerPoint
-        'pptx': '📙',
-        
-        // 数据库
-        'sql': '🗄️',     // SQL
-        'db': '🗄️',      // Database
-        'sqlite': '🗄️',
-        
-        // 脚本
-        'sh': '🖥️',      // Shell
-        'bash': '🖥️',
-        'zsh': '🖥️',
-        'bat': '🖥️',     // Batch
-        'cmd': '🖥️',
-        'ps1': '💻',     // PowerShell
-        
-        // 图片
-        'jpg': '🖼️',     // Image
-        'jpeg': '🖼️',
-        'png': '🖼️',
-        'gif': '🎞️',     // GIF
-        'svg': '🎨',     // SVG
-        'ico': '🎨',     // Icon
-        'webp': '🖼️',
-        'bmp': '🖼️',
-        
-        // 视频/音频
-        'mp4': '🎬',     // Video
-        'avi': '🎬',
-        'mov': '🎬',
-        'mkv': '🎬',
-        'mp3': '🎵',     // Audio
-        'wav': '🎵',
-        'flac': '🎵',
-        
-        // 压缩包
-        'zip': '📦',     // Archive
-        'tar': '📦',
-        'gz': '📦',
-        'rar': '📦',
-        '7z': '📦',
-        
-        // 日志
-        'log': '📊',     // Log
-        
-        // Docker/容器
-        'dockerfile': '🐳',  // Docker
-        'dockerignore': '🐳',
-        
-        // Git
-        'gitignore': '🔀',   // Git
-        'gitattributes': '🔀',
-        
-        // 其他
-        'lock': '🔒',    // Lock file
-        'jar': '☕',      // Java Archive
-        'war': '☕',      // Web Archive
-        'exe': '⚡',      // Executable
-        'dll': '⚙️',      // Library
-        'so': '⚙️',       // Shared Object
+    const fileName = file.name.toLowerCase();
+    
+    // 特殊文件名优先匹配
+    const specialFiles = {
+        'dockerfile': '<i class="devicon-docker-plain colored"></i>',
+        '.dockerignore': '<i class="devicon-docker-plain"></i>',
+        '.gitignore': '<i class="devicon-git-plain"></i>',
+        '.gitattributes': '<i class="devicon-git-plain"></i>',
+        'package.json': '<i class="devicon-npm-original-wordmark colored"></i>',
+        'package-lock.json': '<i class="devicon-npm-original-wordmark"></i>',
+        'yarn.lock': '<i class="devicon-yarn-plain colored"></i>',
+        'readme.md': '<i class="devicon-markdown-original"></i>',
     };
     
-    return iconMap[ext] || '📄';
+    if (specialFiles[fileName]) {
+        return specialFiles[fileName];
+    }
+    
+    // 根据扩展名匹配图标
+    const iconMap = {
+        // JavaScript/TypeScript
+        'js': '<i class="devicon-javascript-plain colored"></i>',
+        'jsx': '<i class="devicon-react-original colored"></i>',
+        'ts': '<i class="devicon-typescript-plain colored"></i>',
+        'tsx': '<i class="devicon-react-original colored"></i>',
+        'vue': '<i class="devicon-vuejs-plain colored"></i>',
+        'mjs': '<i class="devicon-javascript-plain colored"></i>',
+        
+        // Web
+        'html': '<i class="devicon-html5-plain colored"></i>',
+        'htm': '<i class="devicon-html5-plain colored"></i>',
+        'css': '<i class="devicon-css3-plain colored"></i>',
+        'scss': '<i class="devicon-sass-original colored"></i>',
+        'sass': '<i class="devicon-sass-original colored"></i>',
+        'less': '<i class="devicon-less-plain-wordmark colored"></i>',
+        
+        // 后端语言
+        'py': '<i class="devicon-python-plain colored"></i>',
+        'java': '<i class="devicon-java-plain colored"></i>',
+        'class': '<i class="devicon-java-plain"></i>',
+        'go': '<i class="devicon-go-original-wordmark colored"></i>',
+        'cpp': '<i class="devicon-cplusplus-plain colored"></i>',
+        'cc': '<i class="devicon-cplusplus-plain colored"></i>',
+        'cxx': '<i class="devicon-cplusplus-plain colored"></i>',
+        'c': '<i class="devicon-c-plain colored"></i>',
+        'h': '<i class="devicon-c-plain"></i>',
+        'hpp': '<i class="devicon-cplusplus-plain"></i>',
+        'rs': '<i class="devicon-rust-original"></i>',
+        'rb': '<i class="devicon-ruby-plain colored"></i>',
+        'php': '<i class="devicon-php-plain colored"></i>',
+        'swift': '<i class="devicon-swift-plain colored"></i>',
+        'kt': '<i class="devicon-kotlin-plain colored"></i>',
+        'scala': '<i class="devicon-scala-plain colored"></i>',
+        'lua': '<i class="devicon-lua-plain colored"></i>',
+        
+        // 配置文件
+        'json': '<i class="devicon-json-plain"></i>',
+        'xml': '<i class="fa-solid fa-code" style="color: #ff6b35;"></i>',
+        'yaml': '<i class="devicon-yaml-plain"></i>',
+        'yml': '<i class="devicon-yaml-plain"></i>',
+        'toml': '<i class="fa-solid fa-gear" style="color: #9ca3af;"></i>',
+        'ini': '<i class="fa-solid fa-gear" style="color: #9ca3af;"></i>',
+        'conf': '<i class="fa-solid fa-gear" style="color: #9ca3af;"></i>',
+        'config': '<i class="fa-solid fa-gear" style="color: #9ca3af;"></i>',
+        'env': '<i class="fa-solid fa-key" style="color: #fbbf24;"></i>',
+        
+        // 数据库
+        'sql': '<i class="devicon-mysql-plain colored"></i>',
+        'db': '<i class="fa-solid fa-database" style="color: #3b82f6;"></i>',
+        'sqlite': '<i class="devicon-sqlite-plain colored"></i>',
+        
+        // 脚本
+        'sh': '<i class="devicon-bash-plain"></i>',
+        'bash': '<i class="devicon-bash-plain"></i>',
+        'zsh': '<i class="devicon-bash-plain"></i>',
+        'bat': '<i class="fa-solid fa-terminal" style="color: #6b7280;"></i>',
+        'cmd': '<i class="fa-solid fa-terminal" style="color: #6b7280;"></i>',
+        'ps1': '<i class="fa-solid fa-terminal" style="color: #0ea5e9;"></i>',
+        
+        // 文档
+        'md': '<i class="devicon-markdown-original"></i>',
+        'markdown': '<i class="devicon-markdown-original"></i>',
+        'txt': '<i class="fa-solid fa-file-lines" style="color: #9ca3af;"></i>',
+        'pdf': '<i class="fa-solid fa-file-pdf" style="color: #ef4444;"></i>',
+        'doc': '<i class="fa-solid fa-file-word" style="color: #2563eb;"></i>',
+        'docx': '<i class="fa-solid fa-file-word" style="color: #2563eb;"></i>',
+        'xls': '<i class="fa-solid fa-file-excel" style="color: #10b981;"></i>',
+        'xlsx': '<i class="fa-solid fa-file-excel" style="color: #10b981;"></i>',
+        'ppt': '<i class="fa-solid fa-file-powerpoint" style="color: #f97316;"></i>',
+        'pptx': '<i class="fa-solid fa-file-powerpoint" style="color: #f97316;"></i>',
+        
+        // 图片
+        'jpg': '<i class="fa-solid fa-file-image" style="color: #8b5cf6;"></i>',
+        'jpeg': '<i class="fa-solid fa-file-image" style="color: #8b5cf6;"></i>',
+        'png': '<i class="fa-solid fa-file-image" style="color: #8b5cf6;"></i>',
+        'gif': '<i class="fa-solid fa-file-image" style="color: #ec4899;"></i>',
+        'svg': '<i class="fa-solid fa-file-image" style="color: #f59e0b;"></i>',
+        'ico': '<i class="fa-solid fa-image" style="color: #06b6d4;"></i>',
+        'webp': '<i class="fa-solid fa-file-image" style="color: #8b5cf6;"></i>',
+        'bmp': '<i class="fa-solid fa-file-image" style="color: #8b5cf6;"></i>',
+        
+        // 视频/音频
+        'mp4': '<i class="fa-solid fa-file-video" style="color: #ef4444;"></i>',
+        'avi': '<i class="fa-solid fa-file-video" style="color: #ef4444;"></i>',
+        'mov': '<i class="fa-solid fa-file-video" style="color: #ef4444;"></i>',
+        'mkv': '<i class="fa-solid fa-file-video" style="color: #ef4444;"></i>',
+        'mp3': '<i class="fa-solid fa-file-audio" style="color: #06b6d4;"></i>',
+        'wav': '<i class="fa-solid fa-file-audio" style="color: #06b6d4;"></i>',
+        'flac': '<i class="fa-solid fa-file-audio" style="color: #06b6d4;"></i>',
+        
+        // 压缩包
+        'zip': '<i class="fa-solid fa-file-zipper" style="color: #f59e0b;"></i>',
+        'tar': '<i class="fa-solid fa-file-zipper" style="color: #f59e0b;"></i>',
+        'gz': '<i class="fa-solid fa-file-zipper" style="color: #f59e0b;"></i>',
+        'rar': '<i class="fa-solid fa-file-zipper" style="color: #f59e0b;"></i>',
+        '7z': '<i class="fa-solid fa-file-zipper" style="color: #f59e0b;"></i>',
+        
+        // 日志
+        'log': '<i class="fa-solid fa-file-lines" style="color: #6b7280;"></i>',
+        
+        // Docker
+        'dockerfile': '<i class="devicon-docker-plain colored"></i>',
+        
+        // Git
+        'gitignore': '<i class="devicon-git-plain"></i>',
+        
+        // 其他
+        'lock': '<i class="fa-solid fa-lock" style="color: #dc2626;"></i>',
+        'jar': '<i class="devicon-java-plain"></i>',
+        'war': '<i class="devicon-java-plain"></i>',
+        'exe': '<i class="fa-solid fa-gear" style="color: #6366f1;"></i>',
+        'dll': '<i class="fa-solid fa-cube" style="color: #6b7280;"></i>',
+        'so': '<i class="fa-solid fa-cube" style="color: #6b7280;"></i>',
+    };
+    
+    return iconMap[ext] || '<i class="fa-solid fa-file" style="color: #9ca3af;"></i>';
 }
 
 function formatSize(bytes) {

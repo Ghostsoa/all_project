@@ -173,6 +173,20 @@
 .file-icon {
     font-size: 14px;
     flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+}
+
+/* Devicon图标样式 */
+.file-icon i {
+    font-size: 16px;
+}
+
+.file-icon i[class*="devicon-"] {
+    line-height: 1;
 }
 
 .file-name {
