@@ -363,7 +363,8 @@
 
 /* 折叠状态下的侧边栏 */
 .sidebar.collapsed {
-    width: 72px;
+    width: 60px;
+    margin: 8px 0 8px 2px; /* 减少左边距从8px到2px */
 }
 
 .sidebar.collapsed .sidebar-header {
