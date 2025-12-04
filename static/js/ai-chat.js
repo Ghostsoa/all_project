@@ -501,6 +501,136 @@ window.clearCurrentAIChat = async function() {
     }
 };
 
+// ========== 上下文信息获取接口 ==========
+
+/**
+ * 获取当前激活终端的缓冲区数据
+ * @param {number} lines - 获取最近多少行（默认50行）
+ * @returns {object|null} { content: string, serverName: string, sessionId: string }
+ */
+window.getTerminalBuffer = function(lines = 50) {
+    try {
+        // 获取当前激活的终端pane
+        const activeTerminal = document.querySelector('.terminal-pane.active');
+        if (!activeTerminal) {
+            return null;
+        }
+        
+        const sessionId = activeTerminal.id;
+        const terminalSession = window.state?.terminals?.get(sessionId);
+        
+        if (!terminalSession || !terminalSession.term) {
+            return null;
+        }
+        
+        // 获取终端缓冲区数据
+        const buffer = terminalSession.term.buffer.active;
+        const bufferLines = [];
+        const startLine = Math.max(0, buffer.baseY + buffer.cursorY - lines);
+        const endLine = buffer.baseY + buffer.cursorY;
+        
+        for (let i = startLine; i <= endLine; i++) {
+            const line = buffer.getLine(i);
+            if (line) {
+                bufferLines.push(line.translateToString(true));
+            }
+        }
+        
+        const content = bufferLines.join('\n').trim();
+        const serverName = terminalSession.server?.name || '本地终端';
+        
+        return {
+            content: content,
+            serverName: serverName,
+            sessionId: sessionId,
+            lineCount: bufferLines.length
+        };
+    } catch (error) {
+        console.error('获取终端缓冲区失败:', error);
+        return null;
+    }
+};
+
+/**
+ * 获取当前激活编辑器的文件信息和光标上下文
+ * @param {number} contextLines - 光标前后获取多少行（默认10行）
+ * @returns {object|null} { filePath, fileName, cursor, content, ... }
+ */
+window.getEditorContext = function(contextLines = 10) {
+    try {
+        // 获取当前激活的编辑器pane
+        const activeEditor = document.querySelector('.editor-pane.active');
+        if (!activeEditor) {
+            return null;
+        }
+        
+        const filePath = activeEditor.dataset.path;
+        const fileName = filePath ? filePath.split('/').pop() : 'unknown';
+        const editor = activeEditor.querySelector('.CodeMirror');
+        
+        if (!editor || !editor.CodeMirror) {
+            return null;
+        }
+        
+        const cm = editor.CodeMirror;
+        const cursor = cm.getCursor();
+        const lineCount = cm.lineCount();
+        
+        // 获取光标周围的代码上下文
+        const startLine = Math.max(0, cursor.line - contextLines);
+        const endLine = Math.min(lineCount - 1, cursor.line + contextLines);
+        const contextCodeLines = [];
+        
+        for (let i = startLine; i <= endLine; i++) {
+            const lineText = cm.getLine(i);
+            const prefix = i === cursor.line ? '→ ' : '  ';
+            contextCodeLines.push(`${prefix}${i + 1}: ${lineText}`);
+        }
+        
+        // 获取当前行内容
+        const currentLineText = cm.getLine(cursor.line);
+        
+        return {
+            filePath: filePath,
+            fileName: fileName,
+            cursor: {
+                line: cursor.line + 1, // 转为1-based
+                column: cursor.ch + 1
+            },
+            currentLine: currentLineText,
+            contextContent: contextCodeLines.join('\n'),
+            totalLines: lineCount,
+            language: getFileLanguage(fileName)
+        };
+    } catch (error) {
+        console.error('获取编辑器上下文失败:', error);
+        return null;
+    }
+};
+
+/**
+ * 根据文件名获取语言类型
+ */
+function getFileLanguage(fileName) {
+    const ext = fileName.split('.').pop().toLowerCase();
+    const langMap = {
+        'js': 'JavaScript',
+        'ts': 'TypeScript',
+        'go': 'Go',
+        'py': 'Python',
+        'java': 'Java',
+        'cpp': 'C++',
+        'c': 'C',
+        'css': 'CSS',
+        'html': 'HTML',
+        'json': 'JSON',
+        'md': 'Markdown',
+        'sh': 'Shell',
+        'sql': 'SQL'
+    };
+    return langMap[ext] || ext.toUpperCase();
+}
+
 // ========== 消息发送 ==========
 
 // 发送AI消息
@@ -559,12 +689,51 @@ async function streamChat(sessionId, message, thinkingId) {
             console.log('✅ WebSocket连接已建立');
             // 不删除thinking，等收到消息后无缝切换
             
-            // 发送消息到后端
+            // 收集上下文信息
+            const terminalInfo = window.getTerminalBuffer(50);
+            const editorInfo = window.getEditorContext(10);
+            
+            // 构建payload
             const payload = {
                 session_id: sessionId,
                 message: message
             };
-            console.log('📤 发送消息:', payload);
+            
+            // 如果有终端信息，添加实时信息
+            if (terminalInfo) {
+                payload.real_time_info = terminalInfo.content;
+                payload.source_info = `终端 - ${terminalInfo.serverName}`;
+                console.log(`📺 终端上下文 - ${terminalInfo.serverName}, ${terminalInfo.lineCount}行`);
+            }
+            
+            // 如果有编辑器信息，添加指针信息
+            if (editorInfo) {
+                // 构建指针信息文本
+                payload.cursor_info = 
+                    `文件: ${editorInfo.fileName}\n` +
+                    `路径: ${editorInfo.filePath}\n` +
+                    `语言: ${editorInfo.language}\n` +
+                    `光标位置: 行 ${editorInfo.cursor.line}, 列 ${editorInfo.cursor.column}\n` +
+                    `总行数: ${editorInfo.totalLines}\n` +
+                    `当前行: ${editorInfo.currentLine}\n\n` +
+                    `代码上下文:\n${editorInfo.contextContent}`;
+                
+                // 如果没有终端信息，使用编辑器的来源信息
+                if (!terminalInfo) {
+                    payload.source_info = `编辑器 - ${editorInfo.filePath}`;
+                }
+                
+                console.log(`📝 编辑器上下文 - ${editorInfo.fileName}, 光标在 ${editorInfo.cursor.line}:${editorInfo.cursor.column}`);
+            }
+            
+            console.log('📤 发送消息:', {
+                session_id: payload.session_id,
+                message: payload.message,
+                has_real_time_info: !!payload.real_time_info,
+                has_cursor_info: !!payload.cursor_info,
+                source_info: payload.source_info
+            });
+            
             chatWebSocket.send(JSON.stringify(payload));
         };
         

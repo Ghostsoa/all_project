@@ -140,13 +140,27 @@ func (h *AIHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 
 	for {
 		var req struct {
-			SessionID uint   `json:"session_id"`
-			Message   string `json:"message"`
+			SessionID    uint   `json:"session_id"`
+			Message      string `json:"message"`
+			RealTimeInfo string `json:"real_time_info,omitempty"` // 实时信息（如终端缓冲区）
+			CursorInfo   string `json:"cursor_info,omitempty"`    // 指针信息（如光标位置、文件上下文）
+			SourceInfo   string `json:"source_info,omitempty"`    // 来源信息（如SSH服务器名称、文件路径等）
 		}
 
 		if err := conn.ReadJSON(&req); err != nil {
 			log.Printf("读取消息失败: %v", err)
 			break
+		}
+
+		log.Printf("📥 [AI] 收到消息 - SessionID: %d, Message: %s", req.SessionID, req.Message)
+		if req.SourceInfo != "" {
+			log.Printf("   📍 来源信息: %s", req.SourceInfo)
+		}
+		if req.RealTimeInfo != "" {
+			log.Printf("   📌 实时信息长度: %d 字符", len(req.RealTimeInfo))
+		}
+		if req.CursorInfo != "" {
+			log.Printf("   📌 指针信息长度: %d 字符", len(req.CursorInfo))
 		}
 
 		// 获取会话和配置
@@ -169,8 +183,8 @@ func (h *AIHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("✅ 用户消息已保存 - ID: %d, Content: %s", userMsg.ID, userMsg.Content)
 
-		// 处理对话
-		if err := h.processChat(conn, session); err != nil {
+		// 处理对话（传递上下文信息）
+		if err := h.processChat(conn, session, req.RealTimeInfo, req.CursorInfo, req.SourceInfo); err != nil {
 			h.sendError(conn, fmt.Sprintf("处理对话失败: %v", err))
 			continue
 		}
@@ -181,7 +195,7 @@ func (h *AIHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 }
 
 // processChat 处理对话逻辑（支持工具调用循环）
-func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSession) error {
+func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSession, realTimeInfo, cursorInfo, sourceInfo string) error {
 	config := session.Config
 
 	// 配置OpenAI客户端
@@ -209,16 +223,61 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 		// 构建API消息列表
 		apiMessages := []openai.ChatCompletionMessage{}
 
+		// 构建动态系统提示词（注入实时信息）
+		systemPrompt := config.SystemPrompt
+
+		// 如果有实时信息，动态注入到系统提示词
+		if realTimeInfo != "" {
+			var parts []string
+
+			if systemPrompt != "" {
+				parts = append(parts, systemPrompt)
+			}
+
+			// 注入实时信息（带来源标记）
+			parts = append(parts, "\n---\n【用户当前操作界面实时信息】")
+			if sourceInfo != "" {
+				parts = append(parts, "\n来源："+sourceInfo)
+			}
+			parts = append(parts, "\n"+realTimeInfo)
+
+			systemPrompt = strings.Join(parts, "")
+			log.Printf("📝 实时信息已注入系统提示词")
+		}
+
 		// 添加系统提示词
-		if config.SystemPrompt != "" {
+		if systemPrompt != "" {
 			apiMessages = append(apiMessages, openai.ChatCompletionMessage{
 				Role:    "system",
-				Content: config.SystemPrompt,
+				Content: systemPrompt,
 			})
 		}
 
-		// 添加历史消息
-		apiMessages = append(apiMessages, models.ConvertToOpenAIMessages(messages)...)
+		// 添加历史消息（转换为OpenAI格式）
+		historyMessages := models.ConvertToOpenAIMessages(messages)
+
+		// 如果有指针信息，注入到最后一条用户消息（即当前发送的消息）
+		if cursorInfo != "" && len(historyMessages) > 0 {
+			// 找到最后一条用户消息
+			for i := len(historyMessages) - 1; i >= 0; i-- {
+				if historyMessages[i].Role == "user" {
+					// 拼接指针信息到用户消息（带来源标记）
+					var cursorParts []string
+					cursorParts = append(cursorParts, historyMessages[i].Content)
+					cursorParts = append(cursorParts, "\n\n---\n【指针信息】当前光标位置和上下文")
+					if sourceInfo != "" {
+						cursorParts = append(cursorParts, "\n来源："+sourceInfo)
+					}
+					cursorParts = append(cursorParts, "\n"+cursorInfo)
+
+					historyMessages[i].Content = strings.Join(cursorParts, "")
+					log.Printf("📝 指针信息已注入用户消息")
+					break
+				}
+			}
+		}
+
+		apiMessages = append(apiMessages, historyMessages...)
 
 		// 构建请求参数
 		apiRequest := openai.ChatCompletionRequest{
