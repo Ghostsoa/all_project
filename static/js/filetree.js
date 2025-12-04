@@ -87,6 +87,9 @@ export function setCurrentServer(serverID, sessionID) {
     // 设置渲染回调
     fileCache.setRenderCallback(renderFileTree);
     
+    // 设置获取showHidden状态的函数
+    fileCache.setShowHiddenGetter(() => showHiddenFiles);
+    
     currentPath = '/root'; // 默认根目录
     loadDirectory(currentPath);
 }

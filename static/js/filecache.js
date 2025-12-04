@@ -1,6 +1,5 @@
 // 文件树缓存管理器 - Stale-While-Revalidate + 智能预加载
 import { showToast } from './utils.js';
-import { showHiddenFiles } from './filetree.js';
 
 class FileTreeCache {
     constructor() {
@@ -10,6 +9,12 @@ class FileTreeCache {
         this.preloading = false; // 是否正在预加载
         this.currentPath = null; // 当前显示的路径
         this.renderCallback = null; // 渲染回调
+        this.showHiddenGetter = null; // 获取showHidden状态的函数
+    }
+    
+    // 设置获取showHidden状态的函数
+    setShowHiddenGetter(getter) {
+        this.showHiddenGetter = getter;
     }
     
     // 设置渲染回调
@@ -258,8 +263,11 @@ class FileTreeCache {
     }
     
     async fetchFiles(sessionID, path) {
+        const showHidden = this.showHiddenGetter ? this.showHiddenGetter() : false;
+        console.log('📂 加载目录:', path, '显示隐藏文件:', showHidden);
+        
         const response = await fetch(
-            `/api/files/list?session_id=${sessionID}&path=${encodeURIComponent(path)}&show_hidden=${showHiddenFiles}`
+            `/api/files/list?session_id=${sessionID}&path=${encodeURIComponent(path)}&show_hidden=${showHidden}`
         );
         const data = await response.json();
         
@@ -267,6 +275,7 @@ class FileTreeCache {
             throw new Error(data.error || '加载失败');
         }
         
+        console.log('✅ 返回', data.files.length, '个文件');
         return data.files || [];
     }
     

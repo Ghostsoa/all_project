@@ -40,14 +40,35 @@ func (c *CommandCache) Set(serverID uint, commands []*models.CommandHistory) {
 	c.cache[serverID] = commands
 }
 
-// Add 添加新命令到缓存
+// Add 添加新命令到缓存（去重：相同命令更新时间并移到最前）
 func (c *CommandCache) Add(serverID uint, command *models.CommandHistory) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	// 添加到缓存开头
 	commands := c.cache[serverID]
-	c.cache[serverID] = append([]*models.CommandHistory{command}, commands...)
+
+	// 查找是否已存在相同的命令
+	existingIndex := -1
+	for i, cmd := range commands {
+		if cmd.Command == command.Command {
+			existingIndex = i
+			break
+		}
+	}
+
+	if existingIndex >= 0 {
+		// 已存在：更新时间并移到最前
+		existing := commands[existingIndex]
+		existing.CreatedAt = time.Now()
+
+		// 从原位置删除
+		commands = append(commands[:existingIndex], commands[existingIndex+1:]...)
+		// 添加到最前
+		c.cache[serverID] = append([]*models.CommandHistory{existing}, commands...)
+	} else {
+		// 不存在：添加到缓存开头
+		c.cache[serverID] = append([]*models.CommandHistory{command}, commands...)
+	}
 
 	// 标记为脏数据
 	c.dirty[serverID] = true
