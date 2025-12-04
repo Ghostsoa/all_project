@@ -30,11 +30,22 @@ export function setShowHiddenFiles(value) {
     showHiddenFiles = value;
 }
 
+// 防止重复初始化标志
+let isFileTreeInitialized = false;
+
+// 初始化文件树
 export function initFileTree() {
     const fileTreeContainer = document.getElementById('fileTree');
     if (!fileTreeContainer) return;
     
+    // 防止重复初始化
+    if (isFileTreeInitialized) {
+        console.log('⚠️ 文件树已初始化，跳过');
+        return;
+    }
+    
     console.log('🔧 初始化文件树...');
+    isFileTreeInitialized = true;
     
     // 显示隐藏文件勾选框事件
     const showHiddenCheckbox = document.getElementById('showHiddenFiles');
@@ -54,7 +65,7 @@ export function initFileTree() {
         console.warn('❌ 未找到refreshBtn元素');
     }
     
-    // 添加F5刷新快捷键
+    // 添加F5刷新快捷键（只绑定一次）
     document.addEventListener('keydown', (e) => {
         if (e.key === 'F5' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
             e.preventDefault();
@@ -62,14 +73,14 @@ export function initFileTree() {
         }
     });
     
-    // 全局点击事件：关闭所有右键菜单
+    // 全局点击事件：关闭所有右键菜单（只绑定一次）
     document.addEventListener('click', (e) => {
         if (!e.target.closest('.context-menu')) {
             closeAllContextMenus();
         }
     });
     
-    // ESC键关闭菜单
+    // ESC键关闭菜单（只绑定一次）
     document.addEventListener('keydown', (e) => {
         if (e.key === 'Escape') {
             closeAllContextMenus();
