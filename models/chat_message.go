@@ -133,12 +133,13 @@ func (r *ChatMessageRepository) GetRecentMessages(sessionID uint, rounds int) ([
 
 	// 从后向前统计用户消息轮数
 	userCount := 0
-	cutIndex := len(allMessages)
+	cutIndex := 0 // 默认保留所有消息
 
 	for i := len(allMessages) - 1; i >= 0; i-- {
 		if allMessages[i].Role == "user" {
 			userCount++
 			if userCount > rounds {
+				// 超过轮数限制，从i+1开始保留（丢弃更早的消息）
 				cutIndex = i + 1
 				break
 			}
