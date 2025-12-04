@@ -133,7 +133,7 @@ function filterHiddenFiles(files, showHidden) {
     return files.filter(file => !file.name.startsWith('.')); // 隐藏.开头的
 }
 
-export function setCurrentServer(serverID, sessionID) {
+export async function setCurrentServer(serverID, sessionID) {
     currentServerID = serverID;
     currentSessionID = sessionID;
     
@@ -150,7 +150,7 @@ export function setCurrentServer(serverID, sessionID) {
     fileCache.setShowHiddenGetter(() => showHiddenFiles);
     
     currentPath = '/root'; // 默认根目录
-    loadDirectory(currentPath);
+    await loadDirectory(currentPath);
 }
 
 function showLocalFileWarning() {

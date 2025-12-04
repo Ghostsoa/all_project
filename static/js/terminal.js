@@ -61,8 +61,8 @@ export function connectSSH(sessionId, server) {
     let firstDataReceived = false; // 标记是否收到第一次数据
     
     ws.onopen = () => {
-        session.status = 'connected';
-        updateStatusLight('connected');
+        session.status = 'connecting'; // 先保持连接中
+        // 不立即更新状态灯，等文件树加载完成
     };
     
     ws.onmessage = (event) => {
@@ -79,9 +79,13 @@ export function connectSSH(sessionId, server) {
             // 收到SSH输出后，等待1.5秒确保SFTP也初始化完成
             if (!fileTreeLoaded && window.setCurrentServer) {
                 fileTreeLoaded = true;
-                setTimeout(() => {
+                setTimeout(async () => {
                     console.log('🔌 SSH已连接，开始加载文件树...');
-                    window.setCurrentServer(server.ID, sessionId);
+                    await window.setCurrentServer(server.ID, sessionId);
+                    // 文件树加载完成后，更新状态
+                    session.status = 'connected';
+                    updateStatusLight('connected');
+                    console.log('✅ 初始化完成');
                 }, 1500); // 增加到1.5秒
             }
         }
