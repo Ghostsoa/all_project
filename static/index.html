@@ -206,9 +206,25 @@
                                     <span id="selectedModel">GPT-4</span>
                                     <i class="fa-solid fa-chevron-up"></i>
                                 </div>
-                                <!-- 向上弹出的模型列表 -->
+                                <!-- 向上弹出的模型配置选择器 -->
                                 <div class="model-popup" id="modelPopup" style="display: none;">
-                                    <!-- 动态加载配置列表 -->
+                                    <div class="model-popup-section">
+                                        <div class="popup-section-title">选择模型</div>
+                                        <div class="model-list" id="modelList">
+                                            <div class="loading-small">加载中...</div>
+                                        </div>
+                                    </div>
+                                    <div class="popup-divider"></div>
+                                    <div class="model-popup-section">
+                                        <div class="popup-section-title">选择API接口</div>
+                                        <div class="endpoint-list" id="endpointList">
+                                            <div class="loading-small">加载中...</div>
+                                        </div>
+                                    </div>
+                                    <div class="popup-actions" id="popupActions" style="display: none;">
+                                        <button class="btn-popup-cancel" onclick="cancelModelConfig()">取消</button>
+                                        <button class="btn-popup-save" onclick="saveModelConfig()">保存</button>
+                                    </div>
                                 </div>
                             </div>
                             <div class="input-buttons">

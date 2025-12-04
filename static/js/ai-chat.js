@@ -28,17 +28,10 @@ function hideAILoading() {
 
 // ========== 模型配置管理 ==========
 
-// 加载可用的AI配置列表
-async function loadAIConfigs() {
-    try {
-        const data = await apiRequest('/api/ai/configs');
-        availableConfigs = data.data || [];
-        return availableConfigs;
-    } catch (error) {
-        console.error('加载AI配置失败:', error);
-        return [];
-    }
-}
+let tempSelectedModel = null;
+let tempSelectedEndpoint = null;
+let originalModel = null;
+let originalEndpoint = null;
 
 // 更新模型显示
 function updateModelDisplay() {
@@ -53,16 +46,152 @@ function updateModelDisplay() {
     }
 }
 
-// 切换AI配置
-async function switchAIConfig(configId) {
+// 切换模型选择器
+window.toggleModelSelector = async function() {
+    const popup = document.getElementById('modelPopup');
+    if (!popup) return;
+    
+    const isOpen = popup.style.display === 'block';
+    
+    if (isOpen) {
+        popup.style.display = 'none';
+        resetTempSelection();
+    } else {
+        // 记录原始选择
+        originalModel = currentSession?.config?.ai_model_id || null;
+        originalEndpoint = currentSession?.config?.ai_endpoint_id || null;
+        tempSelectedModel = originalModel;
+        tempSelectedEndpoint = originalEndpoint;
+        
+        // 加载模型和接口列表
+        await loadModelAndEndpointLists();
+        
+        // 隐藏保存/取消按钮
+        document.getElementById('popupActions').style.display = 'none';
+        
+        popup.style.display = 'block';
+    }
+};
+
+// 加载模型和接口列表
+async function loadModelAndEndpointLists() {
+    // 加载模型列表
+    try {
+        const modelData = await apiRequest('/api/ai/models');
+        const models = modelData.data || [];
+        renderModelList(models);
+    } catch (error) {
+        console.error('加载模型列表失败:', error);
+        document.getElementById('modelList').innerHTML = '<div class="loading-small">加载失败</div>';
+    }
+    
+    // 加载接口列表
+    try {
+        const endpointData = await apiRequest('/api/ai/endpoints');
+        const endpoints = endpointData.data || [];
+        renderEndpointList(endpoints);
+    } catch (error) {
+        console.error('加载接口列表失败:', error);
+        document.getElementById('endpointList').innerHTML = '<div class="loading-small">加载失败</div>';
+    }
+}
+
+// 渲染模型列表
+function renderModelList(models) {
+    const container = document.getElementById('modelList');
+    if (!container) return;
+    
+    if (models.length === 0) {
+        container.innerHTML = '<div class="loading-small">暂无模型</div>';
+        return;
+    }
+    
+    container.innerHTML = models.map(model => `
+        <div class="model-option ${tempSelectedModel === model.ID ? 'active' : ''}"
+             onclick="selectTempModel(${model.ID})"
+             data-model-id="${model.ID}">
+            <div class="model-info">
+                <div class="model-name">${escapeHtml(model.display_name || model.name)}</div>
+            </div>
+            ${tempSelectedModel === model.ID ? '<i class="fa-solid fa-check"></i>' : ''}
+        </div>
+    `).join('');
+}
+
+// 渲染接口列表
+function renderEndpointList(endpoints) {
+    const container = document.getElementById('endpointList');
+    if (!container) return;
+    
+    if (endpoints.length === 0) {
+        container.innerHTML = '<div class="loading-small">暂无接口</div>';
+        return;
+    }
+    
+    container.innerHTML = endpoints.map(endpoint => `
+        <div class="model-option ${tempSelectedEndpoint === endpoint.ID ? 'active' : ''}"
+             onclick="selectTempEndpoint(${endpoint.ID})"
+             data-endpoint-id="${endpoint.ID}">
+            <div class="model-info">
+                <div class="model-name">${escapeHtml(endpoint.name)}</div>
+                <div class="model-endpoint">${escapeHtml(endpoint.base_url || '')}</div>
+            </div>
+            ${tempSelectedEndpoint === endpoint.ID ? '<i class="fa-solid fa-check"></i>' : ''}
+        </div>
+    `).join('');
+}
+
+// 临时选择模型
+window.selectTempModel = function(modelId) {
+    tempSelectedModel = modelId;
+    loadModelAndEndpointLists(); // 重新渲染
+    checkIfChanged();
+};
+
+// 临时选择接口
+window.selectTempEndpoint = function(endpointId) {
+    tempSelectedEndpoint = endpointId;
+    loadModelAndEndpointLists(); // 重新渲染
+    checkIfChanged();
+};
+
+// 检查是否有改动
+function checkIfChanged() {
+    const hasChanged = tempSelectedModel !== originalModel || tempSelectedEndpoint !== originalEndpoint;
+    const actionsEl = document.getElementById('popupActions');
+    if (actionsEl) {
+        actionsEl.style.display = hasChanged ? 'flex' : 'none';
+    }
+}
+
+// 重置临时选择
+function resetTempSelection() {
+    tempSelectedModel = null;
+    tempSelectedEndpoint = null;
+    originalModel = null;
+    originalEndpoint = null;
+}
+
+// 取消配置修改
+window.cancelModelConfig = function() {
+    toggleModelSelector(); // 关闭弹窗
+};
+
+// 保存模型配置
+window.saveModelConfig = async function() {
     if (!currentSession) return;
+    if (!tempSelectedModel || !tempSelectedEndpoint) {
+        alert('请同时选择模型和API接口');
+        return;
+    }
     
     try {
-        await apiRequest('/api/ai/session/config', {
+        await apiRequest('/api/ai/session/update-config', {
             method: 'POST',
             body: JSON.stringify({
                 session_id: currentSession.ID,
-                config_id: configId
+                ai_model_id: tempSelectedModel,
+                ai_endpoint_id: tempSelectedEndpoint
             })
         });
         
@@ -70,63 +199,12 @@ async function switchAIConfig(configId) {
         const data = await apiRequest(`/api/ai/session?id=${currentSession.ID}`);
         currentSession = data.data;
         updateModelDisplay();
-    } catch (error) {
-        console.error('切换配置失败:', error);
-        alert('切换配置失败: ' + error.message);
-    }
-}
-
-// 切换模型选择器
-window.toggleModelSelector = async function() {
-    const popup = document.getElementById('modelPopup');
-    
-    if (!popup) return;
-    
-    const isOpen = popup.style.display === 'block';
-    
-    if (isOpen) {
-        popup.style.display = 'none';
-    } else {
-        // 加载配置列表
-        const configs = await loadAIConfigs();
-        renderModelOptions(configs);
-        popup.style.display = 'block';
-    }
-};
-
-// 渲染模型选项
-function renderModelOptions(configs) {
-    const popup = document.getElementById('modelPopup');
-    if (!popup) return;
-    
-    if (configs.length === 0) {
-        popup.innerHTML = '<div class="model-option" style="color: rgba(255,255,255,0.4); cursor: default;">暂无可用配置</div>';
-        return;
-    }
-    
-    popup.innerHTML = configs.map(config => {
-        const isActive = currentSession?.config?.ID === config.ID;
-        const model = config.ai_model;
-        const endpoint = config.ai_endpoint;
         
-        return `
-            <div class="model-option ${isActive ? 'active' : ''}" 
-                 onclick="selectAIConfig(${config.ID})"
-                 data-config-id="${config.ID}">
-                <div class="model-info">
-                    <div class="model-name">${model?.display_name || model?.name || '未知模型'}</div>
-                    <div class="model-endpoint">${endpoint?.name || ''}</div>
-                </div>
-                ${isActive ? '<i class="fa-solid fa-check"></i>' : ''}
-            </div>
-        `;
-    }).join('');
-}
-
-// 选择AI配置
-window.selectAIConfig = async function(configId) {
-    await switchAIConfig(configId);
-    toggleModelSelector(); // 关闭弹窗
+        toggleModelSelector(); // 关闭弹窗
+    } catch (error) {
+        console.error('保存配置失败:', error);
+        alert('保存配置失败: ' + error.message);
+    }
 };
 
 // ========== 会话管理 ==========
