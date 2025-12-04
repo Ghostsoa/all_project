@@ -33,16 +33,23 @@ function renderSessionList() {
     if (sessions.length === 0) {
         container.innerHTML = `
             <div class="empty-history">
-                <i class="fa-solid fa-comments"></i>
-                <p>暂无对话历史</p>
+                <button class="btn btn-primary btn-sm" onclick="createNewAISession(); toggleHistoryDropdown();">
+                    <i class="fa-solid fa-plus"></i> 创建新对话
+                </button>
             </div>
         `;
         return;
     }
 
-    container.innerHTML = sessions.map(session => `
-        <div class="history-item ${currentSession?.ID === session.ID ? 'active' : ''}" 
-             onclick="selectAISession(${session.ID || session.id})"
+    container.innerHTML = `
+        <div class="history-item new" onclick="createNewAISession(); toggleHistoryDropdown();">
+            <i class="fa-solid fa-plus"></i>
+            <span>新建对话</span>
+        </div>
+        <div class="history-divider"></div>
+    ` + sessions.map(session => `
+        <div class="history-item ${currentSession?.ID === session.ID || currentSession?.id === session.id ? 'active' : ''}" 
+             onclick="selectAISession(${session.ID || session.id}); toggleHistoryDropdown();"
              data-session-id="${session.ID || session.id}">
             <div class="history-item-title">${escapeHtml(session.title)}</div>
             <div class="history-item-meta">
@@ -54,6 +61,14 @@ function renderSessionList() {
             </button>
         </div>
     `).join('');
+    
+    // 更新标题显示
+    if (currentSession) {
+        const titleEl = document.getElementById('currentConversationTitle');
+        if (titleEl) {
+            titleEl.textContent = currentSession.title || '对话历史';
+        }
+    }
 }
 
 // 选择会话
@@ -513,6 +528,36 @@ window.handleAIInputKeydown = function(event) {
         sendAIMessage();
     }
 };
+
+// 切换历史下拉菜单
+window.toggleHistoryDropdown = function() {
+    const menu = document.getElementById('historyDropdownMenu');
+    const trigger = document.querySelector('.history-trigger');
+    
+    if (!menu) return;
+    
+    const isOpen = menu.style.display === 'block';
+    
+    if (isOpen) {
+        menu.style.display = 'none';
+        if (trigger) trigger.classList.remove('open');
+    } else {
+        menu.style.display = 'block';
+        if (trigger) trigger.classList.add('open');
+    }
+};
+
+// 点击其他地方关闭下拉菜单
+document.addEventListener('click', function(e) {
+    const selector = document.querySelector('.ai-history-selector');
+    const menu = document.getElementById('historyDropdownMenu');
+    
+    if (selector && !selector.contains(e.target) && menu) {
+        menu.style.display = 'none';
+        const trigger = document.querySelector('.history-trigger');
+        if (trigger) trigger.classList.remove('open');
+    }
+});
 
 // 初始化
 export async function initAIChat() {

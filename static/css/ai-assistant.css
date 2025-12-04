@@ -21,33 +21,26 @@
     display: flex;
     align-items: center;
     gap: 6px;
-    padding: 4px 8px;
+    padding: 4px 0;
     cursor: pointer;
-    border-radius: 4px;
-    transition: background 0.2s ease;
     user-select: none;
 }
 
-.history-trigger:hover {
-    background: rgba(255, 255, 255, 0.05);
-}
-
-.history-title {
-    font-size: 12px;
+.current-conversation {
+    font-size: 13px;
     color: rgba(255, 255, 255, 0.9);
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    flex: 1;
 }
 
-.history-trigger i {
+.history-arrow {
     font-size: 10px;
     color: rgba(255, 255, 255, 0.5);
     transition: transform 0.2s ease;
 }
 
-.history-trigger.open i {
+.history-trigger.open .history-arrow {
     transform: rotate(180deg);
 }
 
@@ -86,8 +79,10 @@
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
-    align-items: center;
-    gap: 8px;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+    border-radius: 4px;
 }
 
 .history-item:hover {
@@ -103,6 +98,9 @@
 .history-item.new {
     color: rgba(255, 255, 255, 0.5);
     border-top: 1px solid rgba(255, 255, 255, 0.1);
+    flex-direction: row;
+    align-items: center;
+    gap: 8px;
 }
 
 .history-item.new:hover {
@@ -113,6 +111,17 @@
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
+    font-weight: 500;
+    padding-right: 30px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.history-item-meta {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
 }
 
 .history-divider {
@@ -426,19 +435,11 @@
 /* ========== 对话历史样式增强 ========== */
 .empty-history {
     text-align: center;
-    padding: 40px 20px;
-    color: rgba(255, 255, 255, 0.5);
+    padding: 20px;
 }
 
-.empty-history i {
-    font-size: 32px;
-    margin-bottom: 12px;
-    opacity: 0.5;
-}
-
-.empty-history p {
-    margin: 0;
-    font-size: 13px;
+.empty-history .btn {
+    width: 100%;
 }
 
 .history-item-delete {
@@ -594,22 +595,25 @@
     30% { transform: translateY(-10px); opacity: 1; }
 }
 
-/* ========== 清空对话按钮 ========== */
+/* ========== 输入框按钮组 ========== */
+.input-buttons {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
 .clear-chat-btn {
-    position: absolute;
-    left: 12px;
-    bottom: 12px;
     background: none;
     border: none;
     color: rgba(255, 255, 255, 0.4);
     cursor: pointer;
-    padding: 6px;
-    border-radius: 6px;
+    padding: 0;
+    font-size: 16px;
+    line-height: 1;
     transition: all 0.2s ease;
-    font-size: 14px;
 }
 
 .clear-chat-btn:hover {
-    background: rgba(239, 68, 68, 0.2);
-    color: #ef4444;
+    transform: scale(1.1);
+    filter: brightness(1.2);
 }

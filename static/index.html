@@ -153,18 +153,12 @@
                 <div class="ai-toolbar">
                     <!-- 左侧：对话历史 -->
                     <div class="ai-history-selector">
-                        <button class="history-trigger" onclick="toggleHistoryDropdown()">
-                            <i class="fa-solid fa-clock-rotate-left"></i>
-                            <span class="current-conversation">对话历史</span>
-                            <i class="fa-solid fa-chevron-down"></i>
-                        </button>
+                        <div class="history-trigger" onclick="toggleHistoryDropdown()">
+                            <span class="current-conversation" id="currentConversationTitle">对话历史</span>
+                            <span class="history-arrow">▼</span>
+                        </div>
                         <!-- 历史列表下拉 -->
                         <div class="history-dropdown-menu" id="historyDropdownMenu" style="display: none;">
-                            <div class="history-item new" onclick="createNewAISession()">
-                                <i class="fa-solid fa-plus"></i>
-                                <span>新建对话</span>
-                            </div>
-                            <div class="history-divider"></div>
                             <div id="aiConversationHistory">
                                 <div class="loading">加载中...</div>
                             </div>
@@ -221,16 +215,16 @@
                                     </div>
                                 </div>
                             </div>
-                            <!-- 发送按钮（图标） -->
-                            <button class="send-icon-btn" onclick="sendAIMessage()" title="发送 (Ctrl+Enter)">
-                                <i class="fa-solid fa-paper-plane"></i>
-                            </button>
+                            <div class="input-buttons">
+                                <!-- 清空对话按钮 -->
+                                <button class="clear-chat-btn" onclick="clearCurrentAIChat()" title="清空当前对话">🗑️</button>
+                                <!-- 发送按钮（图标） -->
+                                <button class="send-icon-btn" onclick="sendAIMessage()" title="发送 (Ctrl+Enter)">
+                                    <i class="fa-solid fa-paper-plane"></i>
+                                </button>
+                            </div>
                         </div>
                     </div>
-                    <!-- 清空对话按钮 -->
-                    <button class="clear-chat-btn" onclick="clearCurrentAIChat()" title="清空当前对话">
-                        <i class="fa-solid fa-broom"></i>
-                    </button>
                 </div>
             </div>
 
