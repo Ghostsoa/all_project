@@ -74,10 +74,10 @@ async function loadModels() {
                         <div class="item-subtitle">${escapeHtml(model.name)}</div>
                     </div>
                     <div class="item-actions">
-                        <button class="btn-icon" onclick="editModel(${model.id})" title="编辑">
+                        <button class="btn-icon" onclick="editModel(${model.ID || model.id})" title="编辑">
                             <i class="fa-solid fa-edit"></i>
                         </button>
-                        <button class="btn-icon btn-danger" onclick="deleteModel(${model.id})" title="删除">
+                        <button class="btn-icon btn-danger" onclick="deleteModel(${model.ID || model.id})" title="删除">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     </div>
@@ -122,11 +122,11 @@ window.showAddModelForm = function() {
 
 // 编辑模型
 window.editModel = function(id) {
-    const model = currentModels.find(m => m.id === id);
+    const model = currentModels.find(m => (m.ID || m.id) === id);
     if (!model) return;
 
     document.getElementById('modelFormTitle').textContent = '编辑AI模型';
-    document.getElementById('modelId').value = model.id;
+    document.getElementById('modelId').value = model.ID || model.id;
     document.getElementById('modelName').value = model.name;
     document.getElementById('modelDisplayName').value = model.display_name || '';
     document.getElementById('modelProvider').value = model.provider || '';
@@ -207,10 +207,10 @@ async function loadEndpoints() {
                         <div class="item-subtitle">${escapeHtml(endpoint.base_url)}</div>
                     </div>
                     <div class="item-actions">
-                        <button class="btn-icon" onclick="editEndpoint(${endpoint.id})" title="编辑">
+                        <button class="btn-icon" onclick="editEndpoint(${endpoint.ID || endpoint.id})" title="编辑">
                             <i class="fa-solid fa-edit"></i>
                         </button>
-                        <button class="btn-icon btn-danger" onclick="deleteEndpoint(${endpoint.id})" title="删除">
+                        <button class="btn-icon btn-danger" onclick="deleteEndpoint(${endpoint.ID || endpoint.id})" title="删除">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     </div>
@@ -255,11 +255,11 @@ window.showAddEndpointForm = function() {
 
 // 编辑接口
 window.editEndpoint = function(id) {
-    const endpoint = currentEndpoints.find(e => e.id === id);
+    const endpoint = currentEndpoints.find(e => (e.ID || e.id) === id);
     if (!endpoint) return;
 
     document.getElementById('endpointFormTitle').textContent = '编辑API接口';
-    document.getElementById('endpointId').value = endpoint.id;
+    document.getElementById('endpointId').value = endpoint.ID || endpoint.id;
     document.getElementById('endpointName').value = endpoint.name;
     document.getElementById('endpointBaseURL').value = endpoint.base_url;
     document.getElementById('endpointAPIKey').value = endpoint.api_key;
@@ -346,14 +346,14 @@ async function loadConfigs() {
                     </div>
                     <div class="item-actions">
                         ${!config.is_default ? `
-                            <button class="btn-icon btn-success" onclick="setDefaultConfig(${config.id})" title="设为默认">
+                            <button class="btn-icon btn-success" onclick="setDefaultConfig(${config.ID || config.id})" title="设为默认">
                                 <i class="fa-solid fa-star"></i>
                             </button>
                         ` : ''}
-                        <button class="btn-icon" onclick="editConfig(${config.id})" title="编辑">
+                        <button class="btn-icon" onclick="editConfig(${config.ID || config.id})" title="编辑">
                             <i class="fa-solid fa-edit"></i>
                         </button>
-                        <button class="btn-icon btn-danger" onclick="deleteConfig(${config.id})" title="删除">
+                        <button class="btn-icon btn-danger" onclick="deleteConfig(${config.ID || config.id})" title="删除">
                             <i class="fa-solid fa-trash"></i>
                         </button>
                     </div>
@@ -447,13 +447,13 @@ async function loadConfigFormOptions() {
 
 // 编辑配置
 window.editConfig = async function(id) {
-    const config = currentConfigs.find(c => c.id === id);
+    const config = currentConfigs.find(c => (c.ID || c.id) === id);
     if (!config) return;
 
     await loadConfigFormOptions();
 
     document.getElementById('configFormTitle').textContent = '编辑模型配置';
-    document.getElementById('configId').value = config.id;
+    document.getElementById('configId').value = config.ID || config.id;
     document.getElementById('configName').value = config.name;
     document.getElementById('configModelId').value = config.model_id;
     document.getElementById('configEndpointId').value = config.endpoint_id;
@@ -524,7 +524,7 @@ window.saveConfig = async function() {
             await apiRequest('/api/ai/configs/update', 'POST', data);
         } else {
             const result = await apiRequest('/api/ai/configs/create', 'POST', data);
-            savedId = result.data?.id;
+            savedId = result.data?.ID || result.data?.id;
         }
 
         // 如果设置为默认，需要调用设置默认接口
