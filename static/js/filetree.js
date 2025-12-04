@@ -666,8 +666,9 @@ window.createNewFile = async function(basePath) {
             const data = await response.json();
             if (data.success) {
                 showToast('文件创建成功', 'success');
-                // 刷新目录，显示真实文件
-                await loadDirectory(basePath);
+                // 强制刷新目录，清除缓存后重新加载
+                const files = await fileCache.refresh(currentSessionID, basePath);
+                renderFileTree(files, basePath);
             } else {
                 showToast('创建失败: ' + data.error, 'error');
             }
@@ -753,8 +754,9 @@ window.createNewFolder = async function(basePath) {
             const data = await response.json();
             if (data.success) {
                 showToast('文件夹创建成功', 'success');
-                // 刷新目录，显示真实文件夹
-                await loadDirectory(basePath);
+                // 强制刷新目录，清除缓存后重新加载
+                const files = await fileCache.refresh(currentSessionID, basePath);
+                renderFileTree(files, basePath);
             } else {
                 showToast('创建失败: ' + data.error, 'error');
             }
@@ -898,8 +900,9 @@ window.pasteFile = async function(targetPath) {
             const data = await response.json();
             if (data.success) {
                 showToast('复制成功', 'success');
-                // 刷新当前目录
-                await loadDirectory(currentPath);
+                // 强制刷新当前目录
+                const files = await fileCache.refresh(currentSessionID, currentPath);
+                renderFileTree(files, currentPath);
             } else {
                 showToast('复制失败: ' + data.error, 'error');
             }
@@ -919,8 +922,9 @@ window.pasteFile = async function(targetPath) {
             if (data.success) {
                 showToast('移动成功', 'success');
                 
-                // 刷新当前目录
-                await loadDirectory(currentPath);
+                // 强制刷新当前目录
+                const files = await fileCache.refresh(currentSessionID, currentPath);
+                renderFileTree(files, currentPath);
                 
                 clipboard = null; // 清空剪贴板
             } else {
@@ -992,8 +996,9 @@ window.renameFile = async function(oldPath) {
             const data = await response.json();
             if (data.success) {
                 showToast('重命名成功', 'success');
-                // 刷新目录，显示真实文件名
-                await loadDirectory(parentPath);
+                // 强制刷新目录，显示真实文件名
+                const files = await fileCache.refresh(currentSessionID, parentPath);
+                renderFileTree(files, parentPath);
             } else {
                 showToast('重命名失败: ' + data.error, 'error');
             }
@@ -1042,8 +1047,9 @@ window.deleteFile = async function(path) {
         const data = await response.json();
         if (data.success) {
             showToast('删除成功', 'success');
-            // 刷新当前目录
-            await loadDirectory(parentPath);
+            // 强制刷新当前目录
+            const files = await fileCache.refresh(currentSessionID, parentPath);
+            renderFileTree(files, parentPath);
         } else {
             showToast('删除失败: ' + data.error, 'error');
         }
