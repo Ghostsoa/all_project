@@ -1,5 +1,49 @@
 /* AI 助手面板样式 - 一体化布局 */
 
+/* AI 助手面板 */
+#aiPanel {
+    position: relative;
+}
+
+/* 加载遮罩 */
+.ai-loading-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(15, 15, 15, 0.98);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(4px);
+}
+
+.ai-loading-spinner {
+    text-align: center;
+}
+
+.ai-loading-spinner .spinner {
+    width: 40px;
+    height: 40px;
+    margin: 0 auto 16px;
+    border: 3px solid rgba(255, 255, 255, 0.1);
+    border-top-color: #3b82f6;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.ai-loading-spinner p {
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 14px;
+    margin: 0;
+}
+
 /* 顶部工具栏 */
 .ai-toolbar {
     display: flex;
@@ -313,7 +357,7 @@
 }
 
 .model-option {
-    padding: 8px 12px;
+    padding: 10px 12px;
     font-size: 12px;
     color: rgba(255, 255, 255, 0.7);
     cursor: pointer;
@@ -321,11 +365,21 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: 8px;
 }
 
 .model-option:hover {
     background: rgba(255, 255, 255, 0.08);
     color: rgba(255, 255, 255, 0.9);
+}
+
+.model-option.active {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+}
+
+.model-option.active .model-endpoint {
+    color: rgba(59, 130, 246, 0.7);
 }
 
 .model-option:first-child {
@@ -336,8 +390,26 @@
     border-radius: 0 0 6px 6px;
 }
 
+.model-info {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+}
+
 .model-name {
     font-weight: 500;
+    font-size: 13px;
+}
+
+.model-endpoint {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.model-option i {
+    font-size: 12px;
+    color: #3b82f6;
 }
 
 .model-tag {

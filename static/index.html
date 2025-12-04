@@ -149,6 +149,14 @@
 
             <!-- AI 助手面板 -->
             <div class="right-panel-content" id="aiPanel" style="display: none;">
+                <!-- 加载遮罩 -->
+                <div class="ai-loading-overlay" id="aiLoadingOverlay" style="display: none;">
+                    <div class="ai-loading-spinner">
+                        <div class="spinner"></div>
+                        <p id="aiLoadingText">正在加载配置...</p>
+                    </div>
+                </div>
+                
                 <!-- 顶部工具栏 -->
                 <div class="ai-toolbar">
                     <!-- 左侧：对话历史 -->
@@ -200,19 +208,7 @@
                                 </div>
                                 <!-- 向上弹出的模型列表 -->
                                 <div class="model-popup" id="modelPopup" style="display: none;">
-                                    <div class="model-option" data-model="gpt-4" onclick="selectModel('gpt-4', 'GPT-4')">
-                                        <span class="model-name">GPT-4</span>
-                                        <span class="model-tag">推荐</span>
-                                    </div>
-                                    <div class="model-option" data-model="gpt-3.5" onclick="selectModel('gpt-3.5', 'GPT-3.5')">
-                                        <span class="model-name">GPT-3.5</span>
-                                    </div>
-                                    <div class="model-option" data-model="claude" onclick="selectModel('claude', 'Claude')">
-                                        <span class="model-name">Claude</span>
-                                    </div>
-                                    <div class="model-option" data-model="local" onclick="selectModel('local', '本地')">
-                                        <span class="model-name">本地模型</span>
-                                    </div>
+                                    <!-- 动态加载配置列表 -->
                                 </div>
                             </div>
                             <div class="input-buttons">

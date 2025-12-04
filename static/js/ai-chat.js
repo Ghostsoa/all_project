@@ -6,11 +6,134 @@ import { apiRequest } from './api.js';
 let currentSession = null;
 let chatWebSocket = null;
 let sessions = [];
+let availableConfigs = []; // 可用的AI配置列表
+
+// ========== Loading 控制 ==========
+
+function showAILoading(text = '正在加载...') {
+    const overlay = document.getElementById('aiLoadingOverlay');
+    const textEl = document.getElementById('aiLoadingText');
+    if (overlay) {
+        if (textEl) textEl.textContent = text;
+        overlay.style.display = 'flex';
+    }
+}
+
+function hideAILoading() {
+    const overlay = document.getElementById('aiLoadingOverlay');
+    if (overlay) {
+        overlay.style.display = 'none';
+    }
+}
+
+// ========== 模型配置管理 ==========
+
+// 加载可用的AI配置列表
+async function loadAIConfigs() {
+    try {
+        const data = await apiRequest('/api/ai/configs');
+        availableConfigs = data.data || [];
+        return availableConfigs;
+    } catch (error) {
+        console.error('加载AI配置失败:', error);
+        return [];
+    }
+}
+
+// 更新模型显示
+function updateModelDisplay() {
+    const modelEl = document.getElementById('selectedModel');
+    if (!modelEl) return;
+    
+    if (currentSession?.config?.ai_model) {
+        const model = currentSession.config.ai_model;
+        modelEl.textContent = model.display_name || model.name || '未知模型';
+    } else {
+        modelEl.textContent = '选择模型';
+    }
+}
+
+// 切换AI配置
+async function switchAIConfig(configId) {
+    if (!currentSession) return;
+    
+    try {
+        await apiRequest('/api/ai/session/config', {
+            method: 'POST',
+            body: JSON.stringify({
+                session_id: currentSession.ID,
+                config_id: configId
+            })
+        });
+        
+        // 重新加载会话信息
+        const data = await apiRequest(`/api/ai/session?id=${currentSession.ID}`);
+        currentSession = data.data;
+        updateModelDisplay();
+    } catch (error) {
+        console.error('切换配置失败:', error);
+        alert('切换配置失败: ' + error.message);
+    }
+}
+
+// 切换模型选择器
+window.toggleModelSelector = async function() {
+    const popup = document.getElementById('modelPopup');
+    
+    if (!popup) return;
+    
+    const isOpen = popup.style.display === 'block';
+    
+    if (isOpen) {
+        popup.style.display = 'none';
+    } else {
+        // 加载配置列表
+        const configs = await loadAIConfigs();
+        renderModelOptions(configs);
+        popup.style.display = 'block';
+    }
+};
+
+// 渲染模型选项
+function renderModelOptions(configs) {
+    const popup = document.getElementById('modelPopup');
+    if (!popup) return;
+    
+    if (configs.length === 0) {
+        popup.innerHTML = '<div class="model-option" style="color: rgba(255,255,255,0.4); cursor: default;">暂无可用配置</div>';
+        return;
+    }
+    
+    popup.innerHTML = configs.map(config => {
+        const isActive = currentSession?.config?.ID === config.ID;
+        const model = config.ai_model;
+        const endpoint = config.ai_endpoint;
+        
+        return `
+            <div class="model-option ${isActive ? 'active' : ''}" 
+                 onclick="selectAIConfig(${config.ID})"
+                 data-config-id="${config.ID}">
+                <div class="model-info">
+                    <div class="model-name">${model?.display_name || model?.name || '未知模型'}</div>
+                    <div class="model-endpoint">${endpoint?.name || ''}</div>
+                </div>
+                ${isActive ? '<i class="fa-solid fa-check"></i>' : ''}
+            </div>
+        `;
+    }).join('');
+}
+
+// 选择AI配置
+window.selectAIConfig = async function(configId) {
+    await switchAIConfig(configId);
+    toggleModelSelector(); // 关闭弹窗
+};
 
 // ========== 会话管理 ==========
 
 // 加载会话列表
 export async function loadSessions() {
+    showAILoading('正在加载配置...');
     try {
         const data = await apiRequest('/api/ai/sessions');
         sessions = data.data || [];
@@ -19,27 +142,23 @@ export async function loadSessions() {
         // 如果有会话，自动选择第一个
         if (sessions.length > 0 && !currentSession) {
             await selectAISession(sessions[0].ID);
+        } else {
+            hideAILoading();
         }
     } catch (error) {
         console.error('加载会话列表失败:', error);
+        hideAILoading();
     }
 }
 
 // 渲染会话列表
 function renderSessionList() {
-    console.log('🎨 renderSessionList 开始, sessions数量:', sessions.length);
     const container = document.getElementById('aiConversationHistory');
     const triggerEl = document.querySelector('.history-trigger');
     const titleEl = document.getElementById('currentConversationTitle');
     const arrowEl = document.querySelector('.history-arrow');
     
-    console.log('📦 container:', container);
-    console.log('📦 triggerEl:', triggerEl);
-    
-    if (!container) {
-        console.error('❌ container 未找到！');
-        return;
-    }
+    if (!container) return;
 
     if (sessions.length === 0) {
         // 没有对话历史：显示"开始新的对话 +"
@@ -77,7 +196,7 @@ function renderSessionList() {
         });
     }
 
-    const htmlContent = `
+    container.innerHTML = `
         <div class="history-item new" data-action="create-new">
             <i class="fa-solid fa-plus"></i>
             <span>新建对话</span>
@@ -98,34 +217,21 @@ function renderSessionList() {
         </div>
     `).join('');
     
-    container.innerHTML = htmlContent;
-    console.log('📝 container.innerHTML 已设置, 长度:', htmlContent.length);
-    console.log('📝 前100个字符:', htmlContent.substring(0, 100));
-    
     // 添加事件委托
     container.onclick = function(e) {
-        console.log('🖱️ container 点击事件触发', e.target);
         const target = e.target.closest('[data-action]');
-        console.log('🎯 找到的目标:', target);
-        if (!target) {
-            console.log('❌ 没有找到 data-action 元素');
-            return;
-        }
+        if (!target) return;
         
         const action = target.dataset.action;
         const sessionId = target.dataset.sessionId;
-        console.log('📋 action:', action, 'sessionId:', sessionId);
         
         if (action === 'create-new') {
-            console.log('➕ 创建新会话');
             createNewAISession();
             toggleHistoryDropdown();
         } else if (action === 'select-session' && sessionId) {
-            console.log('✅ 选择会话:', sessionId);
             selectAISession(parseInt(sessionId));
             toggleHistoryDropdown();
         } else if (action === 'delete-session' && sessionId) {
-            console.log('🗑️ 删除会话:', sessionId);
             e.stopPropagation();
             deleteAISession(parseInt(sessionId));
         }
@@ -134,20 +240,25 @@ function renderSessionList() {
 
 // 选择会话
 window.selectAISession = async function(sessionId) {
+    showAILoading('正在切换会话...');
     try {
         const data = await apiRequest(`/api/ai/session?id=${sessionId}`);
         currentSession = data.data;
         
         // 更新UI
         renderSessionList();
+        updateModelDisplay(); // 更新模型显示
         
         // 加载消息
         await loadMessages(sessionId);
         
         // 显示对话区域
         showChatArea();
+        
+        hideAILoading();
     } catch (error) {
         console.error('选择会话失败:', error);
+        hideAILoading();
         alert('加载会话失败: ' + error.message);
     }
 };
