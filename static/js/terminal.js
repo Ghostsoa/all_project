@@ -127,15 +127,15 @@ export function openLocalTerminal() {
     document.getElementById('noSelection').style.display = 'none';
     document.getElementById('terminalWrapper').style.display = 'flex';
     
-    // 创建内容标签（不可关闭）
-    const tabsList = document.getElementById('contentTabsList');
-    const tabHTML = `
-        <div class="content-tab-item active" data-session-id="${sessionId}" data-type="terminal" onclick="window.switchContentTab('${sessionId}')">
+    // 在content-tabs-bar创建固定的终端标签
+    const contentTabsList = document.getElementById('contentTabsList');
+    const terminalTabHTML = `
+        <div class="content-tab-item active" data-session-id="${sessionId}" data-type="terminal" onclick="window.switchToTerminal('${sessionId}')">
             <span class="tab-icon">💻</span>
-            <span class="tab-name">本地终端</span>
+            <span class="tab-name">终端</span>
         </div>
     `;
-    tabsList.insertAdjacentHTML('beforeend', tabHTML);
+    contentTabsList.innerHTML = terminalTabHTML; // 清空并添加终端标签
     
     // 创建终端容器
     const contentContainer = document.getElementById('contentContainer');

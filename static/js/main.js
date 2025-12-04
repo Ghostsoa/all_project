@@ -82,27 +82,18 @@ window.selectServer = async function(id) {
         
         const sessionId = 'ssh-' + server.ID; // 使用服务器ID作为sessionId
         
-        // 高亮当前服务器
-        document.querySelectorAll('.server-item').forEach(item => {
-            item.classList.remove('active');
-        });
-        const serverItem = document.getElementById('server-' + server.ID);
-        if (serverItem) {
-            serverItem.classList.add('active');
-        }
-        
         document.getElementById('noSelection').style.display = 'none';
         document.getElementById('terminalWrapper').style.display = 'flex';
         
-        // 创建内容标签（终端标签，不可关闭）
-        const tabsList = document.getElementById('contentTabsList');
-        const tabHTML = `
-            <div class="content-tab-item active" data-session-id="${sessionId}" data-type="terminal" onclick="window.switchContentTab('${sessionId}')">
+        // 在content-tabs-bar创建固定的终端标签
+        const contentTabsList = document.getElementById('contentTabsList');
+        const terminalTabHTML = `
+            <div class="content-tab-item active" data-session-id="${sessionId}" data-type="terminal" onclick="window.switchToTerminal('${sessionId}')">
                 <span class="tab-icon">💻</span>
-                <span class="tab-name">${server.name}</span>
+                <span class="tab-name">终端</span>
             </div>
         `;
-        tabsList.insertAdjacentHTML('beforeend', tabHTML);
+        contentTabsList.innerHTML = terminalTabHTML; // 清空并添加终端标签
         
         // 创建终端容器
         const contentContainer = document.getElementById('contentContainer');
@@ -125,11 +116,13 @@ window.selectServer = async function(id) {
         });
         
         state.activeSessionId = sessionId;
-        renderTabs();
-        switchTab(sessionId);
         
         connectSSH(sessionId, server);
         loadCommandHistory(server.ID, server.name);
+        
+        // 渲染顶部SSH服务器标签
+        renderTabs();
+        switchTab(sessionId);
         
         // 文件树会在WebSocket连接成功后自动加载
     } catch (error) {
@@ -156,17 +149,60 @@ window.renderTabs = function() {
     tabsList.innerHTML = tabs.join('');
 };
 
-window.switchTab = function(sessionId) {
-    state.activeSessionId = sessionId;
+// 切换到终端（从content-tabs-bar的终端标签点击）
+window.switchToTerminal = function(sessionId) {
+    // 切换content-tab-item的active状态
+    document.querySelectorAll('.content-tab-item').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelector(`.content-tab-item[data-session-id="${sessionId}"]`)?.classList.add('active');
     
+    // 隐藏所有editor-pane
+    document.querySelectorAll('.editor-pane').forEach(pane => {
+        pane.classList.remove('active');
+    });
+    
+    // 显示终端pane
     document.querySelectorAll('.terminal-pane').forEach(pane => {
         pane.classList.remove('active');
     });
     document.getElementById(sessionId)?.classList.add('active');
     
+    // 刷新终端布局
+    const session = state.terminals.get(sessionId);
+    if (session) {
+        setTimeout(() => session.fitAddon.fit(), 100);
+    }
+};
+
+// 切换SSH服务器标签（顶部tabs-bar）
+window.switchTab = function(sessionId) {
+    state.activeSessionId = sessionId;
+    
+    // 切换终端pane显示
+    document.querySelectorAll('.terminal-pane').forEach(pane => {
+        pane.classList.remove('active');
+    });
+    document.getElementById(sessionId)?.classList.add('active');
+    
+    // 切换顶部tab-item高亮
     document.querySelectorAll('.tab-item').forEach(tab => {
         tab.classList.remove('active');
     });
+    
+    // 隐藏所有editor-pane（切换服务器时回到终端）
+    document.querySelectorAll('.editor-pane').forEach(pane => {
+        pane.classList.remove('active');
+    });
+    
+    // 重置content-tabs-bar为该服务器的终端标签
+    const contentTabsList = document.getElementById('contentTabsList');
+    contentTabsList.innerHTML = `
+        <div class="content-tab-item active" data-session-id="${sessionId}" data-type="terminal" onclick="window.switchToTerminal('${sessionId}')">
+            <span class="tab-icon">💻</span>
+            <span class="tab-name">终端</span>
+        </div>
+    `;
     
     const session = state.terminals.get(sessionId);
     if (session) {
@@ -176,6 +212,9 @@ window.switchTab = function(sessionId) {
         // 同步更新文件树到当前服务器（传入sessionID）
         setCurrentServer(session.server.ID, sessionId);
     }
+    
+    // 更新renderTabs以高亮当前tab
+    renderTabs();
 };
 
 window.closeTab = function(sessionId) {

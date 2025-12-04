@@ -39,15 +39,21 @@ function createLoadingTab(filePath, serverID, sessionID) {
     const fileName = filePath.split('/').pop();
     const tabId = 'editor-' + Date.now();
     
-    // 添加标签到统一内容标签栏
+    // 添加标签到统一内容标签栏（在终端标签后面）
     const tabsList = document.getElementById('contentTabsList');
     const tabHTML = `
-        <div class="content-tab-item" data-tab-id="${tabId}" data-path="${filePath}" onclick="window.switchContentTab('${tabId}')">
+        <div class="content-tab-item active" data-tab-id="${tabId}" data-path="${filePath}" onclick="window.switchContentTab('${tabId}')">
             <span class="tab-icon">${getFileIcon(fileName)}</span>
             <span class="tab-name">${fileName}</span>
             <span class="tab-close" onclick="event.stopPropagation(); window.closeContentTab('${tabId}')">×</span>
         </div>
     `;
+    
+    // 移除其他文件标签的active，保持终端标签
+    tabsList.querySelectorAll('.content-tab-item[data-tab-id]').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    
     tabsList.insertAdjacentHTML('beforeend', tabHTML);
     
     // 创建加载中容器
@@ -226,13 +232,18 @@ function switchToTab(filePath) {
     document.querySelectorAll('.content-tab-item').forEach(tab => {
         tab.classList.remove('active');
     });
-    document.querySelector(`.content-tab-item[data-tab-id="${fileInfo.tabId}"]`).classList.add('active');
+    document.querySelector(`.content-tab-item[data-tab-id="${fileInfo.tabId}"]`)?.classList.add('active');
     
-    // 切换内容显示
-    document.querySelectorAll('.terminal-pane, .editor-pane').forEach(pane => {
+    // 隐藏所有terminal-pane和editor-pane
+    document.querySelectorAll('.terminal-pane').forEach(pane => {
         pane.classList.remove('active');
     });
-    document.querySelector(`.editor-pane[data-tab-id="${fileInfo.tabId}"]`).classList.add('active');
+    document.querySelectorAll('.editor-pane').forEach(pane => {
+        pane.classList.remove('active');
+    });
+    
+    // 显示当前editor-pane
+    document.querySelector(`.editor-pane[data-tab-id="${fileInfo.tabId}"]`)?.classList.add('active');
     
     // 刷新编辑器布局
     const editor = editorInstances.get(fileInfo.tabId);
@@ -261,28 +272,13 @@ function markAsUnmodified(tabId) {
     }
 }
 
-// 全局函数 - 统一内容标签切换
+// 全局函数 - 内容标签切换（只处理文件标签）
 window.switchContentTab = function(id) {
-    // 如果是终端session
-    if (id.startsWith('ssh-') || id.startsWith('local-')) {
-        document.querySelectorAll('.content-tab-item').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        document.querySelector(`.content-tab-item[data-session-id="${id}"]`)?.classList.add('active');
-        
-        document.querySelectorAll('.terminal-pane, .editor-pane').forEach(pane => {
-            pane.classList.remove('active');
-        });
-        document.getElementById(id)?.classList.add('active');
-    } 
-    // 如果是编辑器标签
-    else {
-        const pane = document.querySelector(`.editor-pane[data-tab-id="${id}"]`);
-        if (!pane) return;
-        
-        const filePath = pane.dataset.path;
-        switchToTab(filePath);
-    }
+    const pane = document.querySelector(`.editor-pane[data-tab-id="${id}"]`);
+    if (!pane) return;
+    
+    const filePath = pane.dataset.path;
+    switchToTab(filePath);
 };
 
 window.closeContentTab = function(id) {
