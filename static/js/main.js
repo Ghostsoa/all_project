@@ -166,6 +166,12 @@ window.selectServer = async function(id) {
         
         const sessionId = 'ssh-' + server.ID; // 使用服务器ID作为sessionId
         
+        // 立即清空文件树，显示加载中状态
+        const fileTreeContainer = document.getElementById('fileTree');
+        if (fileTreeContainer) {
+            fileTreeContainer.innerHTML = '<div class="file-tree-empty"><p>⏳ 正在连接...</p></div>';
+        }
+        
         document.getElementById('noSelection').style.display = 'none';
         document.getElementById('terminalWrapper').style.display = 'flex';
         
@@ -289,6 +295,12 @@ window.switchTab = function(sessionId) {
     }
     
     state.activeSessionId = sessionId;
+    
+    // 立即清空文件树，避免短暂显示旧服务器的文件
+    const fileTreeContainer = document.getElementById('fileTree');
+    if (fileTreeContainer) {
+        fileTreeContainer.innerHTML = '<div class="file-tree-empty"><p>⏳ 加载中...</p></div>';
+    }
     
     // 隐藏所有pane
     document.querySelectorAll('.terminal-pane').forEach(pane => {

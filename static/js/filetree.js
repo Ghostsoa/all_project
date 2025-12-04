@@ -150,14 +150,10 @@ export async function setCurrentServer(serverID, sessionID) {
     currentSessionID = sessionID;
     isLocalTerminal = false; // 设置为SSH模式
     
+    console.log(`📡 设置SSH服务器: ${sessionID}`);
+    
     // 清空预加载队列，避免旧session的任务继续执行
     fileCache.clearPreloadQueue();
-    
-    // 立即清空文件树，显示加载中
-    const fileTreeContainer = document.getElementById('fileTree');
-    if (fileTreeContainer) {
-        fileTreeContainer.innerHTML = '<div class="file-tree-empty"><p>⏳ 加载中...</p></div>';
-    }
     
     // 显示文件树头部（如果之前隐藏了）
     const headerContainer = document.getElementById('fileTreeHeader');
@@ -186,16 +182,10 @@ export async function setLocalTerminal() {
     currentServerID = null;
     currentSessionID = 'local'; // 本地标识
     
-    console.log('🔄 切换到本地终端模式');
+    console.log('� 切换到本地终端模式');
     
     // 清空预加载队列，避免SSH session的任务继续执行
     fileCache.clearPreloadQueue();
-    
-    // 立即清空文件树，显示加载中
-    const fileTreeContainer = document.getElementById('fileTree');
-    if (fileTreeContainer) {
-        fileTreeContainer.innerHTML = '<div class="file-tree-empty"><p>⏳ 加载本地文件...</p></div>';
-    }
     
     // 设置API端点getter
     fileCache.setApiEndpointGetter(getApiEndpoint);
