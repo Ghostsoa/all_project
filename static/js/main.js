@@ -75,6 +75,43 @@ window.toggleServerExpand = function(serverId) {
     }
 };
 
+// 侧边栏折叠/展开
+window.toggleSidebar = function() {
+    const sidebar = document.querySelector('.sidebar');
+    const mainContainer = document.querySelector('.main-container');
+    const toggleBtn = document.querySelector('.sidebar-toggle');
+    
+    sidebar.classList.toggle('collapsed');
+    mainContainer.classList.toggle('sidebar-collapsed');
+    
+    // 切换箭头方向
+    if (sidebar.classList.contains('collapsed')) {
+        toggleBtn.textContent = '▶';
+        toggleBtn.title = '展开';
+        // 保存折叠状态到localStorage
+        localStorage.setItem('sidebarCollapsed', 'true');
+    } else {
+        toggleBtn.textContent = '◀';
+        toggleBtn.title = '折叠';
+        localStorage.setItem('sidebarCollapsed', 'false');
+    }
+};
+
+// 页面加载时恢复侧边栏折叠状态
+document.addEventListener('DOMContentLoaded', function() {
+    const collapsed = localStorage.getItem('sidebarCollapsed') === 'true';
+    if (collapsed) {
+        const sidebar = document.querySelector('.sidebar');
+        const mainContainer = document.querySelector('.main-container');
+        const toggleBtn = document.querySelector('.sidebar-toggle');
+        
+        sidebar.classList.add('collapsed');
+        mainContainer.classList.add('sidebar-collapsed');
+        toggleBtn.textContent = '▶';
+        toggleBtn.title = '展开';
+    }
+});
+
 // 认证检查
 async function checkAuthStatus() {
     try {

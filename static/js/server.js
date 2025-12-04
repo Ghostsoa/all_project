@@ -28,14 +28,20 @@ export function renderServerList(filterServers = null) {
         const tagsHtml = server.tags && server.tags.length > 0 
             ? `<div class="server-tags-compact">${server.tags.map(tag => `<span class="server-tag">${escapeHtml(tag)}</span>`).join('')}</div>` 
             : '<div class="server-tags-compact"></div>';
+        
+        // 获取服务器名称首字母（支持中文和英文）
+        const firstChar = server.name ? server.name.charAt(0).toUpperCase() : '?';
+        
         return `
             <div class="server-item" id="server-${server.ID}">
                 <!-- 折叠状态：名字+标签 | 按钮 -->
                 <div class="server-compact" onclick="window.toggleServerExpand(${server.ID})">
+                    <div class="server-status"></div>
+                    <div class="server-icon">${firstChar}</div>
                     <div class="server-info-left">
                         <div class="server-name-compact">
-                            <span class="expand-icon">▶</span>
-                            ${escapeHtml(server.name)}
+                            <span class="expand-icon server-expand-icon">▶</span>
+                            <span class="server-name">${escapeHtml(server.name)}</span>
                         </div>
                         ${tagsHtml}
                     </div>

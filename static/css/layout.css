@@ -89,10 +89,16 @@
 /* Main Container - 三栏布局 */
 .main-container {
     display: grid;
-    grid-template-columns: 280px 1fr 280px;
+    grid-template-columns: 240px 1fr 320px;
     flex: 1;
     overflow: hidden;
     gap: 0;
+    transition: grid-template-columns 0.3s ease;
+}
+
+/* 折叠状态 */
+.main-container.sidebar-collapsed {
+    grid-template-columns: 60px 1fr 320px;
 }
 
 /* 空状态提示 */

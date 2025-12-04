@@ -34,14 +34,21 @@
     <div class="main-container">
         <!-- 左侧服务器列表 -->
         <div class="sidebar">
+            <!-- 折叠切换按钮 -->
+            <div class="sidebar-toggle" onclick="toggleSidebar()" title="折叠/展开">
+                ◀
+            </div>
+            
             <div class="sidebar-header">
                 <button class="btn-add-server" onclick="showAddServerModal()">
-                    ➕ 添加服务器
+                    <span>➕</span>
+                    <span class="btn-add-server-text"> 添加服务器</span>
                 </button>
             </div>
             <div class="local-terminal-btn">
                 <button class="btn-local-terminal" onclick="openLocalTerminal()">
-                    💻 本地终端
+                    <span>💻</span>
+                    <span class="btn-local-terminal-text"> 本地终端</span>
                 </button>
             </div>
             <div class="search-box">

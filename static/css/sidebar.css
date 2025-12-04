@@ -14,6 +14,7 @@
 .sidebar-header {
     padding: 16px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    position: relative;
 }
 
 .btn-add-server {
@@ -131,10 +132,44 @@
     cursor: pointer;
     transition: all 0.2s;
     gap: 12px;
+    position: relative;
 }
 
 .server-compact:hover {
     background: rgba(255, 255, 255, 0.03);
+}
+
+/* 服务器状态指示器 */
+.server-status {
+    position: absolute;
+    top: 8px;
+    left: 8px;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    display: none; /* 默认隐藏，连接后显示 */
+}
+
+.server-status.connected {
+    display: block;
+    background: #4ec9b0;
+    box-shadow: 0 0 8px rgba(78, 201, 176, 0.6);
+}
+
+/* 服务器图标（显示首字母） - 正常状态下隐藏 */
+.server-icon {
+    display: none;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.1);
+    align-items: center;
+    justify-content: center;
+    font-size: 14px;
+    font-weight: 600;
+    color: #ffffff;
+    flex-shrink: 0;
 }
 
 .server-info-left {
@@ -268,9 +303,173 @@
 .btn-small.delete {
     background: rgba(255, 59, 48, 0.15);
     border-color: rgba(255, 59, 48, 0.3);
-    color: #ff3b30;
+    color: #ff3b30;         
 }
 
 .btn-small.delete:hover {
     background: rgba(255, 59, 48, 0.25);
+}
+
+/* ========== 侧边栏折叠状态 ========== */
+
+/* 折叠切换按钮 */
+.sidebar-toggle {
+    position: absolute;
+    top: 16px;
+    right: 16px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 16px;
+    transition: all 0.2s;
+    z-index: 10;
+}
+
+.sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* 折叠状态下的侧边栏 */
+.sidebar.collapsed {
+    width: 60px;
+}
+
+.sidebar.collapsed .sidebar-header {
+    padding: 8px;
+}
+
+.sidebar.collapsed .btn-add-server {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.sidebar.collapsed .btn-add-server-text {
+    display: none;
+}
+
+.sidebar.collapsed .local-terminal-btn {
+    padding: 8px;
+}
+
+.sidebar.collapsed .btn-local-terminal {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    font-size: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+}
+
+.sidebar.collapsed .btn-local-terminal-text {
+    display: none;
+}
+
+.sidebar.collapsed .search-box {
+    display: none;
+}
+
+.sidebar.collapsed .server-list {
+    padding: 8px;
+    gap: 8px;
+}
+
+.sidebar.collapsed .server-item {
+    padding: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: auto;
+}
+
+.sidebar.collapsed .server-compact {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    position: relative;
+}
+
+.sidebar.collapsed .btn-small.connect {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    font-size: 18px;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.sidebar.collapsed .server-compact:hover .btn-small.connect {
+    opacity: 1;
+}
+
+.sidebar.collapsed .server-compact:hover .server-icon {
+    opacity: 0.3;
+}
+
+.sidebar.collapsed .server-compact .server-status {
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 8px;
+    height: 8px;
+}
+
+.sidebar.collapsed .server-icon {
+    display: flex !important;
+    margin: 0;
+    font-size: 14px;
+    width: 36px;
+    height: 36px;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.15);
+    border-radius: 50%;
+    font-weight: 600;
+    color: #ffffff;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar.collapsed .server-name,
+.sidebar.collapsed .server-address,
+.sidebar.collapsed .server-tags,
+.sidebar.collapsed .server-tags-compact,
+.sidebar.collapsed .server-info-left,
+.sidebar.collapsed .server-actions,
+.sidebar.collapsed .server-actions-expanded,
+.sidebar.collapsed .server-expand-icon {
+    display: none !important;
+}
+
+/* 展开状态的按钮文本显示 */
+.btn-add-server-text,
+.btn-local-terminal-text {
+    display: inline;
+}
+
+.sidebar.collapsed .sidebar-toggle {
+    right: 8px;
+    top: 8px;
 }
