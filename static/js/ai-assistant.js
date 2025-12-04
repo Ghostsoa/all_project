@@ -18,19 +18,17 @@ window.toggleHistoryDropdown = function() {
     }
 };
 
-// 切换模式
-window.switchMode = function(mode) {
-    currentAIMode = mode;
-    const modeText = mode === 'chat' ? 'Chat' : 'Agent';
+// 切换模式（单按钮切换）
+window.toggleMode = function() {
+    // 在 chat 和 agent 之间切换
+    currentAIMode = currentAIMode === 'chat' ? 'agent' : 'chat';
+    const modeText = currentAIMode === 'chat' ? 'Chat' : 'Agent';
     
-    // 更新按钮激活状态
-    document.querySelectorAll('.mode-switch-btn').forEach(btn => {
-        if (btn.dataset.mode === mode) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
+    // 更新按钮文本
+    const modeBtn = document.getElementById('currentModeText');
+    if (modeBtn) {
+        modeBtn.textContent = modeText;
+    }
     
     console.log(`🔄 切换到${modeText}模式`);
 };
@@ -76,9 +74,9 @@ window.sendAIMessage = function() {
     // 添加用户消息到界面
     addAIMessage('user', message);
     
-    // 清空输入框
+    // 清空输入框并重置高度
     input.value = '';
-    input.style.height = 'auto'; // 重置高度
+    autoResizeTextarea(input);
     
     // TODO: 调用AI API
     setTimeout(() => {
@@ -171,16 +169,39 @@ document.addEventListener('click', (e) => {
     }
 });
 
-// Ctrl+Enter 发送消息
+// 输入框自动增长
+function autoResizeTextarea(textarea) {
+    textarea.style.height = 'auto';
+    const scrollHeight = textarea.scrollHeight;
+    const lineHeight = 18; // 1.5 * 12px
+    const maxHeight = lineHeight * 6; // 6行
+    
+    if (scrollHeight > maxHeight) {
+        textarea.style.height = maxHeight + 'px';
+    } else {
+        textarea.style.height = scrollHeight + 'px';
+    }
+}
+
+// Ctrl+Enter 发送消息 + 输入框自动增长
 document.addEventListener('DOMContentLoaded', () => {
     const aiInput = document.getElementById('aiInput');
     
     if (aiInput) {
+        // Ctrl+Enter 发送
         aiInput.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.key === 'Enter') {
                 e.preventDefault();
                 sendAIMessage();
             }
         });
+        
+        // 输入时自动调整高度
+        aiInput.addEventListener('input', () => {
+            autoResizeTextarea(aiInput);
+        });
+        
+        // 初始化高度
+        autoResizeTextarea(aiInput);
     }
 });

@@ -178,11 +178,10 @@
 
                     <!-- 右侧：模式切换+设置 -->
                     <div class="ai-controls">
-                        <!-- 模式切换按钮 -->
-                        <div class="mode-switch">
-                            <button class="mode-switch-btn active" data-mode="chat" onclick="switchMode('chat')">Chat</button>
-                            <button class="mode-switch-btn" data-mode="agent" onclick="switchMode('agent')">Agent</button>
-                        </div>
+                        <!-- 模式切换按钮（单个） -->
+                        <button class="mode-toggle-btn" onclick="toggleMode()" title="切换模式">
+                            <span id="currentModeText">Chat</span>
+                        </button>
                         <!-- 设置按钮 -->
                         <button class="tool-btn" onclick="openAISettings()" title="设置">
                             <i class="fa-solid fa-gear"></i>
