@@ -977,6 +977,8 @@ window.deleteFile = async function(path) {
         const data = await response.json();
         if (data.success) {
             showToast('删除成功', 'success');
+            // 刷新当前目录确保列表更新
+            await loadDirectory(parentPath);
         } else {
             showToast('删除失败: ' + data.error, 'error');
             await fileCache.rollback(currentSessionID, parentPath);
@@ -1021,8 +1023,10 @@ async function uploadFiles(files, targetPath) {
     
     // 并行上传所有文件（不阻塞UI）
     const uploadPromises = [];
-    for (const file of files) {
-        const taskId = Date.now() + '-' + Math.random();
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        // 生成不含小数点的taskId（避免CSS选择器错误）
+        const taskId = `${Date.now()}-${i}`;
         uploadPromises.push(uploadSingleFile(file, targetPath, taskId));
         // 稍微延迟，避免taskId重复
         await new Promise(resolve => setTimeout(resolve, 10));
@@ -1346,6 +1350,12 @@ window.cancelUpload = function(taskId) {
         if (task.controller) {
             task.controller.abort();
         }
+        
+        // 延迟移除UI（让用户看到已取消状态）
+        setTimeout(() => {
+            removeUploadProgress(taskId);
+            uploadTasks.delete(taskId);
+        }, 1500);
     } else {
         // 如果任务已完成，直接移除UI
         removeUploadProgress(taskId);
