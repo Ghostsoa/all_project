@@ -27,12 +27,19 @@ export async function loadSessions() {
 
 // 渲染会话列表
 function renderSessionList() {
+    console.log('🎨 renderSessionList 开始, sessions数量:', sessions.length);
     const container = document.getElementById('aiConversationHistory');
     const triggerEl = document.querySelector('.history-trigger');
     const titleEl = document.getElementById('currentConversationTitle');
     const arrowEl = document.querySelector('.history-arrow');
     
-    if (!container) return;
+    console.log('📦 container:', container);
+    console.log('📦 triggerEl:', triggerEl);
+    
+    if (!container) {
+        console.error('❌ container 未找到！');
+        return;
+    }
 
     if (sessions.length === 0) {
         // 没有对话历史：显示"开始新的对话 +"
@@ -63,7 +70,7 @@ function renderSessionList() {
         };
     }
 
-    container.innerHTML = `
+    const htmlContent = `
         <div class="history-item new" data-action="create-new">
             <i class="fa-solid fa-plus"></i>
             <span>新建对话</span>
@@ -83,6 +90,10 @@ function renderSessionList() {
             </button>
         </div>
     `).join('');
+    
+    container.innerHTML = htmlContent;
+    console.log('📝 container.innerHTML 已设置, 长度:', htmlContent.length);
+    console.log('📝 前100个字符:', htmlContent.substring(0, 100));
     
     // 添加事件委托
     container.onclick = function(e) {
