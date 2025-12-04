@@ -6,6 +6,95 @@ import { showConfirm } from './modal.js';
 let editorInstances = new Map(); // 存储编辑器实例
 let openFiles = new Map(); // 存储打开的文件信息
 
+// 获取文件图标HTML（用于标签页）
+function getFileIconHTML(fileName) {
+    const ext = fileName.split('.').pop()?.toLowerCase();
+    const name = fileName.toLowerCase();
+    
+    // 特殊文件名
+    const specialFiles = {
+        'dockerfile': '<i class="devicon-docker-plain colored"></i>',
+        '.dockerignore': '<i class="devicon-docker-plain"></i>',
+        '.gitignore': '<i class="devicon-git-plain"></i>',
+        'package.json': '<i class="devicon-npm-original-wordmark colored"></i>',
+        'readme.md': '<i class="devicon-markdown-original"></i>',
+    };
+    
+    if (specialFiles[name]) return specialFiles[name];
+    
+    // 根据扩展名
+    const iconMap = {
+        // JavaScript/TypeScript
+        'js': '<i class="devicon-javascript-plain colored"></i>',
+        'jsx': '<i class="devicon-react-original colored"></i>',
+        'ts': '<i class="devicon-typescript-plain colored"></i>',
+        'tsx': '<i class="devicon-react-original colored"></i>',
+        'vue': '<i class="devicon-vuejs-plain colored"></i>',
+        
+        // Web
+        'html': '<i class="devicon-html5-plain colored"></i>',
+        'css': '<i class="devicon-css3-plain colored"></i>',
+        'scss': '<i class="devicon-sass-original colored"></i>',
+        
+        // 后端
+        'py': '<i class="devicon-python-plain colored"></i>',
+        'java': '<i class="devicon-java-plain colored"></i>',
+        'go': '<i class="devicon-go-original-wordmark colored"></i>',
+        'cpp': '<i class="devicon-cplusplus-plain colored"></i>',
+        'c': '<i class="devicon-c-plain colored"></i>',
+        'rs': '<i class="devicon-rust-original"></i>',
+        'rb': '<i class="devicon-ruby-plain colored"></i>',
+        'php': '<i class="devicon-php-plain colored"></i>',
+        
+        // 配置
+        'json': '<i class="devicon-json-plain"></i>',
+        'yaml': '<i class="devicon-yaml-plain"></i>',
+        'yml': '<i class="devicon-yaml-plain"></i>',
+        'xml': '<i class="fa-solid fa-code" style="color: #ff6b35;"></i>',
+        
+        // 文档
+        'md': '<i class="devicon-markdown-original"></i>',
+        'txt': '<i class="fa-solid fa-file-lines" style="color: #9ca3af;"></i>',
+        'pdf': '<i class="fa-solid fa-file-pdf" style="color: #ef4444;"></i>',
+        
+        // 数据库
+        'sql': '<i class="devicon-mysql-plain colored"></i>',
+        
+        // 脚本
+        'sh': '<i class="devicon-bash-plain"></i>',
+        'bash': '<i class="devicon-bash-plain"></i>',
+        
+        // 图片
+        'jpg': '<i class="fa-regular fa-file-image" style="color: #8b5cf6;"></i>',
+        'jpeg': '<i class="fa-regular fa-file-image" style="color: #8b5cf6;"></i>',
+        'png': '<i class="fa-regular fa-file-image" style="color: #10b981;"></i>',
+        'gif': '<i class="fa-solid fa-image" style="color: #ec4899;"></i>',
+        'svg': '<i class="fa-solid fa-vector-square" style="color: #f59e0b;"></i>',
+        'webp': '<i class="fa-regular fa-file-image" style="color: #06b6d4;"></i>',
+        
+        // 视频
+        'mp4': '<i class="fa-solid fa-file-video" style="color: #ef4444;"></i>',
+        'webm': '<i class="fa-solid fa-file-video" style="color: #f97316;"></i>',
+        'mov': '<i class="fa-solid fa-file-video" style="color: #dc2626;"></i>',
+        'avi': '<i class="fa-solid fa-file-video" style="color: #e11d48;"></i>',
+        'mkv': '<i class="fa-solid fa-file-video" style="color: #be123c;"></i>',
+        
+        // 音频
+        'mp3': '<i class="fa-solid fa-file-audio" style="color: #06b6d4;"></i>',
+        'wav': '<i class="fa-solid fa-file-audio" style="color: #0891b2;"></i>',
+        'ogg': '<i class="fa-solid fa-file-audio" style="color: #0e7490;"></i>',
+        'flac': '<i class="fa-solid fa-compact-disc" style="color: #14b8a6;"></i>',
+        'm4a': '<i class="fa-solid fa-file-audio" style="color: #2dd4bf;"></i>',
+        
+        // 压缩包
+        'zip': '<i class="fa-solid fa-file-zipper" style="color: #f59e0b;"></i>',
+        'tar': '<i class="fa-solid fa-file-zipper" style="color: #d97706;"></i>',
+        'gz': '<i class="fa-solid fa-file-zipper" style="color: #b45309;"></i>',
+    };
+    
+    return iconMap[ext] || '<i class="fa-solid fa-file" style="color: #9ca3af;"></i>';
+}
+
 // 配置Monaco Editor（只配置一次）
 // 注意：require.config只能调用一次，否则会报错
 if (typeof require !== 'undefined' && typeof window.monaco === 'undefined') {
@@ -144,7 +233,7 @@ function createLoadingTab(filePath, serverID, sessionID) {
     const tabsList = document.getElementById('contentTabsList');
     const tabHTML = `
         <div class="content-tab-item active" data-tab-id="${tabId}" data-path="${filePath}" onclick="window.switchContentTab('${tabId}')">
-            <span class="tab-icon">${getFileIcon(fileName)}</span>
+            <span class="tab-icon">${getFileIconHTML(fileName)}</span>
             <span class="tab-name">${fileName}</span>
             <span class="tab-close" onclick="event.stopPropagation(); window.closeContentTab('${tabId}')">×</span>
         </div>
@@ -669,7 +758,7 @@ window.openMediaViewer = async function(filePath, serverID, sessionID, mediaType
     const tabsList = document.getElementById('contentTabsList');
     const tabHTML = `
         <div class="content-tab-item active" data-tab-id="${tabId}" data-path="${filePath}" onclick="window.switchContentTab('${tabId}')">
-            <span class="tab-icon">${getMediaIcon(mediaType)}</span>
+            <span class="tab-icon">${getMediaIcon(mediaType, fileName)}</span>
             <span class="tab-name">${fileName}</span>
             <span class="tab-close" onclick="event.stopPropagation(); window.closeContentTab('${tabId}')">×</span>
         </div>
@@ -751,13 +840,19 @@ window.openMediaViewer = async function(filePath, serverID, sessionID, mediaType
     openFiles.set(filePath, { serverID, sessionID, tabId, type: 'media', mediaType });
 };
 
-function getMediaIcon(mediaType) {
-    const icons = {
-        'image': '🖼️',
-        'video': '🎬',
-        'audio': '🎵'
-    };
-    return icons[mediaType] || '📄';
+function getMediaIcon(mediaType, fileName) {
+    if (!fileName) {
+        // 默认图标
+        const defaultIcons = {
+            'image': '<i class="fa-regular fa-file-image" style="color: #8b5cf6;"></i>',
+            'video': '<i class="fa-solid fa-file-video" style="color: #ef4444;"></i>',
+            'audio': '<i class="fa-solid fa-file-audio" style="color: #06b6d4;"></i>'
+        };
+        return defaultIcons[mediaType] || '<i class="fa-solid fa-file"></i>';
+    }
+    
+    // 根据具体文件名返回图标
+    return getFileIconHTML(fileName);
 }
 
 // 下载文件

@@ -130,6 +130,13 @@
 
 .tab-icon {
     font-size: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tab-icon i {
+    font-size: 14px;
 }
 
 /* ========== Markdown编辑器样式 ========== */
