@@ -57,13 +57,13 @@ window.toggleModelSelector = async function() {
         popup.style.display = 'none';
         resetTempSelection();
     } else {
-        // 记录原始选择
-        originalModel = currentSession?.config?.ai_model_id || null;
-        originalEndpoint = currentSession?.config?.ai_endpoint_id || null;
+        // 记录原始选择 - 从当前会话的config中读取
+        originalModel = currentSession?.config?.ai_model?.ID || null;
+        originalEndpoint = currentSession?.config?.ai_endpoint?.ID || null;
         tempSelectedModel = originalModel;
         tempSelectedEndpoint = originalEndpoint;
         
-        // 加载模型和接口列表
+        // 加载模型和接口列表（只加载一次）
         await loadModelAndEndpointLists();
         
         // 隐藏保存/取消按钮
@@ -144,14 +144,52 @@ function renderEndpointList(endpoints) {
 // 临时选择模型
 window.selectTempModel = function(modelId) {
     tempSelectedModel = modelId;
-    loadModelAndEndpointLists(); // 重新渲染
+    
+    // 只更新UI高亮状态
+    const modelOptions = document.querySelectorAll('#modelList .model-option');
+    modelOptions.forEach(opt => {
+        const optModelId = parseInt(opt.dataset.modelId);
+        const oldCheck = opt.querySelector('i.fa-check');
+        
+        if (optModelId === modelId) {
+            opt.classList.add('active');
+            if (!oldCheck) {
+                const icon = document.createElement('i');
+                icon.className = 'fa-solid fa-check';
+                opt.appendChild(icon);
+            }
+        } else {
+            opt.classList.remove('active');
+            if (oldCheck) oldCheck.remove();
+        }
+    });
+    
     checkIfChanged();
 };
 
 // 临时选择接口
 window.selectTempEndpoint = function(endpointId) {
     tempSelectedEndpoint = endpointId;
-    loadModelAndEndpointLists(); // 重新渲染
+    
+    // 只更新UI高亮状态
+    const endpointOptions = document.querySelectorAll('#endpointList .model-option');
+    endpointOptions.forEach(opt => {
+        const optEndpointId = parseInt(opt.dataset.endpointId);
+        const oldCheck = opt.querySelector('i.fa-check');
+        
+        if (optEndpointId === endpointId) {
+            opt.classList.add('active');
+            if (!oldCheck) {
+                const icon = document.createElement('i');
+                icon.className = 'fa-solid fa-check';
+                opt.appendChild(icon);
+            }
+        } else {
+            opt.classList.remove('active');
+            if (oldCheck) oldCheck.remove();
+        }
+    });
+    
     checkIfChanged();
 };
 

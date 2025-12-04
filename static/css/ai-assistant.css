@@ -361,8 +361,8 @@
 }
 
 .model-option {
-    padding: 10px 12px;
-    font-size: 12px;
+    padding: 8px 12px;
+    font-size: 11px;
     color: rgba(255, 255, 255, 0.7);
     cursor: pointer;
     transition: all 0.2s ease;
@@ -403,16 +403,16 @@
 
 .model-name {
     font-weight: 500;
-    font-size: 13px;
+    font-size: 11px;
 }
 
 .model-endpoint {
-    font-size: 10px;
+    font-size: 9px;
     color: rgba(255, 255, 255, 0.4);
 }
 
 .model-option i {
-    font-size: 12px;
+    font-size: 10px;
     color: #3b82f6;
 }
 
@@ -426,13 +426,13 @@
 
 /* 弹窗分区 */
 .model-popup-section {
-    padding: 8px 0;
+    padding: 6px 0;
 }
 
 .popup-section-title {
-    font-size: 11px;
+    font-size: 10px;
     color: rgba(255, 255, 255, 0.5);
-    padding: 4px 12px 8px;
+    padding: 4px 12px 6px;
     font-weight: 500;
 }
 
@@ -445,12 +445,12 @@
 .popup-divider {
     height: 1px;
     background: rgba(255, 255, 255, 0.1);
-    margin: 4px 0;
+    margin: 2px 0;
 }
 
 .loading-small {
     padding: 8px 12px;
-    font-size: 11px;
+    font-size: 10px;
     color: rgba(255, 255, 255, 0.4);
     text-align: center;
 }
@@ -458,8 +458,8 @@
 /* 弹窗操作按钮 */
 .popup-actions {
     display: flex;
-    gap: 8px;
-    padding: 10px 12px;
+    gap: 6px;
+    padding: 8px 10px;
     border-top: 1px solid rgba(255, 255, 255, 0.1);
     background: rgba(0, 0, 0, 0.2);
     border-radius: 0 0 6px 6px;
@@ -468,10 +468,10 @@
 .btn-popup-cancel,
 .btn-popup-save {
     flex: 1;
-    padding: 6px 12px;
+    padding: 5px 10px;
     border: none;
     border-radius: 4px;
-    font-size: 12px;
+    font-size: 11px;
     cursor: pointer;
     transition: all 0.2s ease;
 }

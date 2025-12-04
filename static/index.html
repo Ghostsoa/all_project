@@ -139,16 +139,16 @@
         <div class="right-panel">
             <!-- 标签切换栏 -->
             <div class="right-panel-tabs">
-                <div class="right-tab" data-tab="ai" onclick="switchRightTab('ai')">
+                <div class="right-tab active" data-tab="ai" onclick="switchRightTab('ai')">
                     🤖 AI 助手
                 </div>
-                <div class="right-tab active" data-tab="commands" onclick="switchRightTab('commands')">
+                <div class="right-tab" data-tab="commands" onclick="switchRightTab('commands')">
                     📜 命令记录
                 </div>
             </div>
 
             <!-- AI 助手面板 -->
-            <div class="right-panel-content" id="aiPanel" style="display: none;">
+            <div class="right-panel-content active" id="aiPanel">
                 <!-- 加载遮罩 -->
                 <div class="ai-loading-overlay" id="aiLoadingOverlay" style="display: none;">
                     <div class="ai-loading-spinner">
@@ -241,7 +241,7 @@
             </div>
 
             <!-- 命令记录面板 -->
-            <div class="right-panel-content active" id="commandsPanel">
+            <div class="right-panel-content" id="commandsPanel" style="display: none;">
                 <div class="commands-header">
                     <div class="commands-title">
                         <span id="commandsServerName">选择服务器查看命令</span>
