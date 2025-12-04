@@ -65,9 +65,16 @@ function renderSessionList() {
     
     // 恢复点击行为：展开/收起列表
     if (triggerEl) {
-        triggerEl.onclick = function() {
+        // 移除旧的事件监听器（如果存在）
+        const newTrigger = triggerEl.cloneNode(true);
+        triggerEl.parentNode.replaceChild(newTrigger, triggerEl);
+        
+        // 使用addEventListener代替onclick，确保事件冒泡正常工作
+        newTrigger.addEventListener('click', function(e) {
+            e.preventDefault();
+            e.stopPropagation();
             toggleHistoryDropdown();
-        };
+        });
     }
 
     const htmlContent = `
