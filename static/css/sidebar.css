@@ -384,6 +384,13 @@
     align-items: center;
     justify-content: center;
     border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.sidebar.collapsed .btn-add-server:hover {
+    background: rgba(255, 255, 255, 0.25);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .sidebar.collapsed .btn-add-server-text {
@@ -407,6 +414,13 @@
     align-items: center;
     justify-content: center;
     border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.sidebar.collapsed .btn-local-terminal:hover {
+    background: rgba(255, 255, 255, 0.2);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .sidebar.collapsed .btn-local-terminal-text {
@@ -427,6 +441,13 @@
     padding: 0;
     margin: 0;
     border-radius: 50%;
+    transition: all 0.2s;
+}
+
+.sidebar.collapsed .sidebar-toggle:hover {
+    background: rgba(255, 255, 255, 0.15);
+    transform: scale(1.05);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .sidebar.collapsed .toggle-text {
@@ -487,6 +508,10 @@
     font-size: 18px;
     opacity: 0;
     transition: opacity 0.2s;
+    background: rgba(255, 255, 255, 0.9) !important;
+    backdrop-filter: blur(10px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+    z-index: 10;
 }
 
 .sidebar.collapsed .server-compact:hover .btn-small.connect {
@@ -494,7 +519,7 @@
 }
 
 .sidebar.collapsed .server-compact:hover .server-icon {
-    opacity: 0.3;
+    opacity: 0;
 }
 
 .sidebar.collapsed .server-compact .server-status {

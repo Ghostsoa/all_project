@@ -335,80 +335,127 @@ function getSpecialFolderClass(folderName) {
 
 function getFileIcon(file) {
     if (file.is_dir) {
-        // 特殊系统文件夹
-        const folderName = file.name.toLowerCase();
-        const specialFolders = {
-            // 系统核心目录
-            'root': '👑',
-            'home': '🏠',
-            'tmp': '⏱️',
-            'etc': '⚙️',
-            'var': '📊',
-            'usr': '👤',
-            'opt': '📦',
-            'bin': '🔧',
-            'sbin': '🔨',
-            'lib': '📚',
-            'boot': '🚀',
-            'dev': '💾',
-            'proc': '⚡',
-            'sys': '🖥️',
-            'mnt': '💿',
-            'media': '💿',
-            // 常见项目目录
-            'project': '🎯',
-            'projects': '🎯',
-            'data': '📊',
-            'database': '🗄️',
-            'backup': '💾',
-            'backups': '💾',
-            'config': '⚙️',
-            'logs': '📋',
-            'log': '📋',
-            'src': '📝',
-            'source': '📝',
-            'dist': '📦',
-            'build': '🔨',
-            'test': '🧪',
-            'tests': '🧪',
-            'docs': '📖',
-            'doc': '📖',
-            'assets': '🎨',
-            'static': '🎨',
-            'public': '🌐',
-            'uploads': '📤',
-            'downloads': '📥',
-            'cache': '⚡',
-            'temp': '⏱️',
-            '.git': '🔀',
-            'node_modules': '📦',
-            '.vscode': '💻',
-            '.idea': '💡',
-        };
-        
-        return specialFolders[folderName] || '📁';
+        // 所有文件夹统一用📁图标
+        return '📁';
     }
     
     const ext = file.name.split('.').pop().toLowerCase();
     const iconMap = {
-        'js': '📜',
-        'json': '📋',
-        'go': '🔵',
-        'py': '🐍',
-        'html': '🌐',
-        'css': '🎨',
-        'md': '📝',
-        'txt': '📄',
-        'log': '📊',
-        'sh': '⚙️',
+        // JavaScript/TypeScript
+        'js': '🟨',      // JavaScript - 黄色方块
+        'jsx': '⚛️',     // React
+        'ts': '🔷',      // TypeScript - 蓝色菱形
+        'tsx': '⚛️',     // React + TypeScript
+        'vue': '💚',     // Vue - 绿心
+        'mjs': '🟨',     // ES Module
+        
+        // Web
+        'html': '🌐',    // HTML
+        'htm': '🌐',
+        'css': '🎨',     // CSS
+        'scss': '💅',    // Sass
+        'sass': '💅',
+        'less': '📐',    // Less
+        
+        // 后端语言
+        'py': '🐍',      // Python
+        'java': '☕',    // Java - 咖啡
+        'class': '☕',
+        'go': '🔷',      // Golang - 蓝色菱形
+        'cpp': '⚙️',     // C++
+        'cc': '⚙️',
+        'cxx': '⚙️',
+        'c': '⚙️',       // C
+        'h': '⚙️',       // Header
+        'hpp': '⚙️',
+        'rs': '🦀',      // Rust - 螃蟹
+        'rb': '💎',      // Ruby - 宝石
+        'php': '🐘',     // PHP - 大象
+        'swift': '🦅',   // Swift - 老鹰
+        'kt': '🎯',      // Kotlin
+        'scala': '🔺',   // Scala
+        'lua': '🌙',     // Lua - 月亮
+        
+        // 配置文件
+        'json': '📋',    // JSON
+        'xml': '📋',     // XML
+        'yaml': '⚙️',    // YAML
         'yml': '⚙️',
-        'yaml': '⚙️',
-        'xml': '📋',
-        'sql': '🗄️',
-        'jpg': '🖼️',
+        'toml': '⚙️',    // TOML
+        'ini': '⚙️',     // INI
+        'conf': '⚙️',    // Config
+        'config': '⚙️',
+        'env': '🔐',     // Environment
+        
+        // 文档
+        'md': '📝',      // Markdown
+        'markdown': '📝',
+        'txt': '📄',     // Text
+        'pdf': '📕',     // PDF
+        'doc': '📘',     // Word
+        'docx': '📘',
+        'xls': '📗',     // Excel
+        'xlsx': '📗',
+        'ppt': '📙',     // PowerPoint
+        'pptx': '📙',
+        
+        // 数据库
+        'sql': '🗄️',     // SQL
+        'db': '🗄️',      // Database
+        'sqlite': '🗄️',
+        
+        // 脚本
+        'sh': '🖥️',      // Shell
+        'bash': '🖥️',
+        'zsh': '🖥️',
+        'bat': '🖥️',     // Batch
+        'cmd': '🖥️',
+        'ps1': '💻',     // PowerShell
+        
+        // 图片
+        'jpg': '🖼️',     // Image
         'jpeg': '🖼️',
         'png': '🖼️',
-        'gif': '🖼️',
+        'gif': '🎞️',     // GIF
+        'svg': '🎨',     // SVG
+        'ico': '🎨',     // Icon
+        'webp': '🖼️',
+        'bmp': '🖼️',
+        
+        // 视频/音频
+        'mp4': '🎬',     // Video
+        'avi': '🎬',
+        'mov': '🎬',
+        'mkv': '🎬',
+        'mp3': '🎵',     // Audio
+        'wav': '🎵',
+        'flac': '🎵',
+        
+        // 压缩包
+        'zip': '📦',     // Archive
+        'tar': '📦',
+        'gz': '📦',
+        'rar': '📦',
+        '7z': '📦',
+        
+        // 日志
+        'log': '📊',     // Log
+        
+        // Docker/容器
+        'dockerfile': '🐳',  // Docker
+        'dockerignore': '🐳',
+        
+        // Git
+        'gitignore': '🔀',   // Git
+        'gitattributes': '🔀',
+        
+        // 其他
+        'lock': '🔒',    // Lock file
+        'jar': '☕',      // Java Archive
+        'war': '☕',      // Web Archive
+        'exe': '⚡',      // Executable
+        'dll': '⚙️',      // Library
+        'so': '⚙️',       // Shared Object
     };
     
     return iconMap[ext] || '📄';

@@ -194,7 +194,6 @@
 /* 系统核心目录 - 金色 */
 .file-item.folder-system {
     background: rgba(255, 215, 0, 0.08);
-    border-left: 2px solid rgba(255, 215, 0, 0.6);
 }
 
 .file-item.folder-system:hover {
@@ -209,7 +208,6 @@
 /* 项目目录 - 蓝色 */
 .file-item.folder-project {
     background: rgba(59, 130, 246, 0.08);
-    border-left: 2px solid rgba(59, 130, 246, 0.6);
 }
 
 .file-item.folder-project:hover {
@@ -224,7 +222,6 @@
 /* 数据目录 - 紫色 */
 .file-item.folder-data {
     background: rgba(168, 85, 247, 0.08);
-    border-left: 2px solid rgba(168, 85, 247, 0.6);
 }
 
 .file-item.folder-data:hover {
@@ -239,7 +236,6 @@
 /* 配置/日志目录 - 橙色 */
 .file-item.folder-config {
     background: rgba(249, 115, 22, 0.08);
-    border-left: 2px solid rgba(249, 115, 22, 0.6);
 }
 
 .file-item.folder-config:hover {
@@ -254,7 +250,6 @@
 /* 构建/发布目录 - 灰色 */
 .file-item.folder-build {
     background: rgba(156, 163, 175, 0.08);
-    border-left: 2px solid rgba(156, 163, 175, 0.6);
 }
 
 .file-item.folder-build:hover {
@@ -269,7 +264,6 @@
 /* 临时目录 - 黄色 */
 .file-item.folder-temp {
     background: rgba(234, 179, 8, 0.08);
-    border-left: 2px solid rgba(234, 179, 8, 0.6);
 }
 
 .file-item.folder-temp:hover {
@@ -284,7 +278,6 @@
 /* 资源目录 - 青色 */
 .file-item.folder-assets {
     background: rgba(20, 184, 166, 0.08);
-    border-left: 2px solid rgba(20, 184, 166, 0.6);
 }
 
 .file-item.folder-assets:hover {
@@ -299,7 +292,6 @@
 /* 测试/文档目录 - 绿色 */
 .file-item.folder-docs {
     background: rgba(34, 197, 94, 0.08);
-    border-left: 2px solid rgba(34, 197, 94, 0.6);
 }
 
 .file-item.folder-docs:hover {
