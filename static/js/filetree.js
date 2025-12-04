@@ -157,8 +157,9 @@ export async function setCurrentServer(serverID, sessionID) {
         headerContainer.appendChild(header);
     }
     
-    // 设置获取showHidden状态的函数
+    // 设置获取showHidden状态的函数和API端点函数
     fileCache.setShowHiddenGetter(() => showHiddenFiles);
+    fileCache.setApiEndpointGetter(getApiEndpoint);
     
     currentPath = '/root'; // 默认根目录
     await loadDirectory(currentPath);
@@ -169,6 +170,9 @@ export async function setLocalTerminal() {
     isLocalTerminal = true;
     currentServerID = null;
     currentSessionID = 'local'; // 本地标识
+    
+    // 设置API端点getter
+    fileCache.setApiEndpointGetter(getApiEndpoint);
     
     // 显示文件树头部
     const headerContainer = document.getElementById('fileTreeHeader');

@@ -10,11 +10,17 @@ class FileTreeCache {
         this.currentPath = null; // 当前显示的路径
         this.renderCallback = null; // 渲染回调
         this.showHiddenGetter = null; // 获取showHidden状态的函数
+        this.apiEndpointGetter = null; // 获取API端点的函数
     }
     
     // 设置获取showHidden状态的函数
     setShowHiddenGetter(getter) {
         this.showHiddenGetter = getter;
+    }
+    
+    // 设置获取API端点的函数
+    setApiEndpointGetter(getter) {
+        this.apiEndpointGetter = getter;
     }
     
     // 设置渲染回调
@@ -266,8 +272,11 @@ class FileTreeCache {
         const showHidden = this.showHiddenGetter ? this.showHiddenGetter() : false;
         console.log('📂 加载目录:', path, '显示隐藏文件:', showHidden);
         
+        // 获取正确的API端点
+        const apiEndpoint = this.apiEndpointGetter ? this.apiEndpointGetter('list') : '/api/files/list';
+        
         const response = await fetch(
-            `/api/files/list?session_id=${sessionID}&path=${encodeURIComponent(path)}&show_hidden=${showHidden}`
+            `${apiEndpoint}?session_id=${sessionID}&path=${encodeURIComponent(path)}&show_hidden=${showHidden}`
         );
         const data = await response.json();
         
