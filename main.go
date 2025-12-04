@@ -38,6 +38,7 @@ func main() {
 	commandHandler := handlers.NewCommandHandler(commandRepo)
 	wsHandler := handlers.NewWebSocketHandler(serverRepo)
 	fileHandler := handlers.NewFileHandler()
+	localFileHandler := handlers.NewLocalFileHandler()
 
 	// 设置Gin为发布模式（生产环境）
 	gin.SetMode(gin.ReleaseMode)
@@ -116,6 +117,17 @@ func main() {
 		api.POST("/files/delete", fileHandler.DeleteFile)
 		api.POST("/files/rename", fileHandler.RenameFile)
 		api.POST("/files/copy", fileHandler.CopyFile) // 复制文件
+
+		// 本地文件管理
+		api.GET("/local/files/list", localFileHandler.ListLocalFiles)
+		api.GET("/local/files/read", localFileHandler.ReadLocalFile)
+		api.GET("/local/files/download", localFileHandler.DownloadLocalFile)
+		api.POST("/local/files/save", localFileHandler.SaveLocalFile)
+		api.POST("/local/files/upload", localFileHandler.UploadLocalFile)
+		api.POST("/local/files/create", localFileHandler.CreateLocalFile)
+		api.POST("/local/files/delete", localFileHandler.DeleteLocalFile)
+		api.POST("/local/files/rename", localFileHandler.RenameLocalFile)
+		api.POST("/local/files/copy", localFileHandler.CopyLocalFile)
 	}
 
 	// WebSocket 路由（需要认证，未登录则重定向）

@@ -8,6 +8,7 @@ import { showConfirm } from './modal.js';
 let currentServerID = null;
 let currentSessionID = null; // 当前会话ID
 let currentPath = '/root';
+let isLocalTerminal = false; // 是否为本地终端
 
 // 剪贴板
 let clipboard = null; // {type: 'copy'|'cut', path: '...'}
@@ -136,26 +137,42 @@ function filterHiddenFiles(files, showHidden) {
 export async function setCurrentServer(serverID, sessionID) {
     currentServerID = serverID;
     currentSessionID = sessionID;
+    isLocalTerminal = false; // 设置为SSH模式
     
-    // 本地终端特殊处理 (ID为0)
-    if (serverID === 0 || serverID === '0') {
-        showLocalFileWarning();
-        return;
+    // 显示文件树头部（如果之前隐藏了）
+    const headerContainer = document.getElementById('fileTreeHeader');
+    if (headerContainer && !headerContainer.querySelector('.filetree-header')) {
+        const header = createFileTreeHeader('/root');
+        headerContainer.appendChild(header);
     }
-    
-    // 立即显示加载状态，清空旧的缓存显示
-    const fileTreeContainer = document.getElementById('fileTree');
-    if (fileTreeContainer) {
-        fileTreeContainer.innerHTML = '<div class="file-tree-empty">📂 加载中...</div>';
-    }
-    
-    // 设置渲染回调
-    fileCache.setRenderCallback(renderFileTree);
     
     // 设置获取showHidden状态的函数
     fileCache.setShowHiddenGetter(() => showHiddenFiles);
     
     currentPath = '/root'; // 默认根目录
+    await loadDirectory(currentPath);
+}
+
+// 设置为本地终端模式
+export async function setLocalTerminal() {
+    isLocalTerminal = true;
+    currentServerID = null;
+    currentSessionID = 'local'; // 本地标识
+    
+    // 显示文件树头部
+    const headerContainer = document.getElementById('fileTreeHeader');
+    if (headerContainer && !headerContainer.querySelector('.filetree-header')) {
+        // 获取用户主目录
+        const response = await fetch('/api/local/files/list?path=');
+        const data = await response.json();
+        const homePath = data.files ? data.files[0]?.path.split('/').slice(0, -1).join('/') || 'C:\\' : 'C:\\';
+        
+        const header = createFileTreeHeader(homePath);
+        headerContainer.appendChild(header);
+        currentPath = homePath;
+    }
+    
+    // 加载本地文件
     await loadDirectory(currentPath);
 }
 
@@ -171,11 +188,23 @@ function showLocalFileWarning() {
     `;
 }
 
+// 加载本地文件列表
+async function loadLocalFiles(path) {
+    const response = await fetch(`/api/local/files/list?path=${encodeURIComponent(path)}`);
+    const data = await response.json();
+    
+    if (!data.success) {
+        throw new Error(data.error || '加载失败');
+    }
+    
+    return data.files || [];
+}
+
 export async function loadDirectory(path, retryCount = 0) {
     
     const fileTreeContainer = document.getElementById('fileTree');
     
-    if (!currentSessionID) {
+    if (!currentSessionID && !isLocalTerminal) {
         console.log('⚠️ 未连接SSH，无法加载文件树');
         fileTreeContainer.innerHTML = '<div class="file-tree-empty"><p>请先连接服务器</p></div>';
         return;
@@ -195,8 +224,14 @@ export async function loadDirectory(path, retryCount = 0) {
     }
     
     try {
-        // 使用缓存管理器：立即返回缓存 + 后台刷新
-        const files = await fileCache.getOrLoad(currentSessionID, path);
+        let files;
+        if (isLocalTerminal) {
+            // 本地终端：直接加载本地文件
+            files = await loadLocalFiles(path);
+        } else {
+            // SSH终端：使用缓存管理器
+            files = await fileCache.getOrLoad(currentSessionID, path);
+        }
         renderFileTree(files, path);
         
         // 加载成功，显示成功状态

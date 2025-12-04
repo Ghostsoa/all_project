@@ -5,7 +5,7 @@ import { showToast } from './utils.js';
 import { loadServers, searchServers, deleteServer, renderServerList } from './server.js';
 import { createTerminal, connectSSH, openLocalTerminal } from './terminal.js';
 import { loadCommandHistory, clearCurrentCommands, saveCommandToHistory } from './commands.js';
-import { initFileTree, setCurrentServer, initDragUpload } from './filetree.js';
+import { initFileTree, setCurrentServer, setLocalTerminal, loadDirectory } from './filetree.js';
 import { openFileEditor } from './editor.js';
 
 // ========== 全局状态灯管理器 ==========
@@ -67,6 +67,7 @@ window.openLocalTerminal = openLocalTerminal;
 window.clearCurrentCommands = clearCurrentCommands;
 window.showToast = showToast;
 window.setCurrentServer = setCurrentServer; // 暴露文件树加载函数
+window.setLocalTerminal = setLocalTerminal; // 暴露本地文件树加载函数
 
 // 服务器卡片展开/折叠
 window.toggleServerExpand = function(serverId) {

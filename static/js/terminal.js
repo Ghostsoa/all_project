@@ -185,9 +185,18 @@ function connectLocalTerminal(sessionId) {
     const ws = new WebSocket(`${config.WS_PROTOCOL}//${config.WS_HOST}/ws/local`);
     ws.binaryType = 'arraybuffer';
     
-    ws.onopen = () => {
+    ws.onopen = async () => {
         session.status = 'connected';
         updateStatusLight('connected');
+        
+        // 加载本地文件树
+        if (window.setLocalTerminal) {
+            try {
+                await window.setLocalTerminal();
+            } catch (error) {
+                console.error('加载本地文件树失败:', error);
+            }
+        }
     };
     
     ws.onmessage = (event) => {
