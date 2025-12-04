@@ -517,27 +517,111 @@ function removeThinking(thinkingId) {
     }
 }
 
-// 格式化消息内容（支持Markdown）
+// 格式化消息内容（完整Markdown支持）
 function formatMessageContent(content) {
-    // 简单的Markdown支持
-    let formatted = escapeHtml(content);
+    if (!content) return '';
     
-    // 代码块
+    let formatted = content;
+    const codeBlocks = [];
+    const inlineCodes = [];
+    
+    // 1. 先提取并保护代码块
     formatted = formatted.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
-        return `<pre><code class="language-${lang || 'text'}">${code.trim()}</code></pre>`;
+        const escapedCode = escapeHtml(code.trim());
+        const codeId = 'code-' + Math.random().toString(36).substr(2, 9);
+        const placeholder = `__CODEBLOCK_${codeBlocks.length}__`;
+        codeBlocks.push(`<div class="code-block">
+            <div class="code-header">
+                <span class="code-lang">${lang || 'text'}</span>
+                <button class="code-copy-btn" onclick="copyCode('${codeId}')" title="复制代码">
+                    <i class="fa-solid fa-copy"></i>
+                </button>
+            </div>
+            <pre><code id="${codeId}" class="language-${lang || 'text'}">${escapedCode}</code></pre>
+        </div>`);
+        return placeholder;
     });
     
-    // 行内代码
-    formatted = formatted.replace(/`([^`]+)`/g, '<code>$1</code>');
+    // 2. 提取并保护行内代码
+    formatted = formatted.replace(/`([^`\n]+)`/g, (match, code) => {
+        const placeholder = `__INLINECODE_${inlineCodes.length}__`;
+        inlineCodes.push(`<code>${escapeHtml(code)}</code>`);
+        return placeholder;
+    });
     
-    // 粗体
-    formatted = formatted.replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>');
+    // 3. 转义HTML（但保留占位符）
+    formatted = escapeHtml(formatted);
     
-    // 换行
+    // 4. 粗体
+    formatted = formatted.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
+    
+    // 5. 斜体
+    formatted = formatted.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
+    
+    // 6. 标题
+    formatted = formatted.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+    formatted = formatted.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+    formatted = formatted.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+    
+    // 7. 无序列表
+    formatted = formatted.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
+    formatted = formatted.replace(/(<li>[\s\S]*?<\/li>\n?)+/g, match => {
+        return '<ul>' + match + '</ul>';
+    });
+    
+    // 8. 有序列表
+    formatted = formatted.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
+    formatted = formatted.replace(/(<li>[\s\S]*?<\/li>\n?)+/g, match => {
+        if (!match.includes('<ul>')) {
+            return '<ol>' + match + '</ol>';
+        }
+        return match;
+    });
+    
+    // 9. 引用
+    formatted = formatted.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+    
+    // 10. 链接
+    formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
+    
+    // 11. 换行
     formatted = formatted.replace(/\n/g, '<br>');
+    
+    // 12. 恢复行内代码
+    inlineCodes.forEach((code, i) => {
+        formatted = formatted.replace(`__INLINECODE_${i}__`, code);
+    });
+    
+    // 13. 恢复代码块
+    codeBlocks.forEach((block, i) => {
+        formatted = formatted.replace(`__CODEBLOCK_${i}__`, block);
+    });
     
     return formatted;
 }
+
+// 复制代码
+window.copyCode = function(codeId) {
+    const codeElement = document.getElementById(codeId);
+    if (!codeElement) return;
+    
+    const text = codeElement.textContent;
+    navigator.clipboard.writeText(text).then(() => {
+        // 显示复制成功提示
+        const btn = event.target.closest('.code-copy-btn');
+        if (btn) {
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+            btn.style.color = '#10b981';
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.style.color = '';
+            }, 2000);
+        }
+    }).catch(err => {
+        console.error('复制失败:', err);
+    });
+};
 
 // 滚动到底部
 function scrollToBottom() {

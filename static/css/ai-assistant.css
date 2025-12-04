@@ -479,31 +479,151 @@
     max-width: 80%;
 }
 
+/* Markdown样式 */
+
+/* 行内代码 */
 .message-content code {
-    background: rgba(0, 0, 0, 0.3);
-    padding: 2px 4px;
+    background: rgba(255, 255, 255, 0.1);
+    color: #e879f9;
+    padding: 2px 6px;
     border-radius: 3px;
     font-size: 12px;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+}
+
+/* 代码块容器 */
+.code-block {
+    margin: 8px 0;
+    border-radius: 6px;
+    overflow: hidden;
+    background: rgba(30, 30, 30, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.code-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.code-lang {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    text-transform: uppercase;
     font-family: 'Consolas', 'Monaco', monospace;
 }
 
-.message-content pre {
-    background: rgba(0, 0, 0, 0.4);
-    padding: 8px;
-    border-radius: 4px;
-    overflow-x: auto;
-    margin: 6px 0;
-    font-size: 12px;
-}
-
-.message-content pre code {
+.code-copy-btn {
     background: none;
-    padding: 0;
+    border: none;
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 3px;
+    font-size: 12px;
+    transition: all 0.2s ease;
 }
 
+.code-copy-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.code-block pre {
+    margin: 0;
+    padding: 10px;
+    background: transparent;
+    overflow-x: auto;
+}
+
+.code-block code {
+    background: transparent;
+    color: rgba(255, 255, 255, 0.9);
+    padding: 0;
+    font-size: 12px;
+    line-height: 1.5;
+    display: block;
+}
+
+/* 粗体和斜体 */
 .message-content strong {
     font-weight: 600;
-    color: #4a90e2;
+    color: #60a5fa;
+}
+
+.message-content em {
+    font-style: italic;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* 标题 */
+.message-content h1 {
+    font-size: 18px;
+    font-weight: 600;
+    color: #60a5fa;
+    margin: 12px 0 8px 0;
+    padding-bottom: 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.message-content h2 {
+    font-size: 16px;
+    font-weight: 600;
+    color: #60a5fa;
+    margin: 10px 0 6px 0;
+}
+
+.message-content h3 {
+    font-size: 14px;
+    font-weight: 600;
+    color: #60a5fa;
+    margin: 8px 0 4px 0;
+}
+
+/* 列表 */
+.message-content ul,
+.message-content ol {
+    margin: 6px 0;
+    padding-left: 20px;
+}
+
+.message-content li {
+    margin: 3px 0;
+    line-height: 1.6;
+}
+
+.message-content ul li {
+    list-style-type: disc;
+}
+
+.message-content ol li {
+    list-style-type: decimal;
+}
+
+/* 引用 */
+.message-content blockquote {
+    margin: 8px 0;
+    padding: 8px 12px;
+    border-left: 3px solid rgba(96, 165, 250, 0.5);
+    background: rgba(96, 165, 250, 0.05);
+    color: rgba(255, 255, 255, 0.8);
+    font-style: italic;
+}
+
+/* 链接 */
+.message-content a {
+    color: #60a5fa;
+    text-decoration: none;
+    border-bottom: 1px solid rgba(96, 165, 250, 0.3);
+    transition: all 0.2s ease;
+}
+
+.message-content a:hover {
+    color: #93c5fd;
+    border-bottom-color: #93c5fd;
 }
 
 /* 思维链样式 */
