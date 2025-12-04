@@ -145,7 +145,7 @@ function filterHiddenFiles(files, showHidden) {
     return files.filter(file => !file.name.startsWith('.')); // 隐藏.开头的
 }
 
-export async function setCurrentServer(serverID, sessionID) {
+export async function setCurrentServer(serverID, sessionID, forceRefresh = false) {
     currentServerID = serverID;
     currentSessionID = sessionID;
     isLocalTerminal = false; // 设置为SSH模式
@@ -168,6 +168,12 @@ export async function setCurrentServer(serverID, sessionID) {
     fileCache.setApiEndpointGetter(getApiEndpoint);
     
     currentPath = '/root'; // 默认根目录
+    
+    // 如果forceRefresh，清除缓存
+    if (forceRefresh) {
+        fileCache.clearSession(sessionID);
+    }
+    
     await loadDirectory(currentPath);
 }
 
