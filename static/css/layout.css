@@ -89,7 +89,7 @@
 /* Main Container - 三栏布局 */
 .main-container {
     display: grid;
-    grid-template-columns: 240px 1fr 320px;
+    grid-template-columns: 240px 1fr 420px;
     flex: 1;
     overflow: hidden;
     gap: 0;
@@ -98,7 +98,7 @@
 
 /* 折叠状态 */
 .main-container.sidebar-collapsed {
-    grid-template-columns: 60px 1fr 320px;
+    grid-template-columns: 60px 1fr 420px;
 }
 
 /* 空状态提示 */
