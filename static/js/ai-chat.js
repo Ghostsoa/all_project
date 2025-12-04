@@ -18,7 +18,7 @@ export async function loadSessions() {
         
         // 如果有会话，自动选择第一个
         if (sessions.length > 0 && !currentSession) {
-            await selectSession(sessions[0].ID || sessions[0].id);
+            await selectAISession(sessions[0].ID || sessions[0].id);
         }
     } catch (error) {
         console.error('加载会话列表失败:', error);
