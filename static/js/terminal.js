@@ -152,10 +152,20 @@ export function openLocalTerminal() {
     
     // 检查是否已经存在本地终端会话
     if (state.terminals.has(sessionId)) {
-        console.log('本地终端已存在，直接切换');
+        console.log('✅ 本地终端已存在，直接切换（不重新加载）');
+        const session = state.terminals.get(sessionId);
+        
+        // 确保状态正确
+        if (session && session.ws && session.ws.readyState === WebSocket.OPEN) {
+            console.log('✅ 本地终端连接正常');
+        }
+        
+        // 只切换显示，不重新加载
         window.switchTab(sessionId);
         return;
     }
+    
+    console.log('🚀 首次打开本地终端');
     
     document.getElementById('noSelection').style.display = 'none';
     document.getElementById('terminalWrapper').style.display = 'flex';

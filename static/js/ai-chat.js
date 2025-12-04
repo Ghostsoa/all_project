@@ -10,7 +10,7 @@ let availableConfigs = []; // 可用的AI配置列表
 
 // ========== Loading 控制 ==========
 
-function showAILoading(text = '正在加载...') {
+function showAILoading(text = '正在加载中') {
     const overlay = document.getElementById('aiLoadingOverlay');
     const textEl = document.getElementById('aiLoadingText');
     if (overlay) {
@@ -249,7 +249,7 @@ window.saveModelConfig = async function() {
 
 // 加载会话列表
 export async function loadSessions() {
-    showAILoading('正在加载配置...');
+    showAILoading('正在加载中');
     try {
         const data = await apiRequest('/api/ai/sessions');
         sessions = data.data || [];
@@ -356,7 +356,7 @@ function renderSessionList() {
 
 // 选择会话
 window.selectAISession = async function(sessionId) {
-    showAILoading('正在切换会话...');
+    showAILoading('正在加载中');
     try {
         const data = await apiRequest(`/api/ai/session?id=${sessionId}`);
         currentSession = data.data;
