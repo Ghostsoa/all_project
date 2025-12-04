@@ -94,6 +94,11 @@ export async function openFileEditor(filePath, serverID, sessionID, fileSize = 0
     // 先创建标签页，显示"加载中"
     const tabId = createLoadingTab(filePath, serverID, sessionID);
     
+    // 显示全局加载状态
+    if (window.updateGlobalStatus) {
+        window.updateGlobalStatus('loading');
+    }
+    
     try {
         // 读取文件内容
         const response = await fetch(`/api/files/read?session_id=${sessionID}&path=${encodeURIComponent(filePath)}`);
@@ -102,19 +107,32 @@ export async function openFileEditor(filePath, serverID, sessionID, fileSize = 0
         if (!data.success) {
             showToast('读取文件失败: ' + data.error, 'error');
             closeEditorTab(tabId);
+            // 显示错误状态
+            if (window.updateGlobalStatus) {
+                window.updateGlobalStatus('error');
+            }
             return;
         }
         
         // 加载成功，创建编辑器
         if (isMarkdown) {
-            initializeMarkdownEditor(tabId, filePath, data.content);
+            await initializeMarkdownEditor(tabId, filePath, data.content);
         } else {
             initializeEditor(tabId, filePath, data.content);
+        }
+        
+        // 显示成功状态
+        if (window.updateGlobalStatus) {
+            window.updateGlobalStatus('success');
         }
     } catch (error) {
         console.error('打开文件失败:', error);
         showToast('打开文件失败', 'error');
         closeEditorTab(tabId);
+        // 显示错误状态
+        if (window.updateGlobalStatus) {
+            window.updateGlobalStatus('error');
+        }
     }
 }
 
@@ -578,6 +596,11 @@ window.saveFile = async function(tabId) {
     
     const content = editor.getValue();
     
+    // 显示全局加载状态
+    if (window.updateGlobalStatus) {
+        window.updateGlobalStatus('loading');
+    }
+    
     try {
         const response = await fetch('/api/files/save', {
             method: 'POST',
@@ -593,12 +616,24 @@ window.saveFile = async function(tabId) {
         if (data.success) {
             showToast('保存成功', 'success');
             markAsUnmodified(tabId);
+            // 显示成功状态
+            if (window.updateGlobalStatus) {
+                window.updateGlobalStatus('success');
+            }
         } else {
             showToast('保存失败: ' + data.error, 'error');
+            // 显示错误状态
+            if (window.updateGlobalStatus) {
+                window.updateGlobalStatus('error');
+            }
         }
     } catch (error) {
         console.error('保存文件失败:', error);
         showToast('保存失败', 'error');
+        // 显示错误状态
+        if (window.updateGlobalStatus) {
+            window.updateGlobalStatus('error');
+        }
     }
 };
 

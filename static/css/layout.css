@@ -2,25 +2,88 @@
 
 /* Header */
 .header {
-    background: rgba(255, 255, 255, 0.03);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 16px 24px;
+    background: rgba(255, 255, 255, 0.05);
+    backdrop-filter: blur(20px);
+    padding: 12px 20px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
 }
 
 .header h1 {
     font-size: 18px;
     font-weight: 600;
+    margin: 0;
     color: #ffffff;
-    letter-spacing: -0.3px;
 }
 
 .header-actions {
     display: flex;
     gap: 10px;
+}
+
+/* 全局状态灯带 */
+.global-status-light-bar {
+    height: 3px;
+    background: #1e1e1e;
+    position: relative;
+    overflow: hidden;
+}
+
+.global-status-light {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #3e3e42;
+    transition: background 0.3s;
+}
+
+/* 加载中 - 彩色流光动画 */
+.global-status-light.loading {
+    background: linear-gradient(90deg, 
+        #ff0080 0%,
+        #ff8c00 10%,
+        #ffd700 20%,
+        #00ff00 30%,
+        #00bfff 40%,
+        #0080ff 50%,
+        #8000ff 60%,
+        #ff0080 70%,
+        #ff8c00 80%,
+        #ffd700 90%,
+        #00ff00 100%);
+    background-size: 300% 100%;
+    animation: flowingRainbow 2s linear infinite;
+}
+
+/* 完成 - 绿灯闪烁后消失 */
+.global-status-light.success {
+    background: #4ec9b0;
+    box-shadow: 0 0 8px rgba(78, 201, 176, 0.5);
+    animation: successFade 0.8s ease-out forwards;
+}
+
+/* 错误 - 红灯 */
+.global-status-light.error {
+    background: #f48771;
+    box-shadow: 0 0 8px rgba(244, 135, 113, 0.5);
+}
+
+@keyframes successFade {
+    0% {
+        opacity: 1;
+    }
+    70% {
+        opacity: 1;
+    }
+    100% {
+        opacity: 0;
+        background: #3e3e42;
+    }
 }
 
 /* Main Container - 三栏布局 */

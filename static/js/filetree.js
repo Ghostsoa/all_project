@@ -172,24 +172,27 @@ function showLocalFileWarning() {
 }
 
 export async function loadDirectory(path, retryCount = 0) {
-    if (!currentServerID) {
-        console.log('未连接服务器');
-        return;
-    }
     
-    currentPath = path;
-    fileCache.setCurrentPath(path);
-    
-    // 显示加载状态（首次加载）
     const fileTreeContainer = document.getElementById('fileTree');
-    if (!fileCache.cache.has(fileCache.makeKey(currentSessionID, path))) {
-        fileTreeContainer.innerHTML = '<div class="file-tree-empty">📂 加载中...</div>';
+    
+    if (retryCount === 0) {
+        // 第一次加载时显示加载状态（不是重试）
+        fileTreeContainer.innerHTML = '<div class="file-tree-empty"><p>⏳ 加载中...</p></div>';
+        // 显示全局加载状态
+        if (window.updateGlobalStatus) {
+            window.updateGlobalStatus('loading');
+        }
     }
     
     try {
         // 使用缓存管理器：立即返回缓存 + 后台刷新
         const files = await fileCache.getOrLoad(currentSessionID, path);
         renderFileTree(files, path);
+        
+        // 加载成功，显示成功状态
+        if (retryCount === 0 && window.updateGlobalStatus) {
+            window.updateGlobalStatus('success');
+        }
     } catch (error) {
         console.error('加载目录失败:', error);
         

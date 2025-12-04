@@ -8,6 +8,44 @@ import { loadCommandHistory, clearCurrentCommands, saveCommandToHistory } from '
 import { initFileTree, setCurrentServer } from './filetree.js';
 import { openFileEditor } from './editor.js';
 
+// ========== 全局状态灯管理器 ==========
+let globalStatusTimeout = null;
+
+/**
+ * 更新全局状态灯
+ * @param {string} status - 状态: 'loading', 'success', 'error', 'idle'
+ */
+window.updateGlobalStatus = function(status) {
+    const light = document.getElementById('globalStatusLight');
+    if (!light) return;
+    
+    // 清除之前的定时器
+    if (globalStatusTimeout) {
+        clearTimeout(globalStatusTimeout);
+        globalStatusTimeout = null;
+    }
+    
+    // 移除所有状态类
+    light.classList.remove('loading', 'success', 'error');
+    
+    if (status === 'loading') {
+        light.classList.add('loading');
+    } else if (status === 'success') {
+        light.classList.add('success');
+        // 成功后800ms自动恢复idle
+        globalStatusTimeout = setTimeout(() => {
+            light.classList.remove('success');
+        }, 800);
+    } else if (status === 'error') {
+        light.classList.add('error');
+        // 错误后2秒自动恢复idle
+        globalStatusTimeout = setTimeout(() => {
+            light.classList.remove('error');
+        }, 2000);
+    }
+    // idle状态不需要特殊处理，已经移除所有类
+};
+
 // 保存每个服务器的content-tabs状态
 const serverContentTabs = new Map(); // sessionId -> HTML string
 const serverActivePane = new Map(); // sessionId -> { type: 'terminal'|'editor', id: string }
