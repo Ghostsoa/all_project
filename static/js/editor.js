@@ -190,6 +190,7 @@ function initializeMarkdownEditor(tabId, filePath, content) {
     
     // 配置marked
     if (window.marked) {
+        console.log('✅ marked.js已加载');
         marked.setOptions({
             highlight: function(code, lang) {
                 if (lang && window.hljs && window.hljs.getLanguage(lang)) {
@@ -200,6 +201,8 @@ function initializeMarkdownEditor(tabId, filePath, content) {
             breaks: true,
             gfm: true
         });
+    } else {
+        console.warn('⚠️ marked.js未加载！');
     }
     
     // 初始化Monaco编辑器
@@ -244,16 +247,23 @@ function updateMarkdownPreview(tabId, markdown) {
     if (!previewPane) return;
     
     if (window.marked) {
-        const html = marked.parse(markdown);
-        previewPane.innerHTML = `<div class="markdown-body">${html}</div>`;
-        
-        // 高亮代码块
-        if (window.hljs) {
-            previewPane.querySelectorAll('pre code').forEach((block) => {
-                window.hljs.highlightElement(block);
-            });
+        try {
+            // marked.parse 返回字符串，不是Promise
+            const html = window.marked.parse(markdown);
+            previewPane.innerHTML = `<div class="markdown-body">${html}</div>`;
+            
+            // 高亮代码块
+            if (window.hljs) {
+                previewPane.querySelectorAll('pre code').forEach((block) => {
+                    window.hljs.highlightElement(block);
+                });
+            }
+        } catch (error) {
+            console.error('Markdown渲染失败:', error);
+            previewPane.innerHTML = `<div class="markdown-body"><pre>${markdown}</pre></div>`;
         }
     } else {
+        console.warn('marked.js未加载');
         previewPane.innerHTML = `<div class="markdown-body"><pre>${markdown}</pre></div>`;
     }
 }
