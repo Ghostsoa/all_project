@@ -1019,16 +1019,25 @@ async function uploadFiles(files, targetPath) {
         return;
     }
     
-    // 逐个上传文件
+    // 并行上传所有文件（不阻塞UI）
+    const uploadPromises = [];
     for (const file of files) {
         const taskId = Date.now() + '-' + Math.random();
-        await uploadSingleFile(file, targetPath, taskId);
+        uploadPromises.push(uploadSingleFile(file, targetPath, taskId));
+        // 稍微延迟，避免taskId重复
+        await new Promise(resolve => setTimeout(resolve, 10));
     }
+    
+    // 等待所有上传完成（但不阻塞UI）
+    Promise.all(uploadPromises).catch(err => {
+        console.error('部分文件上传失败:', err);
+    });
 }
 
-// 上传单个文件
+// 上传单个文件（支持分片上传）
 async function uploadSingleFile(file, targetPath, taskId) {
     const filePath = targetPath === '/' ? `/${file.name}` : `${targetPath}/${file.name}`;
+    const CHUNK_SIZE = 80 * 1024 * 1024; // 80MB每片，留20MB余量
     
     // 创建上传任务
     const task = {
@@ -1045,44 +1054,26 @@ async function uploadSingleFile(file, targetPath, taskId) {
     
     try {
         const startTime = Date.now();
-        let lastLoaded = 0;
-        let lastTime = startTime;
         
-        // 读取文件内容为Base64
-        const content = await readFileAsBase64(file);
-        
-        // 发送上传请求
-        const response = await fetch('/api/files/upload', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                session_id: currentSessionID,
-                path: filePath,
-                content: content,
-                encoding: 'base64'
-            }),
-            signal: task.controller.signal
-        });
-        
-        if (task.cancelled) {
-            throw new Error('已取消');
-        }
-        
-        const data = await response.json();
-        
-        if (data.success) {
-            // 上传成功
-            updateUploadProgress(taskId, 100, file.size, 0, 'success');
-            setTimeout(() => {
-                removeUploadProgress(taskId);
-                uploadTasks.delete(taskId);
-            }, 2000);
-            
-            // 刷新当前目录
-            await loadDirectory(targetPath);
+        // 判断是否需要分片上传
+        if (file.size > 100 * 1024 * 1024) {
+            // 大于100MB，使用分片上传
+            await uploadFileInChunks(file, filePath, taskId, task, startTime);
         } else {
-            throw new Error(data.error || '上传失败');
+            // 小于100MB，直接上传
+            await uploadFileComplete(file, filePath, taskId, task, startTime);
         }
+        
+        // 上传成功
+        updateUploadProgress(taskId, 100, file.size, 0, 'success');
+        setTimeout(() => {
+            removeUploadProgress(taskId);
+            uploadTasks.delete(taskId);
+        }, 2000);
+        
+        // 刷新当前目录
+        await loadDirectory(targetPath);
+        
     } catch (error) {
         if (error.name === 'AbortError' || error.message === '已取消') {
             updateUploadProgress(taskId, 0, file.size, 0, 'cancelled');
@@ -1096,6 +1087,121 @@ async function uploadSingleFile(file, targetPath, taskId) {
             uploadTasks.delete(taskId);
         }, 3000);
     }
+}
+
+// 完整上传小文件（<100MB）
+async function uploadFileComplete(file, filePath, taskId, task, startTime) {
+    // 显示编码状态
+    updateUploadProgress(taskId, 10, file.size, 0, 'uploading');
+    const speedSpan = document.querySelector(`#upload-${taskId} .upload-speed`);
+    if (speedSpan) speedSpan.textContent = '编码中...';
+    
+    const content = await readFileAsBase64(file);
+    
+    // 显示上传状态
+    updateUploadProgress(taskId, 50, file.size, 0, 'uploading');
+    if (speedSpan) speedSpan.textContent = '上传中...';
+    
+    const uploadStartTime = Date.now();
+    
+    const response = await fetch('/api/files/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            session_id: currentSessionID,
+            path: filePath,
+            content: content,
+            encoding: 'base64'
+        }),
+        signal: task.controller.signal
+    });
+    
+    if (task.cancelled) {
+        throw new Error('已取消');
+    }
+    
+    const data = await response.json();
+    if (!data.success) {
+        throw new Error(data.error || '上传失败');
+    }
+    
+    // 计算平均速度
+    const timeDiff = (Date.now() - uploadStartTime) / 1000;
+    const speed = timeDiff > 0 ? file.size / timeDiff : 0;
+    updateUploadProgress(taskId, 90, file.size, speed, 'uploading');
+}
+
+// 分片上传大文件（>100MB）
+async function uploadFileInChunks(file, filePath, taskId, task, startTime) {
+    const CHUNK_SIZE = 80 * 1024 * 1024; // 80MB每片
+    const totalChunks = Math.ceil(file.size / CHUNK_SIZE);
+    const uploadId = Date.now() + '-' + Math.random().toString(36).substr(2, 9);
+    
+    let uploadedBytes = 0;
+    let lastUpdateTime = startTime;
+    
+    for (let chunkIndex = 0; chunkIndex < totalChunks; chunkIndex++) {
+        if (task.cancelled) {
+            throw new Error('已取消');
+        }
+        
+        // 切片
+        const start = chunkIndex * CHUNK_SIZE;
+        const end = Math.min(start + CHUNK_SIZE, file.size);
+        const chunk = file.slice(start, end);
+        
+        // 读取分片为Base64
+        const chunkBase64 = await readFileAsBase64Blob(chunk);
+        
+        // 上传分片
+        const response = await fetch('/api/files/upload-chunk', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                session_id: currentSessionID,
+                path: filePath,
+                upload_id: uploadId,
+                chunk_index: chunkIndex,
+                total_chunks: totalChunks,
+                content: chunkBase64
+            }),
+            signal: task.controller.signal
+        });
+        
+        if (task.cancelled) {
+            throw new Error('已取消');
+        }
+        
+        const data = await response.json();
+        if (!data.success) {
+            throw new Error(data.error || '分片上传失败');
+        }
+        
+        // 更新进度
+        uploadedBytes += (end - start);
+        const progress = (uploadedBytes / file.size) * 100;
+        
+        // 计算速度
+        const now = Date.now();
+        const timeDiff = (now - lastUpdateTime) / 1000;
+        const speed = timeDiff > 0 ? (end - start) / timeDiff : 0;
+        lastUpdateTime = now;
+        
+        updateUploadProgress(taskId, progress, file.size, speed, 'uploading');
+    }
+}
+
+// 读取Blob为Base64
+function readFileAsBase64Blob(blob) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(blob);
+    });
 }
 
 // 创建上传进度UI
@@ -1116,34 +1222,13 @@ function createUploadProgressUI(taskId, fileName, fileSize) {
         <div class="upload-info">
             <div class="upload-status">
                 <span class="upload-size">0 / ${formatSize(fileSize)}</span>
-                <span class="upload-speed">计算中...</span>
+                <span class="upload-speed">准备中...</span>
             </div>
             <span class="upload-percentage">0%</span>
         </div>
     `;
     
     container.appendChild(progressItem);
-    
-    // 模拟进度更新（因为Base64编码是同步的，我们模拟一个平滑进度）
-    let progress = 0;
-    const interval = setInterval(() => {
-        if (progress < 90) {
-            progress += Math.random() * 10;
-            progress = Math.min(progress, 90);
-            
-            const loaded = (fileSize * progress / 100);
-            const speed = loaded / ((Date.now() - Date.now()) / 1000 || 1);
-            
-            updateUploadProgress(taskId, progress, fileSize, speed, 'uploading');
-        }
-    }, 200);
-    
-    // 保存interval以便清理
-    const task = uploadTasks.get(taskId);
-    if (task) {
-        task.progressInterval = interval;
-    }
-    
     return progressItem;
 }
 
@@ -1157,12 +1242,6 @@ function updateUploadProgress(taskId, progress, totalSize, speed, status, errorM
     const sizeSpan = progressItem.querySelector('.upload-size');
     const speedSpan = progressItem.querySelector('.upload-speed');
     const cancelBtn = progressItem.querySelector('.upload-cancel');
-    
-    // 清理进度模拟
-    const task = uploadTasks.get(taskId);
-    if (task && task.progressInterval) {
-        clearInterval(task.progressInterval);
-    }
     
     // 更新进度条
     progressFill.style.width = progress + '%';
@@ -1213,10 +1292,6 @@ window.cancelUpload = function(taskId) {
     if (task) {
         task.cancelled = true;
         task.controller.abort();
-        
-        if (task.progressInterval) {
-            clearInterval(task.progressInterval);
-        }
     } else {
         // 如果任务已完成，直接移除UI
         removeUploadProgress(taskId);

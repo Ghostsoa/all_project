@@ -2,8 +2,10 @@ package handlers
 
 import (
 	"encoding/base64"
+	"fmt"
 	"io"
 	"net/http"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -343,6 +345,119 @@ func (h *FileHandler) UploadFile(c *gin.Context) {
 		"success": true,
 		"message": "文件上传成功",
 	})
+}
+
+// UploadChunk 分片上传接口
+func (h *FileHandler) UploadChunk(c *gin.Context) {
+	var req struct {
+		SessionID   string `json:"session_id"`
+		Path        string `json:"path"`
+		UploadID    string `json:"upload_id"`
+		ChunkIndex  int    `json:"chunk_index"`
+		TotalChunks int    `json:"total_chunks"`
+		Content     string `json:"content"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		return
+	}
+
+	// 从会话管理器获取SFTP客户端
+	session := GetSessionManager().GetSession(req.SessionID)
+	if session == nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "会话不存在"})
+		return
+	}
+
+	sftpClient := session.SFTPClient
+	if sftpClient == nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "SFTP客户端未初始化"})
+		return
+	}
+
+	// 解码Base64内容
+	content, err := base64.StdEncoding.DecodeString(req.Content)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Base64解码失败"})
+		return
+	}
+
+	// 创建临时目录存储分片
+	tmpDir := fmt.Sprintf("/tmp/upload_%s", req.UploadID)
+	chunkPath := fmt.Sprintf("%s/chunk_%d", tmpDir, req.ChunkIndex)
+
+	// 创建临时目录（本地）
+	if err := os.MkdirAll(tmpDir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建临时目录失败"})
+		return
+	}
+
+	// 写入分片到本地临时文件
+	if err := os.WriteFile(chunkPath, content, 0644); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "写入分片失败"})
+		return
+	}
+
+	// 如果是最后一个分片，进行合并
+	if req.ChunkIndex == req.TotalChunks-1 {
+		// 合并所有分片
+		mergedFile, err := os.Create(tmpDir + "/merged")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "创建合并文件失败"})
+			return
+		}
+		defer mergedFile.Close()
+
+		// 按顺序读取所有分片并合并
+		for i := 0; i < req.TotalChunks; i++ {
+			chunkFile := fmt.Sprintf("%s/chunk_%d", tmpDir, i)
+			chunkData, err := os.ReadFile(chunkFile)
+			if err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": fmt.Sprintf("读取分片%d失败", i)})
+				return
+			}
+			if _, err := mergedFile.Write(chunkData); err != nil {
+				c.JSON(http.StatusInternalServerError, gin.H{"error": "写入合并文件失败"})
+				return
+			}
+		}
+
+		// 重新打开合并后的文件用于上传
+		mergedFile, err = os.Open(tmpDir + "/merged")
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "打开合并文件失败"})
+			return
+		}
+		defer mergedFile.Close()
+
+		// 上传到远程服务器
+		remoteFile, err := sftpClient.Create(req.Path)
+		if err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "创建远程文件失败"})
+			return
+		}
+		defer remoteFile.Close()
+
+		// 复制数据
+		if _, err := io.Copy(remoteFile, mergedFile); err != nil {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "上传文件失败"})
+			return
+		}
+
+		// 清理临时文件
+		os.RemoveAll(tmpDir)
+
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": "分片上传完成",
+		})
+	} else {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"message": fmt.Sprintf("分片%d上传成功", req.ChunkIndex),
+		})
+	}
 }
 
 // DownloadFile 下载文件（返回原始文件流）

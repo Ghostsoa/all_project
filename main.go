@@ -87,6 +87,7 @@ func main() {
 		api.GET("/files/download", fileHandler.DownloadFile)
 		api.POST("/files/save", fileHandler.SaveFile)
 		api.POST("/files/upload", fileHandler.UploadFile)
+		api.POST("/files/upload-chunk", fileHandler.UploadChunk) // 分片上传
 		api.POST("/files/create", fileHandler.CreateFile)
 		api.POST("/files/delete", fileHandler.DeleteFile)
 		api.POST("/files/rename", fileHandler.RenameFile)
