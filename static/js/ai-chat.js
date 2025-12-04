@@ -11,17 +11,23 @@ let sessions = [];
 
 // 加载会话列表
 export async function loadSessions() {
+    console.log('🔄 loadSessions 开始加载');
     try {
         const data = await apiRequest('/api/ai/sessions');
+        console.log('📥 API返回数据:', data);
         sessions = data.data || [];
+        console.log('📋 sessions数组:', sessions);
+        console.log('📊 sessions数量:', sessions.length);
+        
         renderSessionList();
         
         // 如果有会话，自动选择第一个
         if (sessions.length > 0 && !currentSession) {
-            await selectAISession(sessions[0].ID || sessions[0].id);
+            console.log('🎯 自动选择第一个会话:', sessions[0]);
+            await selectAISession(sessions[0].ID);
         }
     } catch (error) {
-        console.error('加载会话列表失败:', error);
+        console.error('❌ 加载会话列表失败:', error);
     }
 }
 
@@ -64,31 +70,55 @@ function renderSessionList() {
     }
 
     container.innerHTML = `
-        <div class="history-item new" onclick="createNewAISession(); toggleHistoryDropdown();">
+        <div class="history-item new" data-action="create-new">
             <i class="fa-solid fa-plus"></i>
             <span>新建对话</span>
         </div>
         <div class="history-divider"></div>
     ` + sessions.map(session => `
-        <div class="history-item ${currentSession?.ID === session.ID || currentSession?.id === session.id ? 'active' : ''}" 
-             onclick="selectAISession(${session.ID || session.id}); toggleHistoryDropdown();"
-             data-session-id="${session.ID || session.id}">
+        <div class="history-item ${currentSession?.ID === session.ID ? 'active' : ''}" 
+             data-action="select-session"
+             data-session-id="${session.ID}">
             <div class="history-item-title">${escapeHtml(session.title)}</div>
             <div class="history-item-meta">
                 <span>${formatTime(session.last_active_at)}</span>
                 ${session.config?.ai_model ? `<span class="model-tag">${escapeHtml(session.config.ai_model.display_name || session.config.ai_model.name)}</span>` : ''}
             </div>
-            <button class="history-item-delete" onclick="event.stopPropagation(); deleteAISession(${session.ID || session.id})" title="删除">
+            <button class="history-item-delete" data-action="delete-session" data-session-id="${session.ID}" title="删除">
                 <i class="fa-solid fa-trash"></i>
             </button>
         </div>
     `).join('');
+    
+    // 添加事件委托
+    container.onclick = function(e) {
+        const target = e.target.closest('[data-action]');
+        if (!target) return;
+        
+        const action = target.dataset.action;
+        const sessionId = target.dataset.sessionId;
+        
+        console.log('🖱️ 点击历史项:', action, sessionId);
+        
+        if (action === 'create-new') {
+            createNewAISession();
+            toggleHistoryDropdown();
+        } else if (action === 'select-session' && sessionId) {
+            selectAISession(parseInt(sessionId));
+            toggleHistoryDropdown();
+        } else if (action === 'delete-session' && sessionId) {
+            e.stopPropagation();
+            deleteAISession(parseInt(sessionId));
+        }
+    };
 }
 
 // 选择会话
 window.selectAISession = async function(sessionId) {
+    console.log('📌 selectAISession 被调用, sessionId:', sessionId);
     try {
         const data = await apiRequest(`/api/ai/session?id=${sessionId}`);
+        console.log('📥 会话数据:', data);
         currentSession = data.data;
         
         // 更新UI
@@ -99,8 +129,10 @@ window.selectAISession = async function(sessionId) {
         
         // 显示对话区域
         showChatArea();
+        
+        console.log('✅ 会话加载成功');
     } catch (error) {
-        console.error('选择会话失败:', error);
+        console.error('❌ 选择会话失败:', error);
         alert('加载会话失败: ' + error.message);
     }
 };
