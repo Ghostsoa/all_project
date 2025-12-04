@@ -527,8 +527,8 @@ window.startEditMessage = function(messageId) {
     const buttons = document.createElement('div');
     buttons.className = 'message-edit-buttons';
     buttons.innerHTML = `
-        <button class="btn-edit-save" onclick="saveEditedMessage(${messageId})">保存</button>
-        <button class="btn-edit-cancel" onclick="cancelEditMessage(${messageId})">取消</button>
+        <button class="btn-edit-save" onclick="saveEditedMessage(${messageId})" title="保存">✓</button>
+        <button class="btn-edit-cancel" onclick="cancelEditMessage(${messageId})" title="取消">✕</button>
     `;
     
     // 保存原始内容用于取消
@@ -701,10 +701,10 @@ window.getTerminalBuffer = function(lines = 50) {
 
 /**
  * 获取当前激活编辑器的文件信息和光标上下文
- * @param {number} contextLines - 光标前后获取多少行（默认10行）
+ * @param {number} contextLines - 光标前后获取多少行（默认100行）
  * @returns {object|null} { filePath, fileName, cursor, content, ... }
  */
-window.getEditorContext = function(contextLines = 10) {
+window.getEditorContext = function(contextLines = 100) {
     try {
         // 获取当前激活的编辑器pane
         const activeEditorPane = document.querySelector('.editor-pane.active');
@@ -723,20 +723,50 @@ window.getEditorContext = function(contextLines = 10) {
             return null;
         }
         
-        // 获取光标位置
+        // 获取光标位置和选中范围
         const position = editor.getPosition();
+        const selection = editor.getSelection();
         const model = editor.getModel();
         const lineCount = model.getLineCount();
         
-        // 获取光标周围的代码上下文
-        const startLine = Math.max(1, position.lineNumber - contextLines);
-        const endLine = Math.min(lineCount, position.lineNumber + contextLines);
-        const contextCodeLines = [];
+        let contextCodeLines = [];
+        let isFullFile = false;
+        let isSelection = false;
+        let selectionRange = null;
         
-        for (let i = startLine; i <= endLine; i++) {
-            const lineText = model.getLineContent(i);
-            const prefix = i === position.lineNumber ? '→ ' : '  ';
-            contextCodeLines.push(`${prefix}${i}: ${lineText}`);
+        // 优先级1: 检查是否有选中内容
+        if (selection && !selection.isEmpty()) {
+            isSelection = true;
+            const startLine = selection.startLineNumber;
+            const endLine = selection.endLineNumber;
+            selectionRange = { start: startLine, end: endLine };
+            
+            // 发送选中的行
+            for (let i = startLine; i <= endLine; i++) {
+                const lineText = model.getLineContent(i);
+                const prefix = '✓ ';  // 选中标记
+                contextCodeLines.push(`${prefix}${i}: ${lineText}`);
+            }
+        }
+        // 优先级2: 小文件发送完整内容
+        else if (lineCount <= 200) {
+            isFullFile = true;
+            for (let i = 1; i <= lineCount; i++) {
+                const lineText = model.getLineContent(i);
+                const prefix = i === position.lineNumber ? '→ ' : '  ';
+                contextCodeLines.push(`${prefix}${i}: ${lineText}`);
+            }
+        }
+        // 优先级3: 大文件发送光标周围
+        else {
+            const startLine = Math.max(1, position.lineNumber - contextLines);
+            const endLine = Math.min(lineCount, position.lineNumber + contextLines);
+            
+            for (let i = startLine; i <= endLine; i++) {
+                const lineText = model.getLineContent(i);
+                const prefix = i === position.lineNumber ? '→ ' : '  ';
+                contextCodeLines.push(`${prefix}${i}: ${lineText}`);
+            }
         }
         
         // 获取当前行内容
@@ -752,6 +782,9 @@ window.getEditorContext = function(contextLines = 10) {
             currentLine: currentLineText,
             contextContent: contextCodeLines.join('\n'),
             totalLines: lineCount,
+            isFullFile: isFullFile,      // 标记是否为完整文件
+            isSelection: isSelection,    // 标记是否为选中内容
+            selectionRange: selectionRange,  // 选中范围
             language: getFileLanguage(fileName)
         };
     } catch (error) {
@@ -1009,8 +1042,8 @@ async function streamChat(sessionId, message, thinkingId) {
         let messageElement = null;
         
         // 收集上下文信息
-        const terminalInfo = window.getTerminalBuffer(200);  // 增加到200行
-        const editorInfo = window.getEditorContext(10);
+        const terminalInfo = window.getTerminalBuffer(200);  // 终端200行
+        const editorInfo = window.getEditorContext(100);     // 编辑器前后100行
         
         // 构建payload
         const payload = {
@@ -1027,22 +1060,39 @@ async function streamChat(sessionId, message, thinkingId) {
         
         // 如果有编辑器信息，添加指针信息
         if (editorInfo) {
-            // 构建指针信息文本
+            // 构建范围信息文本
+            let rangeInfo;
+            let contextType;
+            
+            if (editorInfo.isSelection) {
+                // 选中内容 - 优先级最高
+                rangeInfo = `内容类型: 用户选中内容 ✓\n选中范围: 第${editorInfo.selectionRange.start}-${editorInfo.selectionRange.end}行 (共${editorInfo.selectionRange.end - editorInfo.selectionRange.start + 1}行)\n总行数: ${editorInfo.totalLines}`;
+                contextType = `选中${editorInfo.selectionRange.end - editorInfo.selectionRange.start + 1}行`;
+            } else if (editorInfo.isFullFile) {
+                // 完整文件 - 小文件
+                rangeInfo = `内容类型: 完整文件\n文件行数: ${editorInfo.totalLines}`;
+                contextType = '完整文件';
+            } else {
+                // 光标周围 - 大文件
+                rangeInfo = `内容类型: 光标周围上下文\n显示范围: 第${Math.max(1, editorInfo.cursor.line - 100)}-${Math.min(editorInfo.totalLines, editorInfo.cursor.line + 100)}行\n总行数: ${editorInfo.totalLines}`;
+                contextType = '光标前后100行';
+            }
+            
             payload.cursor_info = 
                 `文件: ${editorInfo.fileName}\n` +
                 `路径: ${editorInfo.filePath}\n` +
                 `语言: ${editorInfo.language}\n` +
+                `${rangeInfo}\n` +
                 `光标位置: 行 ${editorInfo.cursor.line}, 列 ${editorInfo.cursor.column}\n` +
-                `总行数: ${editorInfo.totalLines}\n` +
                 `当前行: ${editorInfo.currentLine}\n\n` +
-                `代码上下文:\n${editorInfo.contextContent}`;
+                `代码内容:\n${editorInfo.contextContent}`;
             
             // 如果没有终端信息，使用编辑器的来源信息
             if (!terminalInfo) {
                 payload.source_info = `编辑器 - ${editorInfo.filePath}`;
             }
             
-            console.log(`📝 编辑器上下文 - ${editorInfo.fileName}, 光标在 ${editorInfo.cursor.line}:${editorInfo.cursor.column}`);
+            console.log(`📝 编辑器上下文 - ${editorInfo.fileName}, ${contextType}, 光标在 ${editorInfo.cursor.line}:${editorInfo.cursor.column}`);
         }
         
         console.log('📤 发送消息:', {
@@ -1241,12 +1291,8 @@ function createMessageElement(role, content, reasoning = null, messageId = null)
         const actionsDiv = document.createElement('div');
         actionsDiv.className = 'message-actions';
         actionsDiv.innerHTML = `
-            <button class="message-action-btn" onclick="startEditMessage(${messageId})" title="编辑">
-                <i class="fa-solid fa-pen"></i>
-            </button>
-            <button class="message-action-btn" onclick="confirmRevokeMessage(${messageId})" title="撤回">
-                <i class="fa-solid fa-rotate-left"></i>
-            </button>
+            <button class="message-action-btn" onclick="startEditMessage(${messageId})" title="编辑">✏️</button>
+            <button class="message-action-btn" onclick="confirmRevokeMessage(${messageId})" title="撤回">↩️</button>
         `;
         contentWrapper.appendChild(actionsDiv);
     }
@@ -1383,12 +1429,20 @@ function formatMessageContent(content) {
         const escapedCode = escapeHtml(code.trim());
         const codeId = 'code-' + Math.random().toString(36).substr(2, 9);
         const placeholder = `__CODEBLOCK_${codeBlocks.length}__`;
+        const isBash = lang === 'bash' || lang === 'sh' || lang === 'shell';
+        const executeBtn = isBash ? `<button class="code-execute-btn" onclick="executeCode('${codeId}')" title="在终端执行">
+                    <i class="fa-solid fa-play"></i>
+                </button>` : '';
+        
         codeBlocks.push(`<div class="code-block">
             <div class="code-header">
                 <span class="code-lang">${lang || 'text'}</span>
-                <button class="code-copy-btn" onclick="copyCode('${codeId}')" title="复制代码">
-                    <i class="fa-solid fa-copy"></i>
-                </button>
+                <div class="code-actions">
+                    ${executeBtn}
+                    <button class="code-copy-btn" onclick="copyCode('${codeId}', event)" title="复制代码">
+                        <i class="fa-solid fa-copy"></i>
+                    </button>
+                </div>
             </div>
             <pre><code id="${codeId}" class="language-${lang || 'text'}">${escapedCode}</code></pre>
         </div>`);
@@ -1457,26 +1511,65 @@ function formatMessageContent(content) {
 }
 
 // 复制代码
-window.copyCode = function(codeId) {
+window.copyCode = function(codeId, event) {
     const codeElement = document.getElementById(codeId);
     if (!codeElement) return;
     
     const text = codeElement.textContent;
     navigator.clipboard.writeText(text).then(() => {
         // 显示复制成功提示
-        const btn = event.target.closest('.code-copy-btn');
-        if (btn) {
-            const originalHTML = btn.innerHTML;
-            btn.innerHTML = '<i class="fa-solid fa-check"></i>';
-            btn.style.color = '#10b981';
-            setTimeout(() => {
-                btn.innerHTML = originalHTML;
-                btn.style.color = '';
-            }, 2000);
+        if (event) {
+            const btn = event.target.closest('.code-copy-btn');
+            if (btn) {
+                const originalHTML = btn.innerHTML;
+                btn.innerHTML = '<i class="fa-solid fa-check"></i>';
+                btn.style.color = '#10b981';
+                setTimeout(() => {
+                    btn.innerHTML = originalHTML;
+                    btn.style.color = '';
+                }, 2000);
+            }
         }
     }).catch(err => {
         console.error('复制失败:', err);
     });
+};
+
+/**
+ * 执行代码到终端
+ */
+window.executeCode = function(codeId) {
+    const codeElement = document.getElementById(codeId);
+    if (!codeElement) return;
+    
+    const command = codeElement.textContent.trim();
+    
+    // 获取当前激活的终端
+    const activeTerminal = document.querySelector('.terminal-pane.active');
+    if (!activeTerminal) {
+        alert('请先打开一个终端');
+        return;
+    }
+    
+    const sessionId = activeTerminal.id;
+    const session = state.terminals.get(sessionId);
+    
+    if (!session || !session.ws || session.ws.readyState !== WebSocket.OPEN) {
+        alert('终端未连接');
+        return;
+    }
+    
+    // 发送命令到终端
+    session.ws.send(command + '\r');
+    
+    // 视觉反馈
+    console.log('✅ 已执行命令:', command);
+    
+    // 可选：切换到终端标签
+    const terminalTab = document.querySelector(`.content-tab-item[data-session-id="${sessionId}"]`);
+    if (terminalTab && window.switchToTerminal) {
+        window.switchToTerminal(sessionId);
+    }
 };
 
 // 滚动到底部

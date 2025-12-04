@@ -307,8 +307,12 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 						if sourceInfo != "" && realTimeInfo == "" {
 							contextParts = append(contextParts, "**来源**: "+sourceInfo+"\n\n")
 						}
-						contextParts = append(contextParts, "**说明**: 这是系统自动捕获的用户编辑器实时状态，包含当前光标位置和周围代码上下文（前后10行），箭头(→)标记光标所在行。\n\n")
-						contextParts = append(contextParts, "**代码上下文**:\n```\n"+cursorInfo+"\n```")
+						contextParts = append(contextParts, "**说明**: 这是系统自动捕获的用户编辑器实时状态。内容类型有三种优先级：\n")
+						contextParts = append(contextParts, "1. **用户选中内容** (最高优先级，标记✓) - 用户明确选中的代码段\n")
+						contextParts = append(contextParts, "2. **完整文件** - 文件≤200行时发送全部内容\n")
+						contextParts = append(contextParts, "3. **光标周围上下文** - 文件>200行时发送光标前后100行\n")
+						contextParts = append(contextParts, "\n箭头(→)标记光标所在行。详细信息见下方代码块。\n\n")
+						contextParts = append(contextParts, "**代码信息**:\n```\n"+cursorInfo+"\n```")
 						log.Printf("📝 编辑器上下文已注入用户消息")
 					}
 
