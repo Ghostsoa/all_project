@@ -401,33 +401,47 @@ window.showAddConfigForm = async function() {
 // 加载配置表单的选项
 async function loadConfigFormOptions() {
     try {
-        // 加载模型列表
-        if (currentModels.length === 0) {
-            const modelsData = await apiRequest('/api/ai/models');
-            currentModels = modelsData.data || [];
-        }
+        // 强制重新加载模型列表（确保是最新的）
+        const modelsData = await apiRequest('/api/ai/models');
+        currentModels = modelsData.data || [];
 
-        // 加载接口列表
-        if (currentEndpoints.length === 0) {
-            const endpointsData = await apiRequest('/api/ai/endpoints');
-            currentEndpoints = endpointsData.data || [];
-        }
+        // 强制重新加载接口列表（确保是最新的）
+        const endpointsData = await apiRequest('/api/ai/endpoints');
+        currentEndpoints = endpointsData.data || [];
+
+        // 过滤启用的模型
+        const activeModels = currentModels.filter(m => m.is_active);
+        const activeEndpoints = currentEndpoints.filter(e => e.is_active);
 
         // 填充模型下拉框
         const modelSelect = document.getElementById('configModelId');
-        modelSelect.innerHTML = '<option value="">请选择模型</option>' +
-            currentModels.filter(m => m.is_active).map(m =>
-                `<option value="${m.id}">${escapeHtml(m.display_name || m.name)}</option>`
-            ).join('');
+        if (activeModels.length === 0) {
+            modelSelect.innerHTML = '<option value="">暂无可用模型，请先添加并启用模型</option>';
+        } else {
+            modelSelect.innerHTML = '<option value="">请选择模型</option>' +
+                activeModels.map(m =>
+                    `<option value="${m.id}">${escapeHtml(m.display_name || m.name)}</option>`
+                ).join('');
+        }
 
         // 填充接口下拉框
         const endpointSelect = document.getElementById('configEndpointId');
-        endpointSelect.innerHTML = '<option value="">请选择接口</option>' +
-            currentEndpoints.filter(e => e.is_active).map(e =>
-                `<option value="${e.id}">${escapeHtml(e.name)}</option>`
-            ).join('');
+        if (activeEndpoints.length === 0) {
+            endpointSelect.innerHTML = '<option value="">暂无可用接口，请先添加并启用接口</option>';
+        } else {
+            endpointSelect.innerHTML = '<option value="">请选择接口</option>' +
+                activeEndpoints.map(e =>
+                    `<option value="${e.id}">${escapeHtml(e.name)}</option>`
+                ).join('');
+        }
+
+        // 如果没有可用选项，给用户提示
+        if (activeModels.length === 0 || activeEndpoints.length === 0) {
+            alert('提示：请先在"AI模型"和"API接口"标签页中添加并启用至少一个模型和一个接口。');
+        }
     } catch (error) {
         console.error('加载选项失败:', error);
+        alert('加载选项失败: ' + error.message);
     }
 }
 
@@ -461,16 +475,29 @@ window.closeConfigForm = function() {
 // 保存配置
 window.saveConfig = async function() {
     const id = document.getElementById('configId').value;
-    const modelId = parseInt(document.getElementById('configModelId').value);
-    const endpointId = parseInt(document.getElementById('configEndpointId').value);
+    const modelIdValue = document.getElementById('configModelId').value;
+    const endpointIdValue = document.getElementById('configEndpointId').value;
 
-    // 验证必填字段
-    if (!modelId || isNaN(modelId)) {
+    // 验证必填字段 - 空字符串或未选择
+    if (!modelIdValue || modelIdValue === '') {
         alert('请选择AI模型');
         return;
     }
-    if (!endpointId || isNaN(endpointId)) {
+    if (!endpointIdValue || endpointIdValue === '') {
         alert('请选择API接口');
+        return;
+    }
+
+    const modelId = parseInt(modelIdValue);
+    const endpointId = parseInt(endpointIdValue);
+
+    // 再次验证转换后的值
+    if (isNaN(modelId) || modelId <= 0) {
+        alert('模型ID无效，请重新选择');
+        return;
+    }
+    if (isNaN(endpointId) || endpointId <= 0) {
+        alert('接口ID无效，请重新选择');
         return;
     }
 
