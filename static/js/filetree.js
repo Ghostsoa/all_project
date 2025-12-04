@@ -106,14 +106,31 @@ function toggleHiddenFiles() {
     
     setShowHiddenFiles(checked);
     
-    // 清除缓存，重新加载当前目录
     if (currentSessionID && currentPath) {
-        console.log('🗑️ 清除缓存并重新加载');
-        fileCache.cache.clear();
-        loadDirectory(currentPath);
+        // 立即后台静默刷新（不清除缓存，使用stale-while-revalidate）
+        console.log('🔄 静默刷新文件树...');
+        const key = fileCache.makeKey(currentSessionID, currentPath);
+        
+        // 如果有缓存，先用缓存数据过滤显示
+        if (fileCache.cache.has(key)) {
+            const cached = fileCache.cache.get(key);
+            const filteredFiles = filterHiddenFiles(cached.data, checked);
+            renderFileTree(filteredFiles, currentPath);
+        }
+        
+        // 后台静默刷新新数据
+        fileCache.revalidateInBackground(currentSessionID, currentPath, key);
     } else {
         console.warn('⚠️ 未连接服务器或无当前路径，无法重新加载');
     }
+}
+
+// 过滤隐藏文件
+function filterHiddenFiles(files, showHidden) {
+    if (showHidden) {
+        return files; // 显示所有
+    }
+    return files.filter(file => !file.name.startsWith('.')); // 隐藏.开头的
 }
 
 export function setCurrentServer(serverID, sessionID) {
