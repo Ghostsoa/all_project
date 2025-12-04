@@ -360,7 +360,9 @@ window.switchTab = function(sessionId) {
                 setLocalTerminal();
             } else {
                 // SSH终端
-                setCurrentServer(session.server.ID, sessionId);
+                // 首次切换到此服务器时强制刷新（不使用缓存）
+                const isFirstTime = !serverContentTabs.has(sessionId);
+                setCurrentServer(session.server.ID, sessionId, isFirstTime);
             }
         }
     }
