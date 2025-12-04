@@ -14,7 +14,6 @@
 .sidebar-header {
     padding: 16px;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    position: relative;
 }
 
 .btn-add-server {
@@ -312,29 +311,54 @@
 
 /* ========== 侧边栏折叠状态 ========== */
 
-/* 折叠切换按钮 */
+/* 底部折叠按钮容器 */
+.sidebar-footer {
+    padding: 12px 16px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* 汉堡菜单按钮 */
 .sidebar-toggle {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    background: rgba(255, 255, 255, 0.08);
+    width: 100%;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 6px;
-    width: 32px;
-    height: 32px;
+    border-radius: 8px;
     display: flex;
     align-items: center;
     justify-content: center;
+    gap: 8px;
     cursor: pointer;
-    color: rgba(255, 255, 255, 0.6);
-    font-size: 16px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 12px;
     transition: all 0.2s;
-    z-index: 10;
 }
 
 .sidebar-toggle:hover {
-    background: rgba(255, 255, 255, 0.15);
+    background: rgba(255, 255, 255, 0.1);
     color: rgba(255, 255, 255, 0.9);
+}
+
+/* 汉堡图标 */
+.toggle-icon {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    width: 16px;
+}
+
+.toggle-icon span {
+    display: block;
+    width: 100%;
+    height: 2px;
+    background: currentColor;
+    border-radius: 1px;
+    transition: all 0.3s;
+}
+
+/* 折叠文本 */
+.toggle-text {
+    font-weight: 500;
 }
 
 /* 折叠状态下的侧边栏 */
@@ -344,6 +368,8 @@
 
 .sidebar.collapsed .sidebar-header {
     padding: 8px;
+    display: flex;
+    justify-content: center;
 }
 
 .sidebar.collapsed .btn-add-server {
@@ -363,6 +389,8 @@
 
 .sidebar.collapsed .local-terminal-btn {
     padding: 8px;
+    display: flex;
+    justify-content: center;
 }
 
 .sidebar.collapsed .btn-local-terminal {
@@ -380,6 +408,28 @@
     display: none;
 }
 
+/* 折叠状态下的底部按钮 */
+.sidebar.collapsed .sidebar-footer {
+    padding: 8px;
+    display: flex;
+    justify-content: center;
+}
+
+.sidebar.collapsed .sidebar-toggle {
+    width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: 50%;
+}
+
+.sidebar.collapsed .toggle-text {
+    display: none;
+}
+
+.sidebar.collapsed .toggle-icon {
+    margin: 0;
+}
+
 .sidebar.collapsed .search-box {
     display: none;
 }
@@ -387,10 +437,14 @@
 .sidebar.collapsed .server-list {
     padding: 8px;
     gap: 8px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
 }
 
 .sidebar.collapsed .server-item {
     padding: 0;
+    width: 44px;
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -467,9 +521,4 @@
 .btn-add-server-text,
 .btn-local-terminal-text {
     display: inline;
-}
-
-.sidebar.collapsed .sidebar-toggle {
-    right: 8px;
-    top: 8px;
 }

@@ -79,20 +79,18 @@ window.toggleServerExpand = function(serverId) {
 window.toggleSidebar = function() {
     const sidebar = document.querySelector('.sidebar');
     const mainContainer = document.querySelector('.main-container');
-    const toggleBtn = document.querySelector('.sidebar-toggle');
+    const toggleText = document.querySelector('.toggle-text');
     
     sidebar.classList.toggle('collapsed');
     mainContainer.classList.toggle('sidebar-collapsed');
     
-    // 切换箭头方向
+    // 切换文本
     if (sidebar.classList.contains('collapsed')) {
-        toggleBtn.textContent = '▶';
-        toggleBtn.title = '展开';
+        if (toggleText) toggleText.textContent = '展开';
         // 保存折叠状态到localStorage
         localStorage.setItem('sidebarCollapsed', 'true');
     } else {
-        toggleBtn.textContent = '◀';
-        toggleBtn.title = '折叠';
+        if (toggleText) toggleText.textContent = '折叠';
         localStorage.setItem('sidebarCollapsed', 'false');
     }
 };
@@ -103,12 +101,11 @@ document.addEventListener('DOMContentLoaded', function() {
     if (collapsed) {
         const sidebar = document.querySelector('.sidebar');
         const mainContainer = document.querySelector('.main-container');
-        const toggleBtn = document.querySelector('.sidebar-toggle');
+        const toggleText = document.querySelector('.toggle-text');
         
         sidebar.classList.add('collapsed');
         mainContainer.classList.add('sidebar-collapsed');
-        toggleBtn.textContent = '▶';
-        toggleBtn.title = '展开';
+        if (toggleText) toggleText.textContent = '展开';
     }
 });
 

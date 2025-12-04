@@ -34,11 +34,6 @@
     <div class="main-container">
         <!-- 左侧服务器列表 -->
         <div class="sidebar">
-            <!-- 折叠切换按钮 -->
-            <div class="sidebar-toggle" onclick="toggleSidebar()" title="折叠/展开">
-                ◀
-            </div>
-            
             <div class="sidebar-header">
                 <button class="btn-add-server" onclick="showAddServerModal()">
                     <span>➕</span>
@@ -56,6 +51,18 @@
             </div>
             <div class="server-list" id="serverList">
                 <div class="loading">加载中...</div>
+            </div>
+            
+            <!-- 折叠切换按钮 - 底部 -->
+            <div class="sidebar-footer">
+                <button class="sidebar-toggle" onclick="toggleSidebar()" title="折叠/展开">
+                    <span class="toggle-icon">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </span>
+                    <span class="toggle-text">折叠</span>
+                </button>
             </div>
         </div>
 
