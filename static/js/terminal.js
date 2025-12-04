@@ -180,14 +180,36 @@ function connectLocalTerminal(sessionId) {
     const session = state.terminals.get(sessionId);
     const { term } = session;
     
+    // 如果已有连接且正在连接，则不重复连接
+    if (session.ws && session.ws.readyState === WebSocket.CONNECTING) {
+        console.log('本地终端正在连接，跳过重复连接');
+        return;
+    }
+    
+    // 关闭旧连接
+    if (session.ws) {
+        session.ws.close(1000, 'reconnecting');
+    }
+    
     updateStatusLight('connecting');
     
     const ws = new WebSocket(`${config.WS_PROTOCOL}//${config.WS_HOST}/ws/local`);
     ws.binaryType = 'arraybuffer';
+    session.ws = ws; // 保存连接
+    
+    // 心跳保活
+    let heartbeatInterval;
     
     ws.onopen = async () => {
         session.status = 'connected';
         updateStatusLight('connected');
+        
+        // 启动心跳
+        heartbeatInterval = setInterval(() => {
+            if (ws.readyState === WebSocket.OPEN) {
+                ws.send(new Uint8Array([0])); // 发送空字节保活
+            }
+        }, 30000); // 每30秒一次
         
         // 加载本地文件树
         if (window.setLocalTerminal) {
@@ -208,16 +230,33 @@ function connectLocalTerminal(sessionId) {
     };
     
     ws.onerror = (error) => {
-        console.error('WebSocket 错误:', error);
+        console.error('本地终端 WebSocket 错误:', error);
+        clearInterval(heartbeatInterval); // 清理心跳
         session.status = 'disconnected';
-        updateStatusLight('disconnected');
-        showDisconnectOverlay(sessionId, '连接错误', '本地终端连接失败');
+        updateStatusLight('error');
+        // 本地终端出错，尝试重连
+        setTimeout(() => {
+            console.log('尝试重连本地终端...');
+            connectLocalTerminal(sessionId);
+        }, 2000);
     };
     
-    ws.onclose = () => {
+    ws.onclose = (event) => {
+        console.log('本地终端 WebSocket 关闭:', event.code, event.reason);
+        clearInterval(heartbeatInterval); // 清理心跳
         session.status = 'disconnected';
         updateStatusLight('disconnected');
-        showDisconnectOverlay(sessionId, '连接已断开', '本地终端已关闭');
+        
+        // 如果不是正常关闭（1000），尝试自动重连
+        if (event.code !== 1000 && event.reason !== 'reconnecting') {
+            term.write('\r\n\x1b[33m连接已断开，2秒后自动重连...\x1b[0m\r\n');
+            setTimeout(() => {
+                console.log('自动重连本地终端...');
+                connectLocalTerminal(sessionId);
+            }, 2000);
+        } else if (event.code === 1000 && event.reason !== 'reconnecting') {
+            showDisconnectOverlay(sessionId, '连接已断开', '本地终端已关闭');
+        }
     };
     
     term.onData(data => {
