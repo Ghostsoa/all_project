@@ -316,13 +316,23 @@ async function streamChat(sessionId, message, thinkingId) {
                     // 思维链内容
                     reasoningContent += data.content;
                     
-                    if (messageElement) {
-                        updateReasoningContent(messageElement, reasoningContent);
+                    // 如果还没有消息元素，先创建一个
+                    if (!messageElement) {
+                        messageElement = createMessageElement('assistant', '正在思考...');
                     }
+                    
+                    updateReasoningContent(messageElement, reasoningContent);
+                    scrollToBottom();
                     
                 } else if (data.type === 'done') {
                     // 完成
                     console.log('✅ 对话完成');
+                    
+                    // 如果只有reasoning没有content，清除"正在思考..."
+                    if (messageElement && assistantMessage === '') {
+                        updateMessageContent(messageElement, '');
+                    }
+                    
                     resolve();
                     
                 } else if (data.type === 'error') {
