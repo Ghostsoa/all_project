@@ -623,11 +623,23 @@ export function saveCurrentContentTabsState() {
 
 // 全局函数 - 内容标签切换（只处理文件标签）
 window.switchContentTab = function(id) {
-    const pane = document.querySelector(`.editor-pane[data-tab-id="${id}"]`);
+    // 查找编辑器面板或媒体查看器
+    const pane = document.querySelector(`.editor-pane[data-tab-id="${id}"], .media-viewer[data-tab-id="${id}"]`);
     if (!pane) return;
     
     const filePath = pane.dataset.path;
-    switchToTab(filePath);
+    
+    // 隐藏所有面板
+    document.querySelectorAll('.terminal-pane, .editor-pane, .media-viewer').forEach(p => {
+        p.classList.remove('active');
+    });
+    
+    // 显示选中的面板
+    pane.classList.add('active');
+    
+    // 更新标签状态
+    document.querySelectorAll('.content-tab-item').forEach(t => t.classList.remove('active'));
+    document.querySelector(`.content-tab-item[data-tab-id="${id}"]`)?.classList.add('active');
 };
 
 window.closeContentTab = function(id) {
@@ -649,6 +661,22 @@ window.closeContentTab = function(id) {
             editor.dispose();
             editorInstances.delete(id);
         }
+        
+        if (filePath) {
+            openFiles.delete(filePath);
+        }
+    
+    // 如果是媒体查看器标签
+    } else if (id.startsWith('media-')) {
+        const tab = document.querySelector(`.content-tab-item[data-tab-id="${id}"]`);
+        const pane = document.querySelector(`.media-viewer[data-tab-id="${id}"]`);
+        const filePath = pane?.dataset.path;
+        
+        tab?.remove();
+        pane?.remove();
+        
+        // 清理缩放数据
+        imageZoomData.delete(id);
         
         if (filePath) {
             openFiles.delete(filePath);
@@ -769,8 +797,8 @@ window.openMediaViewer = async function(filePath, serverID, sessionID, mediaType
     });
     tabsList.insertAdjacentHTML('beforeend', tabHTML);
     
-    // 创建媒体查看器面板
-    const contentContainer = document.querySelector('.terminal-wrapper');
+    // 创建媒体查看器面板（插入到content-container，与terminal-pane和editor-pane并列）
+    const contentContainer = document.getElementById('contentContainer');
     const mediaURL = `/api/files/download?session_id=${sessionID}&path=${encodeURIComponent(filePath)}`;
     
     let mediaHTML = '';
