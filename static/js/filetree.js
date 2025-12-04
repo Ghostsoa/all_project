@@ -1224,21 +1224,6 @@ window.cancelUpload = function(taskId) {
     }
 };
 
-// 添加slideOut动画
-const styleSheet = document.styleSheets[0];
-styleSheet.insertRule(`
-    @keyframes slideOut {
-        from {
-            opacity: 1;
-            transform: translateX(0);
-        }
-        to {
-            opacity: 0;
-            transform: translateX(100%);
-        }
-    }
-`, styleSheet.cssRules.length);
-
 // 读取文件为Base64
 function readFileAsBase64(file) {
     return new Promise((resolve, reject) => {
