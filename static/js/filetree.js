@@ -170,20 +170,24 @@ export async function loadDirectory(path, retryCount = 0) {
     } catch (error) {
         console.error('加载目录失败:', error);
         
-        // 如果是SFTP未就绪，且重试次数少于3次，则等待后重试
-        if (error.message && error.message.includes('SSH会话不存在') && retryCount < 3) {
-            console.log(`SFTP未就绪，${1 + retryCount * 0.5}秒后重试 (${retryCount + 1}/3)`);
+        // 如果是SFTP未就绪，且重试次数少于5次，则等待后重试
+        if (error.message && error.message.includes('SSH会话不存在') && retryCount < 5) {
+            const delay = 1500 + retryCount * 1000; // 1.5s, 2.5s, 3.5s, 4.5s, 5.5s
+            console.log(`⏳ SFTP未就绪，${delay/1000}秒后重试 (${retryCount + 1}/5)`);
             fileTreeContainer.innerHTML = `
                 <div class="file-tree-empty">
-                    <p>⏳ 等待连接...</p>
+                    <p>⏳ 等待SFTP连接...</p>
                     <p style="font-size: 10px; margin-top: 8px; color: rgba(255,255,255,0.5);">
-                        正在建立SFTP连接 (${retryCount + 1}/3)
+                        正在建立连接 (${retryCount + 1}/5)
+                    </p>
+                    <p style="font-size: 9px; margin-top: 4px; color: rgba(255,255,255,0.3);">
+                        ${(delay/1000).toFixed(1)}秒后重试...
                     </p>
                 </div>
             `;
             setTimeout(() => {
                 loadDirectory(path, retryCount + 1);
-            }, 1000 + retryCount * 500); // 1s, 1.5s, 2s
+            }, delay);
             return;
         }
         

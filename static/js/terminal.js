@@ -76,12 +76,13 @@ export function connectSSH(sessionId, server) {
         if (!firstDataReceived) {
             firstDataReceived = true;
             
-            // 收到SSH输出后，等待500ms确保SFTP也初始化完成
+            // 收到SSH输出后，等待1.5秒确保SFTP也初始化完成
             if (!fileTreeLoaded && window.setCurrentServer) {
                 fileTreeLoaded = true;
                 setTimeout(() => {
+                    console.log('🔌 SSH已连接，开始加载文件树...');
                     window.setCurrentServer(server.ID, sessionId);
-                }, 500);
+                }, 1500); // 增加到1.5秒
             }
         }
     };
