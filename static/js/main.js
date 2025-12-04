@@ -281,6 +281,12 @@ window.switchTab = function(sessionId) {
     
     console.log(`[切换开始] 从 ${prevSessionId} 切换到 ${sessionId}`);
     
+    // 如果是同一个session，不需要切换
+    if (prevSessionId === sessionId) {
+        console.log('⚠️ 已在当前session，跳过切换');
+        return;
+    }
+    
     // 在修改DOM之前，保存当前服务器的状态
     if (prevSessionId && prevSessionId !== sessionId) {
         const contentTabsList = document.getElementById('contentTabsList');
