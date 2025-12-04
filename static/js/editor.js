@@ -66,6 +66,9 @@ export async function openFileEditor(filePath, serverID, sessionID, fileSize = 0
         if (!confirmed) return;
     }
     
+    // 检查是否为Markdown文件
+    const isMarkdown = filePath.endsWith('.md') || filePath.endsWith('.markdown');
+    
     // 先创建标签页，显示"加载中"
     const tabId = createLoadingTab(filePath, serverID, sessionID);
     
@@ -81,7 +84,11 @@ export async function openFileEditor(filePath, serverID, sessionID, fileSize = 0
         }
         
         // 加载成功，创建编辑器
-        initializeEditor(tabId, filePath, data.content);
+        if (isMarkdown) {
+            initializeMarkdownEditor(tabId, filePath, data.content);
+        } else {
+            initializeEditor(tabId, filePath, data.content);
+        }
     } catch (error) {
         console.error('打开文件失败:', error);
         showToast('打开文件失败', 'error');
@@ -135,6 +142,153 @@ function createLoadingTab(filePath, serverID, sessionID) {
     
     return tabId;
 }
+
+function initializeMarkdownEditor(tabId, filePath, content) {
+    const container = document.getElementById(tabId);
+    container.classList.remove('loading');
+    container.innerHTML = ''; // 清空加载提示
+    
+    const fileInfo = openFiles.get(filePath);
+    if (!fileInfo) return;
+    
+    fileInfo.loading = false;
+    fileInfo.viewMode = 'split'; // 默认分屏模式：edit, preview, split
+    
+    // 更新工具栏，添加模式切换按钮
+    const toolbar = document.querySelector(`[data-tab-id="${tabId}"] .editor-toolbar`);
+    if (toolbar) {
+        toolbar.innerHTML = `
+            <span class="editor-path">${filePath}</span>
+            <div class="markdown-toolbar">
+                <button class="mode-btn active" data-mode="edit" onclick="window.switchMarkdownMode('${tabId}', 'edit')" title="编辑模式">
+                    📝 编辑
+                </button>
+                <button class="mode-btn active" data-mode="split" onclick="window.switchMarkdownMode('${tabId}', 'split')" title="分屏模式">
+                    🔀 分屏
+                </button>
+                <button class="mode-btn" data-mode="preview" onclick="window.switchMarkdownMode('${tabId}', 'preview')" title="预览模式">
+                    👁️ 预览
+                </button>
+                <button class="editor-save-btn" onclick="window.saveFile('${tabId}')">💾 保存 (Ctrl+S)</button>
+            </div>
+        `;
+    }
+    
+    // 创建分屏容器
+    container.innerHTML = `
+        <div class="markdown-container split-mode">
+            <div class="markdown-editor-pane" id="${tabId}-editor"></div>
+            <div class="markdown-preview-pane" id="${tabId}-preview"></div>
+        </div>
+    `;
+    
+    // 配置marked
+    if (window.marked) {
+        marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && window.hljs && window.hljs.getLanguage(lang)) {
+                    return window.hljs.highlight(code, { language: lang }).value;
+                }
+                return code;
+            },
+            breaks: true,
+            gfm: true
+        });
+    }
+    
+    // 初始化Monaco编辑器
+    const fileName = filePath.split('/').pop();
+    require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+    require(['vs/editor/editor.main'], function() {
+        const editor = monaco.editor.create(document.getElementById(`${tabId}-editor`), {
+            value: content,
+            language: 'markdown',
+            theme: 'vs-dark',
+            automaticLayout: true,
+            fontSize: 13,
+            minimap: { enabled: false }, // Markdown不需要minimap
+            wordWrap: 'on',
+            lineNumbers: 'on'
+        });
+        
+        // 保存编辑器实例
+        editorInstances.set(tabId, editor);
+        
+        // 初始渲染预览
+        updateMarkdownPreview(tabId, content);
+        
+        // 实时更新预览（防抖）
+        let updateTimeout;
+        editor.getModel().onDidChangeContent(() => {
+            clearTimeout(updateTimeout);
+            updateTimeout = setTimeout(() => {
+                updateMarkdownPreview(tabId, editor.getValue());
+                markAsModified(tabId);
+            }, 300);
+        });
+        
+        // Ctrl+S保存
+        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
+            window.saveFile(tabId);
+        });
+    });
+}
+
+function updateMarkdownPreview(tabId, markdown) {
+    const previewPane = document.getElementById(`${tabId}-preview`);
+    if (!previewPane) return;
+    
+    if (window.marked) {
+        const html = marked.parse(markdown);
+        previewPane.innerHTML = `<div class="markdown-body">${html}</div>`;
+        
+        // 高亮代码块
+        if (window.hljs) {
+            previewPane.querySelectorAll('pre code').forEach((block) => {
+                window.hljs.highlightElement(block);
+            });
+        }
+    } else {
+        previewPane.innerHTML = `<div class="markdown-body"><pre>${markdown}</pre></div>`;
+    }
+}
+
+// 切换Markdown模式
+window.switchMarkdownMode = function(tabId, mode) {
+    const fileInfo = Array.from(openFiles.values()).find(f => f.tabId === tabId);
+    if (!fileInfo) return;
+    
+    fileInfo.viewMode = mode;
+    
+    const container = document.querySelector(`[data-tab-id="${tabId}"] .markdown-container`);
+    const toolbar = document.querySelector(`[data-tab-id="${tabId}"] .markdown-toolbar`);
+    
+    if (!container || !toolbar) return;
+    
+    // 更新按钮状态
+    toolbar.querySelectorAll('.mode-btn').forEach(btn => {
+        btn.classList.remove('active');
+        if (btn.dataset.mode === mode) {
+            btn.classList.add('active');
+        }
+    });
+    
+    // 切换模式
+    container.className = 'markdown-container';
+    if (mode === 'edit') {
+        container.classList.add('edit-mode');
+    } else if (mode === 'preview') {
+        container.classList.add('preview-mode');
+    } else {
+        container.classList.add('split-mode');
+    }
+    
+    // 刷新编辑器布局
+    const editor = editorInstances.get(tabId);
+    if (editor && mode !== 'preview') {
+        setTimeout(() => editor.layout(), 10);
+    }
+};
 
 function initializeEditor(tabId, filePath, content) {
     const container = document.getElementById(tabId);
