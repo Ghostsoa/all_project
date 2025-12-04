@@ -768,17 +768,29 @@ window.handleAIInputKeydown = function(event) {
 
 // 切换历史下拉菜单
 window.toggleHistoryDropdown = function() {
+    alert('toggleHistoryDropdown 被调用了！');
+    console.log('🔄 toggleHistoryDropdown 被调用');
     const menu = document.getElementById('historyDropdownMenu');
     const trigger = document.querySelector('.history-trigger');
     
-    if (!menu) return;
+    console.log('📋 menu:', menu);
+    console.log('📋 menu.style.display:', menu?.style.display);
+    
+    if (!menu) {
+        console.error('❌ historyDropdownMenu 元素未找到');
+        alert('菜单元素未找到！');
+        return;
+    }
     
     const isOpen = menu.style.display === 'block';
+    console.log('📋 isOpen:', isOpen);
     
     if (isOpen) {
+        console.log('🔽 关闭下拉菜单');
         menu.style.display = 'none';
         if (trigger) trigger.classList.remove('open');
     } else {
+        console.log('🔼 打开下拉菜单');
         menu.style.display = 'block';
         if (trigger) trigger.classList.add('open');
     }
