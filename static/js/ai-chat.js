@@ -11,6 +11,7 @@ let sessions = [];
 let availableConfigs = []; // 可用的AI配置列表
 let chatWSHeartbeatInterval = null; // 心跳定时器
 let isReconnecting = false; // 重连标志
+let isGenerating = false; // 是否正在生成
 
 // ========== Loading 控制 ==========
 
@@ -759,6 +760,51 @@ async function attemptReconnect(retries = 3) {
     console.error('❌ 重连失败，已达最大重试次数');
 }
 
+// ========== 按钮状态管理 ==========
+
+/**
+ * 显示停止按钮，隐藏发送按钮
+ */
+function showStopButton() {
+    const stopBtn = document.getElementById('stopGenerateBtn');
+    const sendBtn = document.getElementById('sendAIBtn');
+    if (stopBtn) stopBtn.style.display = 'flex';
+    if (sendBtn) sendBtn.style.display = 'none';
+    isGenerating = true;
+}
+
+/**
+ * 隐藏停止按钮，显示发送按钮
+ */
+function hideStopButton() {
+    const stopBtn = document.getElementById('stopGenerateBtn');
+    const sendBtn = document.getElementById('sendAIBtn');
+    if (stopBtn) stopBtn.style.display = 'none';
+    if (sendBtn) sendBtn.style.display = 'flex';
+    isGenerating = false;
+}
+
+/**
+ * 停止AI生成
+ */
+window.stopAIGeneration = function() {
+    if (!isGenerating) return;
+    
+    if (chatWebSocket && chatWebSocket.readyState === WebSocket.OPEN) {
+        try {
+            chatWebSocket.send(JSON.stringify({
+                type: 'stop',
+                session_id: currentSession?.ID
+            }));
+            console.log('⏹️ 已发送停止信号');
+        } catch (error) {
+            console.error('发送停止信号失败:', error);
+        }
+    }
+    
+    hideStopButton();
+};
+
 // ========== 消息发送 ==========
 
 // 发送AI消息
@@ -785,6 +831,9 @@ window.sendAIMessage = async function() {
     // 显示思考中状态
     const thinkingId = showThinking();
     
+    // 显示停止按钮
+    showStopButton();
+    
     try {
         // 建立WebSocket连接进行流式对话
         await streamChat(currentSession.ID, message, thinkingId);
@@ -792,6 +841,9 @@ window.sendAIMessage = async function() {
         console.error('发送消息失败:', error);
         removeThinking(thinkingId);
         appendMessage('assistant', '抱歉，发生了错误: ' + error.message);
+    } finally {
+        // 隐藏停止按钮
+        hideStopButton();
     }
 };
 
@@ -930,6 +982,21 @@ async function streamChat(sessionId, message, thinkingId) {
                     }
                     
                     // 清理可能残留的thinking元素
+                    removeThinking(thinkingId);
+                    
+                    resolve();
+                    
+                } else if (data.type === 'stopped') {
+                    // 停止生成
+                    console.log('⏹️ 生成已停止');
+                    
+                    // 在消息末尾添加停止标记
+                    if (messageElement) {
+                        const currentContent = assistantMessage || '';
+                        updateMessageContent(messageElement, currentContent + '\n\n_[生成已停止]_');
+                    }
+                    
+                    // 清理thinking元素
                     removeThinking(thinkingId);
                     
                     resolve();

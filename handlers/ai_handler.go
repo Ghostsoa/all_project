@@ -138,8 +138,39 @@ func (h *AIHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
+	// 用于停止生成的channel
+	stopChan := make(chan bool, 1)
+	defer close(stopChan)
+
+	// 启动一个goroutine监听停止信号
+	go func() {
+		for {
+			var req struct {
+				Type      string `json:"type"`
+				SessionID uint   `json:"session_id"`
+			}
+			if err := conn.ReadJSON(&req); err != nil {
+				return
+			}
+
+			if req.Type == "stop" {
+				log.Printf("⏹️ [AI] 收到停止信号 - SessionID: %d", req.SessionID)
+				select {
+				case stopChan <- true:
+				default:
+				}
+				return
+			}
+
+			if req.Type == "ping" {
+				conn.WriteJSON(map[string]string{"type": "pong"})
+			}
+		}
+	}()
+
 	for {
 		var req struct {
+			Type         string `json:"type"`
 			SessionID    uint   `json:"session_id"`
 			Message      string `json:"message"`
 			RealTimeInfo string `json:"real_time_info,omitempty"` // 实时信息（如终端缓冲区）
@@ -150,6 +181,17 @@ func (h *AIHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 		if err := conn.ReadJSON(&req); err != nil {
 			log.Printf("读取消息失败: %v", err)
 			break
+		}
+
+		// 处理心跳
+		if req.Type == "ping" {
+			conn.WriteJSON(map[string]string{"type": "pong"})
+			continue
+		}
+
+		// 忽略stop消息（已在goroutine中处理）
+		if req.Type == "stop" {
+			continue
 		}
 
 		log.Printf("📥 [AI] 收到消息 - SessionID: %d, Message: %s", req.SessionID, req.Message)
@@ -183,8 +225,8 @@ func (h *AIHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("✅ 用户消息已保存 - ID: %d, Content: %s", userMsg.ID, userMsg.Content)
 
-		// 处理对话（传递上下文信息）
-		if err := h.processChat(conn, session, req.RealTimeInfo, req.CursorInfo, req.SourceInfo); err != nil {
+		// 处理对话（传递上下文信息和停止channel）
+		if err := h.processChat(conn, session, req.RealTimeInfo, req.CursorInfo, req.SourceInfo, stopChan); err != nil {
 			h.sendError(conn, fmt.Sprintf("处理对话失败: %v", err))
 			continue
 		}
@@ -195,8 +237,22 @@ func (h *AIHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 }
 
 // processChat 处理对话逻辑（支持工具调用循环）
-func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSession, realTimeInfo, cursorInfo, sourceInfo string) error {
+func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSession, realTimeInfo, cursorInfo, sourceInfo string, stopChan <-chan bool) error {
 	config := session.Config
+
+	// 创建可取消的context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	// 监听停止信号
+	go func() {
+		select {
+		case <-stopChan:
+			log.Println("⏹️ 收到停止信号，取消生成")
+			cancel()
+		case <-ctx.Done():
+		}
+	}()
 
 	// 配置OpenAI客户端
 	clientConfig := openai.DefaultConfig(config.Endpoint.APIKey)
@@ -305,8 +361,8 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 		}
 		log.Printf("====================================================")
 
-		// 创建流式请求
-		stream, err := client.CreateChatCompletionStream(context.Background(), apiRequest)
+		// 创建流式请求（使用可取消的context）
+		stream, err := client.CreateChatCompletionStream(ctx, apiRequest)
 
 		if err != nil {
 			return fmt.Errorf("创建流式请求失败: %w", err)
@@ -317,13 +373,28 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 		var fullContent strings.Builder
 		var fullReasoning strings.Builder
 		var toolCalls []openai.ToolCall
+		stopped := false
 
 		for {
+			// 检查是否被取消
+			select {
+			case <-ctx.Done():
+				log.Println("⏹️ 生成已被取消")
+				stopped = true
+				goto SaveAndExit
+			default:
+			}
+
 			response, err := stream.Recv()
 			if err == io.EOF {
 				break
 			}
 			if err != nil {
+				// 如果是context取消导致的错误，不视为失败
+				if ctx.Err() != nil {
+					stopped = true
+					goto SaveAndExit
+				}
 				return fmt.Errorf("接收流式响应失败: %w", err)
 			}
 
@@ -361,11 +432,31 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 			}
 		}
 
+	SaveAndExit:
 		// 保存助手消息
+		content := fullContent.String()
+
+		// 如果被停止且有工具调用，不保存此消息（避免不配对的tool_calls）
+		if stopped && len(toolCalls) > 0 {
+			log.Println("⚠️ 生成被停止且有未完成的工具调用，不保存此消息避免不配对")
+			h.sendChunk(conn, "stopped", "生成已停止（未完成的工具调用已丢弃）")
+			break
+		}
+
+		if stopped {
+			// 如果被停止但没有工具调用，正常保存内容
+			if content != "" {
+				content += "\n\n[生成已停止]"
+			} else {
+				content = "[生成已停止]"
+			}
+		}
+
+		// 只有在正常完成或被停止但无工具调用时才保存
 		assistantMsg := &models.ChatMessage{
 			SessionID:        session.ID,
 			Role:             "assistant",
-			Content:          fullContent.String(),
+			Content:          content,
 			ToolCalls:        toolCalls,
 			ReasoningContent: fullReasoning.String(),
 		}
@@ -373,6 +464,12 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 			return err
 		}
 		messages = append(messages, assistantMsg)
+
+		// 如果被停止，发送stopped消息
+		if stopped {
+			h.sendChunk(conn, "stopped", "生成已停止")
+			break
+		}
 
 		// 如果没有工具调用，结束循环
 		if len(toolCalls) == 0 {
