@@ -138,35 +138,8 @@ func (h *AIHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 	}
 	defer conn.Close()
 
-	// 用于停止生成的channel
-	stopChan := make(chan bool, 1)
-	defer close(stopChan)
-
-	// 启动一个goroutine监听停止信号
-	go func() {
-		for {
-			var req struct {
-				Type      string `json:"type"`
-				SessionID uint   `json:"session_id"`
-			}
-			if err := conn.ReadJSON(&req); err != nil {
-				return
-			}
-
-			if req.Type == "stop" {
-				log.Printf("⏹️ [AI] 收到停止信号 - SessionID: %d", req.SessionID)
-				select {
-				case stopChan <- true:
-				default:
-				}
-				return
-			}
-
-			if req.Type == "ping" {
-				conn.WriteJSON(map[string]string{"type": "pong"})
-			}
-		}
-	}()
+	// 用于停止生成的channel（在每次对话中创建新的）
+	var currentStopChan chan bool
 
 	for {
 		var req struct {
@@ -189,8 +162,17 @@ func (h *AIHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		// 忽略stop消息（已在goroutine中处理）
+		// 处理停止信号
 		if req.Type == "stop" {
+			log.Printf("⏹️ [AI] 收到停止信号 - SessionID: %d", req.SessionID)
+			if currentStopChan != nil {
+				select {
+				case currentStopChan <- true:
+					log.Println("✅ 停止信号已发送到处理通道")
+				default:
+					log.Println("⚠️ 停止信号通道已满或已关闭")
+				}
+			}
 			continue
 		}
 
@@ -225,11 +207,20 @@ func (h *AIHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 		}
 		log.Printf("✅ 用户消息已保存 - ID: %d, Content: %s", userMsg.ID, userMsg.Content)
 
+		// 为本次对话创建新的停止channel
+		currentStopChan = make(chan bool, 1)
+
 		// 处理对话（传递上下文信息和停止channel）
-		if err := h.processChat(conn, session, req.RealTimeInfo, req.CursorInfo, req.SourceInfo, stopChan); err != nil {
+		if err := h.processChat(conn, session, req.RealTimeInfo, req.CursorInfo, req.SourceInfo, currentStopChan); err != nil {
 			h.sendError(conn, fmt.Sprintf("处理对话失败: %v", err))
+			close(currentStopChan)
+			currentStopChan = nil
 			continue
 		}
+
+		// 关闭本次对话的停止channel
+		close(currentStopChan)
+		currentStopChan = nil
 
 		// 更新会话活跃时间
 		h.sessionRepo.UpdateLastActive(req.SessionID)
@@ -291,14 +282,15 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 			}
 
 			// 注入实时信息（带来源标记）
-			parts = append(parts, "\n---\n【用户当前操作界面实时信息】")
+			parts = append(parts, "\n\n---\n## 用户当前操作环境快照\n")
 			if sourceInfo != "" {
-				parts = append(parts, "\n来源："+sourceInfo)
+				parts = append(parts, "**来源**: "+sourceInfo+"\n\n")
 			}
-			parts = append(parts, "\n"+realTimeInfo)
+			parts = append(parts, "**说明**: 以下是用户当前正在查看的终端界面的最近输出（终端缓冲区快照），包含最近执行的命令和输出结果。你可以根据这些信息理解用户的操作上下文。\n\n")
+			parts = append(parts, "```\n"+realTimeInfo+"\n```")
 
 			systemPrompt = strings.Join(parts, "")
-			log.Printf("📝 实时信息已注入系统提示词")
+			log.Printf("📝 终端快照已注入系统提示词")
 		}
 
 		// 添加系统提示词
@@ -320,14 +312,15 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 					// 拼接指针信息到用户消息（带来源标记）
 					var cursorParts []string
 					cursorParts = append(cursorParts, historyMessages[i].Content)
-					cursorParts = append(cursorParts, "\n\n---\n【指针信息】当前光标位置和上下文")
+					cursorParts = append(cursorParts, "\n\n---\n## 用户当前编辑器上下文\n")
 					if sourceInfo != "" {
-						cursorParts = append(cursorParts, "\n来源："+sourceInfo)
+						cursorParts = append(cursorParts, "**来源**: "+sourceInfo+"\n\n")
 					}
-					cursorParts = append(cursorParts, "\n"+cursorInfo)
+					cursorParts = append(cursorParts, "**说明**: 以下是用户当前正在查看/编辑的文件的光标位置和周围代码上下文。箭头(→)标记的是光标所在行。\n\n")
+					cursorParts = append(cursorParts, "```\n"+cursorInfo+"\n```")
 
 					historyMessages[i].Content = strings.Join(cursorParts, "")
-					log.Printf("📝 指针信息已注入用户消息")
+					log.Printf("📝 编辑器上下文已注入用户消息")
 					break
 				}
 			}
@@ -444,12 +437,17 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 		}
 
 		if stopped {
-			// 如果被停止但没有工具调用，正常保存内容
-			if content != "" {
-				content += "\n\n[生成已停止]"
-			} else {
-				content = "[生成已停止]"
+			// 如果被停止但没有工具调用，先推送停止标记文本
+			stopText := "\n\n[生成已停止]"
+			if content == "" {
+				stopText = "[生成已停止]"
 			}
+
+			// 推送停止标记到前端
+			h.sendChunk(conn, "content", stopText)
+
+			// 添加到保存内容
+			content += stopText
 		}
 
 		// 只有在正常完成或被停止但无工具调用时才保存

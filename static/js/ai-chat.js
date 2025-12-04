@@ -796,13 +796,16 @@ window.stopAIGeneration = function() {
                 type: 'stop',
                 session_id: currentSession?.ID
             }));
-            console.log('⏹️ 已发送停止信号');
+            console.log('⏹️ 已发送停止信号，等待后端响应...');
+            // ✅ 不立即隐藏按钮，等后端返回stopped信号
         } catch (error) {
             console.error('发送停止信号失败:', error);
+            hideStopButton();
         }
+    } else {
+        // 如果连接已断开，直接隐藏按钮
+        hideStopButton();
     }
-    
-    hideStopButton();
 };
 
 // ========== 消息发送 ==========
@@ -987,14 +990,8 @@ async function streamChat(sessionId, message, thinkingId) {
                     resolve();
                     
                 } else if (data.type === 'stopped') {
-                    // 停止生成
+                    // 停止生成（后端已推送"[生成已停止]"文本）
                     console.log('⏹️ 生成已停止');
-                    
-                    // 在消息末尾添加停止标记
-                    if (messageElement) {
-                        const currentContent = assistantMessage || '';
-                        updateMessageContent(messageElement, currentContent + '\n\n_[生成已停止]_');
-                    }
                     
                     // 清理thinking元素
                     removeThinking(thinkingId);
