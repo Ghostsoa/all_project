@@ -160,7 +160,7 @@ window.selectServer = async function(id) {
         
         if (existingSession) {
             // 已有会话，直接切换
-            window.switchTab(existingSession);
+            window.switchContentTab(existingSession);
             return;
         }
         
@@ -168,10 +168,6 @@ window.selectServer = async function(id) {
         
         document.getElementById('noSelection').style.display = 'none';
         document.getElementById('terminalWrapper').style.display = 'flex';
-        
-        // 立即清空content区域，准备新服务器
-        const contentContainer = document.getElementById('contentContainer');
-        contentContainer.innerHTML = '';
         
         // 在content-tabs-bar创建固定的终端标签
         const contentTabsList = document.getElementById('contentTabsList');
@@ -184,6 +180,7 @@ window.selectServer = async function(id) {
         contentTabsList.innerHTML = terminalTabHTML; // 清空并添加终端标签
         
         // 创建终端容器
+        const contentContainer = document.getElementById('contentContainer');
         const terminalPane = document.createElement('div');
         terminalPane.id = sessionId;
         terminalPane.className = 'terminal-pane active';
@@ -285,15 +282,6 @@ window.switchTab = function(sessionId) {
     
     state.activeSessionId = sessionId;
     
-    // 如果切换到不同服务器且该服务器没有保存状态，立即清空显示加载中
-    if (prevSessionId !== sessionId && !serverContentTabs.has(sessionId)) {
-        const contentContainer = document.getElementById('contentContainer');
-        contentContainer.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: rgba(255,255,255,0.5);">⏳ 正在连接...</div>';
-        
-        const contentTabsList = document.getElementById('contentTabsList');
-        contentTabsList.innerHTML = '<div style="padding: 10px; color: rgba(255,255,255,0.5);">加载中...</div>';
-    }
-    
     // 隐藏所有pane
     document.querySelectorAll('.terminal-pane').forEach(pane => {
         pane.classList.remove('active');
@@ -346,8 +334,8 @@ window.switchTab = function(sessionId) {
     if (session) {
         setTimeout(() => session.fitAddon.fit(), 100);
         
-        // 检查是否为本地终端（通过sessionId或server.ID判断）
-        const isLocal = sessionId.startsWith('local') || session.server.ID === 0;
+        // 检查是否为本地终端
+        const isLocal = sessionId.startsWith('local');
         
         if (!isLocal) {
             loadCommandHistory(session.server.ID, session.server.name);
@@ -357,14 +345,10 @@ window.switchTab = function(sessionId) {
         if (!prevSessionId || prevSessionId !== sessionId) {
             if (isLocal) {
                 // 本地终端
-                console.log('🔄 切换到本地终端，调用setLocalTerminal');
                 setLocalTerminal();
             } else {
                 // SSH终端
-                console.log('🔄 切换到SSH终端，调用setCurrentServer');
-                // 首次切换到此服务器时强制刷新（不使用缓存）
-                const isFirstTime = !serverContentTabs.has(sessionId);
-                setCurrentServer(session.server.ID, sessionId, isFirstTime);
+                setCurrentServer(session.server.ID, sessionId);
             }
         }
     }

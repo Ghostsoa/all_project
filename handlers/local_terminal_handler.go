@@ -20,17 +20,11 @@ var (
 	localTerminalMutex  sync.RWMutex
 )
 
-// clientInfo 客户端信息
-type clientInfo struct {
-	conn    *websocket.Conn
-	writeMu sync.Mutex // 写锁，防止并发写
-}
-
 // LocalTerminalSession 本地终端会话
 type LocalTerminalSession struct {
 	cmd       *exec.Cmd
 	ptmx      *os.File
-	clients   map[*websocket.Conn]*clientInfo
+	clients   map[*websocket.Conn]bool
 	clientsMu sync.RWMutex
 	input     chan []byte
 }
@@ -65,7 +59,7 @@ func InitGlobalLocalTerminal() error {
 
 	session := &LocalTerminalSession{
 		cmd:     cmd,
-		clients: make(map[*websocket.Conn]*clientInfo),
+		clients: make(map[*websocket.Conn]bool),
 		input:   make(chan []byte, 100),
 	}
 
@@ -116,12 +110,10 @@ func (s *LocalTerminalSession) broadcastOutput() {
 			copy(data, buffer[:n])
 
 			s.clientsMu.RLock()
-			for _, client := range s.clients {
-				// 异步发送，避免阻塞，使用写锁防止并发写
-				go func(ci *clientInfo) {
-					ci.writeMu.Lock()
-					defer ci.writeMu.Unlock()
-					if err := ci.conn.WriteMessage(websocket.BinaryMessage, data); err != nil {
+			for client := range s.clients {
+				// 异步发送，避免阻塞
+				go func(c *websocket.Conn) {
+					if err := c.WriteMessage(websocket.BinaryMessage, data); err != nil {
 						log.Println("发送到客户端失败:", err)
 					}
 				}(client)
@@ -143,9 +135,7 @@ func (s *LocalTerminalSession) handleInput() {
 // addClient 添加客户端
 func (s *LocalTerminalSession) addClient(ws *websocket.Conn) {
 	s.clientsMu.Lock()
-	s.clients[ws] = &clientInfo{
-		conn: ws,
-	}
+	s.clients[ws] = true
 	s.clientsMu.Unlock()
 	log.Printf("本地终端客户端已连接，当前客户端数: %d", len(s.clients))
 }
