@@ -52,6 +52,8 @@ export function connectSSH(sessionId, server) {
     const session = state.terminals.get(sessionId);
     const { term } = session;
     
+    console.log(`[SSH连接] sessionId=${sessionId}, server=${server.name}`);
+    
     updateStatusLight('connecting');
     
     const ws = new WebSocket(`${config.WS_PROTOCOL}//${config.WS_HOST}/ws?server_id=${server.ID}&session_id=${sessionId}`);
@@ -66,10 +68,17 @@ export function connectSSH(sessionId, server) {
     };
     
     ws.onmessage = (event) => {
+        // 确保写入正确的term实例
+        const currentSession = state.terminals.get(sessionId);
+        if (!currentSession) {
+            console.error(`[SSH消息] session不存在: ${sessionId}`);
+            return;
+        }
+        
         if (typeof event.data === 'string') {
-            term.write(event.data);
+            currentSession.term.write(event.data);
         } else {
-            term.write(new Uint8Array(event.data));
+            currentSession.term.write(new Uint8Array(event.data));
         }
         
         // 收到第一次数据后，说明SSH已就绪，延迟加载文件树
@@ -104,21 +113,33 @@ export function connectSSH(sessionId, server) {
         showDisconnectOverlay(sessionId, '连接已断开', 'SSH会话已关闭');
     };
     
-    term.onData(data => {
-        if (ws && ws.readyState === WebSocket.OPEN) {
-            ws.send(data);
+    // 清除旧的onData监听器（如果有）
+    if (session.disposeOnData) {
+        session.disposeOnData.dispose();
+    }
+    
+    // 绑定新的onData监听器
+    session.disposeOnData = term.onData(data => {
+        const currentSession = state.terminals.get(sessionId);
+        if (!currentSession || !currentSession.ws) {
+            console.error(`[用户输入] session或ws不存在: ${sessionId}`);
+            return;
+        }
+        
+        if (currentSession.ws.readyState === WebSocket.OPEN) {
+            currentSession.ws.send(data);
             
             // 捕获命令
             if (data === '\r' || data === '\n') {
-                const command = session.commandBuffer.trim();
+                const command = currentSession.commandBuffer.trim();
                 if (command && command.length > 0) {
                     saveCommandToHistory(server.ID, command);
                 }
-                session.commandBuffer = '';
+                currentSession.commandBuffer = '';
             } else if (data === '\u007F' || data === '\b') {
-                session.commandBuffer = session.commandBuffer.slice(0, -1);
+                currentSession.commandBuffer = currentSession.commandBuffer.slice(0, -1);
             } else if (data >= ' ' && data <= '~') {
-                session.commandBuffer += data;
+                currentSession.commandBuffer += data;
             }
         }
     });

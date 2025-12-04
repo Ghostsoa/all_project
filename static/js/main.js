@@ -336,8 +336,13 @@ window.switchTab = function(sessionId) {
     if (session) {
         console.log(`[切换] sessionId=${sessionId}, pane元素=`, document.getElementById(sessionId));
         console.log(`[切换] 当前active的pane=`, document.querySelector('.terminal-pane.active'));
+        console.log(`[切换] 所有terminal-pane:`, document.querySelectorAll('.terminal-pane'));
         
-        setTimeout(() => session.fitAddon.fit(), 100);
+        setTimeout(() => {
+            session.fitAddon.fit();
+            session.term.focus();  // 强制focus到当前terminal
+            console.log(`[切换] 已focus到terminal:`, sessionId);
+        }, 100);
         
         // 检查是否为本地终端
         const isLocal = sessionId.startsWith('local');
