@@ -1,0 +1,246 @@
+/* ========== 终端区域样式 ========== */
+
+.terminal-area {
+    display: flex;
+    flex-direction: column;
+    background: rgba(255, 255, 255, 0.02);
+    backdrop-filter: blur(20px);
+    border-left: 1px solid rgba(255, 255, 255, 0.08);
+    border-right: 1px solid rgba(255, 255, 255, 0.08);
+    overflow: hidden;
+    margin: 8px 0;
+    border-radius: 12px;
+}
+
+.terminal-wrapper {
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+}
+
+/* 多窗口标签栏 */
+.tabs-bar {
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    padding: 8px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border-radius: 12px 12px 0 0;
+}
+
+.tabs-list {
+    display: flex;
+    gap: 6px;
+    min-height: 36px;
+}
+
+.tab-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    backdrop-filter: blur(10px);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    color: rgba(255, 255, 255, 0.6);
+    font-size: 12px;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: all 0.2s;
+    min-width: 150px;
+    max-width: 200px;
+}
+
+.tab-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.tab-item.active {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.2);
+    color: #ffffff;
+}
+
+.tab-name {
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tab-close {
+    opacity: 0;
+    font-size: 16px;
+    font-weight: bold;
+    padding: 0 4px;
+    transition: opacity 0.2s;
+}
+
+.tab-item:hover .tab-close {
+    opacity: 1;
+}
+
+.tab-close:hover {
+    color: #f48771;
+}
+
+/* 终端容器 */
+.terminals-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+    background: #000000;
+    margin: 8px;
+    margin-bottom: 20px;
+    border-radius: 12px;
+}
+
+.terminal-pane {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: none;
+    overflow: hidden;
+    background: #000000;
+}
+
+.terminal-pane.active {
+    display: block;
+}
+
+/* 终端内部样式 - 确保纯黑 */
+.terminal-pane .xterm {
+    height: 100%;
+    background: #000000 !important;
+    padding: 0;
+}
+
+.terminal-pane .xterm .xterm-viewport {
+    background: #000000 !important;
+}
+
+.terminal-pane .xterm .xterm-screen {
+    background: #000000 !important;
+}
+
+/* 状态灯带 - 纯灯带 */
+.status-light-bar {
+    height: 3px;
+    background: #1e1e1e;
+    position: relative;
+    overflow: hidden;
+}
+
+.status-light {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: #3e3e42;
+    transition: background 0.3s;
+}
+
+/* 连接中 - 彩色流光动画 */
+.status-light.connecting {
+    background: linear-gradient(90deg, 
+        #ff0080 0%,
+        #ff8c00 10%,
+        #ffd700 20%,
+        #00ff00 30%,
+        #00bfff 40%,
+        #0080ff 50%,
+        #8000ff 60%,
+        #ff0080 70%,
+        #ff8c00 80%,
+        #ffd700 90%,
+        #00ff00 100%);
+    background-size: 300% 100%;
+    animation: flowingRainbow 2s linear infinite;
+}
+
+@keyframes flowingRainbow {
+    0% {
+        background-position: 0% 0%;
+    }
+    100% {
+        background-position: 300% 0%;
+    }
+}
+
+/* 连接成功 - 绿灯 */
+.status-light.connected {
+    background: #4ec9b0;
+    box-shadow: 0 0 8px rgba(78, 201, 176, 0.5);
+}
+
+/* 断开连接 - 红灯 */
+.status-light.disconnected {
+    background: #f48771;
+    box-shadow: 0 0 8px rgba(244, 135, 113, 0.5);
+}
+
+/* 断连提示覆盖层 */
+.disconnect-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(30, 30, 30, 0.95);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(5px);
+}
+
+.disconnect-content {
+    text-align: center;
+    max-width: 400px;
+    padding: 40px;
+}
+
+.disconnect-icon {
+    font-size: 64px;
+    margin-bottom: 20px;
+    animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.6;
+        transform: scale(1.1);
+    }
+}
+
+.disconnect-title {
+    font-size: 24px;
+    color: #f48771;
+    margin-bottom: 12px;
+    font-weight: 500;
+}
+
+.disconnect-message {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.6);
+    margin-bottom: 24px;
+}
+
+.disconnect-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+}
+
+.disconnect-actions .btn {
+    min-width: 100px;
+}

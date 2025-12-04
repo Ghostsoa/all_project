@@ -1,0 +1,309 @@
+/* ========== 编辑器样式 ========== */
+
+.main-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+}
+
+/* 统一内容标签栏：终端 + 文件 */
+.content-tabs-bar {
+    display: flex;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    padding: 4px 8px;
+    min-height: 42px;
+    align-items: center;
+}
+
+.content-tabs-list {
+    display: flex;
+    gap: 4px;
+    flex: 1;
+    overflow-x: auto;
+    overflow-y: hidden;
+}
+
+.content-tabs-list::-webkit-scrollbar {
+    height: 4px;
+}
+
+.content-tab-item {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.7);
+    transition: all 0.2s;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.content-tab-item:hover {
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.15);
+}
+
+.content-tab-item.active {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: rgba(59, 130, 246, 0.4);
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.content-tab-item.modified .tab-name {
+    color: #fbbf24;
+}
+
+.content-tab-item .tab-close {
+    margin-left: 4px;
+    opacity: 0.5;
+    transition: opacity 0.2s;
+}
+
+.content-tab-item .tab-close:hover {
+    opacity: 1;
+}
+
+/* 终端标签不显示关闭按钮 */
+.content-tab-item[data-type="terminal"] .tab-close {
+    display: none;
+}
+
+.content-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
+}
+
+/* 编辑器面板 */
+.editor-pane {
+    display: none;
+    flex-direction: column;
+    height: 100%;
+}
+
+.editor-pane.active {
+    display: flex;
+}
+
+.editor-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.editor-path {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+    font-family: 'Consolas', monospace;
+}
+
+.editor-save-btn {
+    padding: 4px 10px;
+    font-size: 11px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 4px;
+    color: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.editor-save-btn:hover {
+    background: rgba(255, 255, 255, 0.15);
+    color: #ffffff;
+}
+
+.editor-container {
+    flex: 1;
+    overflow: hidden;
+}
+
+.tab-icon {
+    font-size: 14px;
+}
+
+/* ========== Markdown编辑器样式 ========== */
+.markdown-toolbar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.mode-btn {
+    padding: 4px 12px;
+    font-size: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mode-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.mode-btn.active {
+    background: rgba(59, 130, 246, 0.2);
+    border-color: rgba(59, 130, 246, 0.5);
+    color: rgba(59, 130, 246, 1);
+}
+
+.markdown-container {
+    display: flex;
+    height: 100%;
+    overflow: hidden;
+}
+
+.markdown-editor-pane,
+.markdown-preview-pane {
+    height: 100%;
+    overflow: hidden;
+}
+
+/* 分屏模式：50% - 50% */
+.markdown-container.split-mode .markdown-editor-pane {
+    flex: 1;
+    border-right: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.markdown-container.split-mode .markdown-preview-pane {
+    flex: 1;
+    display: block;
+}
+
+/* 编辑模式：100% 编辑器 */
+.markdown-container.edit-mode .markdown-editor-pane {
+    flex: 1;
+}
+
+.markdown-container.edit-mode .markdown-preview-pane {
+    display: none;
+}
+
+/* 预览模式：100% 预览 */
+.markdown-container.preview-mode .markdown-editor-pane {
+    display: none;
+}
+
+.markdown-container.preview-mode .markdown-preview-pane {
+    flex: 1;
+    display: block;
+}
+
+.markdown-preview-pane {
+    overflow: auto;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 20px;
+}
+
+.markdown-body {
+    max-width: 900px;
+    margin: 0 auto;
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1.6;
+}
+
+.markdown-body h1, .markdown-body h2, .markdown-body h3,
+.markdown-body h4, .markdown-body h5, .markdown-body h6 {
+    margin-top: 24px;
+    margin-bottom: 16px;
+    font-weight: 600;
+    line-height: 1.25;
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.markdown-body h1 {
+    font-size: 2em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 0.3em;
+}
+
+.markdown-body h2 {
+    font-size: 1.5em;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding-bottom: 0.3em;
+}
+
+.markdown-body p {
+    margin-bottom: 16px;
+}
+
+.markdown-body code {
+    background: rgba(255, 255, 255, 0.1);
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.9em;
+}
+
+.markdown-body pre {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 16px;
+    border-radius: 6px;
+    overflow-x: auto;
+    margin-bottom: 16px;
+}
+
+.markdown-body pre code {
+    background: none;
+    padding: 0;
+}
+
+.markdown-body ul, .markdown-body ol {
+    margin-bottom: 16px;
+    padding-left: 2em;
+}
+
+.markdown-body li {
+    margin-bottom: 4px;
+}
+
+.markdown-body blockquote {
+    border-left: 4px solid rgba(59, 130, 246, 0.5);
+    padding-left: 16px;
+    margin: 16px 0;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.markdown-body table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-bottom: 16px;
+}
+
+.markdown-body table th, .markdown-body table td {
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    padding: 8px 12px;
+}
+
+.markdown-body table th {
+    background: rgba(255, 255, 255, 0.05);
+    font-weight: 600;
+}
+
+.markdown-body a {
+    color: rgba(59, 130, 246, 0.9);
+    text-decoration: none;
+}
+
+.markdown-body a:hover {
+    text-decoration: underline;
+}
+
+.markdown-body img {
+    max-width: 100%;
+    height: auto;
+}

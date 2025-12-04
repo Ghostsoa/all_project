@@ -143,6 +143,12 @@ export async function setCurrentServer(serverID, sessionID) {
         return;
     }
     
+    // 立即显示加载状态，清空旧的缓存显示
+    const fileTreeContainer = document.getElementById('fileTree');
+    if (fileTreeContainer) {
+        fileTreeContainer.innerHTML = '<div class="file-tree-empty">📂 加载中...</div>';
+    }
+    
     // 设置渲染回调
     fileCache.setRenderCallback(renderFileTree);
     
