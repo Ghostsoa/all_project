@@ -188,56 +188,75 @@ function initializeMarkdownEditor(tabId, filePath, content) {
         </div>
     `;
     
-    // 配置marked
-    if (window.marked) {
-        console.log('✅ marked.js已加载');
-        marked.setOptions({
-            highlight: function(code, lang) {
-                if (lang && window.hljs && window.hljs.getLanguage(lang)) {
-                    return window.hljs.highlight(code, { language: lang }).value;
+    // 等待marked加载完成（最多等待3秒）
+    const waitForMarked = () => {
+        return new Promise((resolve) => {
+            let attempts = 0;
+            const maxAttempts = 30; // 3秒
+            
+            const checkMarked = () => {
+                if (window.marked) {
+                    console.log('✅ marked.js已加载');
+                    // 配置marked
+                    window.marked.setOptions({
+                        highlight: function(code, lang) {
+                            if (lang && window.hljs && window.hljs.getLanguage(lang)) {
+                                return window.hljs.highlight(code, { language: lang }).value;
+                            }
+                            return code;
+                        },
+                        breaks: true,
+                        gfm: true
+                    });
+                    resolve(true);
+                } else if (attempts < maxAttempts) {
+                    attempts++;
+                    setTimeout(checkMarked, 100);
+                } else {
+                    console.warn('⚠️ marked.js加载超时');
+                    resolve(false);
                 }
-                return code;
-            },
-            breaks: true,
-            gfm: true
+            };
+            checkMarked();
         });
-    } else {
-        console.warn('⚠️ marked.js未加载！');
-    }
+    };
     
-    // 初始化Monaco编辑器
-    const fileName = filePath.split('/').pop();
-    require(['vs/editor/editor.main'], function() {
-        const editor = monaco.editor.create(document.getElementById(`${tabId}-editor`), {
-            value: content,
-            language: 'markdown',
-            theme: 'vs-dark',
-            automaticLayout: true,
-            fontSize: 13,
-            minimap: { enabled: false }, // Markdown不需要minimap
-            wordWrap: 'on',
-            lineNumbers: 'on'
-        });
-        
-        // 保存编辑器实例
-        editorInstances.set(tabId, editor);
-        
-        // 初始渲染预览
-        updateMarkdownPreview(tabId, content);
-        
-        // 实时更新预览（防抖）
-        let updateTimeout;
-        editor.getModel().onDidChangeContent(() => {
-            clearTimeout(updateTimeout);
-            updateTimeout = setTimeout(() => {
-                updateMarkdownPreview(tabId, editor.getValue());
-                markAsModified(tabId);
-            }, 300);
-        });
-        
-        // Ctrl+S保存
-        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
-            window.saveFile(tabId);
+    // 先等待marked加载
+    waitForMarked().then(() => {
+        // 初始化Monaco编辑器
+        const fileName = filePath.split('/').pop();
+        require(['vs/editor/editor.main'], function() {
+            const editor = monaco.editor.create(document.getElementById(`${tabId}-editor`), {
+                value: content,
+                language: 'markdown',
+                theme: 'vs-dark',
+                automaticLayout: true,
+                fontSize: 13,
+                minimap: { enabled: false }, // Markdown不需要minimap
+                wordWrap: 'on',
+                lineNumbers: 'on'
+            });
+            
+            // 保存编辑器实例
+            editorInstances.set(tabId, editor);
+            
+            // 初始渲染预览
+            updateMarkdownPreview(tabId, content);
+            
+            // 实时更新预览（防抖）
+            let updateTimeout;
+            editor.getModel().onDidChangeContent(() => {
+                clearTimeout(updateTimeout);
+                updateTimeout = setTimeout(() => {
+                    updateMarkdownPreview(tabId, editor.getValue());
+                    markAsModified(tabId);
+                }, 300);
+            });
+            
+            // Ctrl+S保存
+            editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
+                window.saveFile(tabId);
+            });
         });
     });
 }
