@@ -5,7 +5,7 @@ import { showToast } from './utils.js';
 import { loadServers, searchServers, deleteServer, renderServerList } from './server.js';
 import { createTerminal, connectSSH, openLocalTerminal } from './terminal.js';
 import { loadCommandHistory, clearCurrentCommands, saveCommandToHistory } from './commands.js';
-import { initFileTree, setCurrentServer, setLocalTerminal, loadDirectory } from './filetree.js';
+import { initFileTree, setCurrentServer, setLocalTerminal, loadDirectory, initDragUpload } from './filetree.js';
 import { openFileEditor } from './editor.js';
 
 // ========== 全局状态灯管理器 ==========
@@ -308,17 +308,27 @@ window.switchTab = function(sessionId) {
         if (savedActive) {
             if (savedActive.type === 'terminal') {
                 // 激活终端
-                document.getElementById(savedActive.id)?.classList.add('active');
+                const terminalPane = document.getElementById(savedActive.id);
+                if (terminalPane) {
+                    terminalPane.classList.add('active');
+                    console.log(`[激活终端pane] ${savedActive.id}`);
+                }
                 contentTabsList.querySelector('.content-tab-item[data-type="terminal"]')?.classList.add('active');
             } else if (savedActive.type === 'editor') {
                 // 激活编辑器
                 const editorPane = document.querySelector(`.editor-pane[data-tab-id="${savedActive.id}"]`);
-                editorPane?.classList.add('active');
+                if (editorPane) {
+                    editorPane.classList.add('active');
+                }
                 contentTabsList.querySelector(`.content-tab-item[data-tab-id="${savedActive.id}"]`)?.classList.add('active');
             }
         } else {
             // 没有保存的状态，默认激活终端
-            document.getElementById(sessionId)?.classList.add('active');
+            const terminalPane = document.getElementById(sessionId);
+            if (terminalPane) {
+                terminalPane.classList.add('active');
+                console.log(`[激活终端pane-默认] ${sessionId}`);
+            }
             contentTabsList.querySelector('.content-tab-item[data-type="terminal"]')?.classList.add('active');
         }
     } else {
@@ -329,7 +339,13 @@ window.switchTab = function(sessionId) {
                 <span class="tab-name">终端</span>
             </div>
         `;
-        document.getElementById(sessionId)?.classList.add('active');
+        const terminalPane = document.getElementById(sessionId);
+        if (terminalPane) {
+            terminalPane.classList.add('active');
+            console.log(`[激活终端pane-首次] ${sessionId}`);
+        } else {
+            console.error(`[错误] 找不到terminal-pane: ${sessionId}`);
+        }
     }
     
     const session = state.terminals.get(sessionId);
