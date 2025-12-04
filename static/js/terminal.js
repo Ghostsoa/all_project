@@ -127,7 +127,14 @@ export function connectSSH(sessionId, server) {
 }
 
 export function openLocalTerminal() {
-    const sessionId = 'local-' + (++state.sessionCounter);
+    const sessionId = 'local'; // 固定的sessionId，全局唯一
+    
+    // 检查是否已经存在本地终端会话
+    if (state.terminals.has(sessionId)) {
+        console.log('本地终端已存在，直接切换');
+        window.switchTab(sessionId);
+        return;
+    }
     
     document.getElementById('noSelection').style.display = 'none';
     document.getElementById('terminalWrapper').style.display = 'flex';
@@ -180,15 +187,19 @@ function connectLocalTerminal(sessionId) {
     const session = state.terminals.get(sessionId);
     const { term } = session;
     
-    // 如果已有连接且正在连接，则不重复连接
-    if (session.ws && session.ws.readyState === WebSocket.CONNECTING) {
-        console.log('本地终端正在连接，跳过重复连接');
-        return;
-    }
-    
-    // 关闭旧连接
+    // 如果已有连接且已连接或正在连接，则不重复连接
     if (session.ws) {
-        session.ws.close(1000, 'reconnecting');
+        const wsState = session.ws.readyState;
+        if (wsState === WebSocket.CONNECTING) {
+            console.log('本地终端正在连接，跳过重复连接');
+            return;
+        } else if (wsState === WebSocket.OPEN) {
+            console.log('本地终端已连接，跳过重复连接');
+            return;
+        } else {
+            // CLOSING或CLOSED，关闭并重新连接
+            session.ws.close(1000, 'reconnecting');
+        }
     }
     
     updateStatusLight('connecting');

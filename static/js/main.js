@@ -160,7 +160,7 @@ window.selectServer = async function(id) {
         
         if (existingSession) {
             // 已有会话，直接切换
-            window.switchContentTab(existingSession);
+            window.switchTab(existingSession);
             return;
         }
         
@@ -168,6 +168,10 @@ window.selectServer = async function(id) {
         
         document.getElementById('noSelection').style.display = 'none';
         document.getElementById('terminalWrapper').style.display = 'flex';
+        
+        // 立即清空content区域，准备新服务器
+        const contentContainer = document.getElementById('contentContainer');
+        contentContainer.innerHTML = '';
         
         // 在content-tabs-bar创建固定的终端标签
         const contentTabsList = document.getElementById('contentTabsList');
@@ -180,7 +184,6 @@ window.selectServer = async function(id) {
         contentTabsList.innerHTML = terminalTabHTML; // 清空并添加终端标签
         
         // 创建终端容器
-        const contentContainer = document.getElementById('contentContainer');
         const terminalPane = document.createElement('div');
         terminalPane.id = sessionId;
         terminalPane.className = 'terminal-pane active';
@@ -281,6 +284,15 @@ window.switchTab = function(sessionId) {
     }
     
     state.activeSessionId = sessionId;
+    
+    // 如果切换到不同服务器且该服务器没有保存状态，立即清空显示加载中
+    if (prevSessionId !== sessionId && !serverContentTabs.has(sessionId)) {
+        const contentContainer = document.getElementById('contentContainer');
+        contentContainer.innerHTML = '<div style="display: flex; align-items: center; justify-content: center; height: 100%; color: rgba(255,255,255,0.5);">⏳ 正在连接...</div>';
+        
+        const contentTabsList = document.getElementById('contentTabsList');
+        contentTabsList.innerHTML = '<div style="padding: 10px; color: rgba(255,255,255,0.5);">加载中...</div>';
+    }
     
     // 隐藏所有pane
     document.querySelectorAll('.terminal-pane').forEach(pane => {
