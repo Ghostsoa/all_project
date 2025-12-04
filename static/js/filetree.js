@@ -3,6 +3,7 @@ import { state } from './config.js';
 import { showToast } from './utils.js';
 import { openFileEditor } from './editor.js';
 import { fileCache } from './filecache.js';
+import { showConfirm } from './modal.js';
 
 let currentServerID = null;
 let currentSessionID = null; // 当前会话ID
@@ -28,10 +29,16 @@ export function initFileTree() {
     
     // 空白区域右键菜单
     fileTreeContainer.addEventListener('contextmenu', (e) => {
-        // 如果点击的是文件项，让文件项自己处理
-        if (e.target.closest('.file-item')) return;
+        // 如果点击的是文件项或文件操作按钮，让它们自己处理
+        if (e.target.closest('.file-item') || 
+            e.target.closest('.file-action-btn') ||
+            e.target.closest('.file-tree-header')) {
+            return;
+        }
         
+        // 空白区域右键
         e.preventDefault();
+        e.stopPropagation();
         showBlankContextMenu(e, currentPath);
     });
 }
@@ -628,7 +635,12 @@ window.renameFile = async function(oldPath) {
 };
 
 window.deleteFile = async function(path) {
-    if (!confirm('确定要删除这个文件/文件夹吗？')) return;
+    const fileName = path.split('/').pop();
+    const confirmed = await showConfirm(
+        `确定要删除 "${fileName}" 吗？此操作不可恢复。`,
+        '删除确认'
+    );
+    if (!confirmed) return;
     
     const parentPath = path.split('/').slice(0, -1).join('/') || '/';
     
