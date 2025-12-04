@@ -11,23 +11,17 @@ let sessions = [];
 
 // 加载会话列表
 export async function loadSessions() {
-    console.log('🔄 loadSessions 开始加载');
     try {
         const data = await apiRequest('/api/ai/sessions');
-        console.log('📥 API返回数据:', data);
         sessions = data.data || [];
-        console.log('📋 sessions数组:', sessions);
-        console.log('📊 sessions数量:', sessions.length);
-        
         renderSessionList();
         
         // 如果有会话，自动选择第一个
         if (sessions.length > 0 && !currentSession) {
-            console.log('🎯 自动选择第一个会话:', sessions[0]);
             await selectAISession(sessions[0].ID);
         }
     } catch (error) {
-        console.error('❌ 加载会话列表失败:', error);
+        console.error('加载会话列表失败:', error);
     }
 }
 
@@ -98,8 +92,6 @@ function renderSessionList() {
         const action = target.dataset.action;
         const sessionId = target.dataset.sessionId;
         
-        console.log('🖱️ 点击历史项:', action, sessionId);
-        
         if (action === 'create-new') {
             createNewAISession();
             toggleHistoryDropdown();
@@ -115,10 +107,8 @@ function renderSessionList() {
 
 // 选择会话
 window.selectAISession = async function(sessionId) {
-    console.log('📌 selectAISession 被调用, sessionId:', sessionId);
     try {
         const data = await apiRequest(`/api/ai/session?id=${sessionId}`);
-        console.log('📥 会话数据:', data);
         currentSession = data.data;
         
         // 更新UI
@@ -129,10 +119,8 @@ window.selectAISession = async function(sessionId) {
         
         // 显示对话区域
         showChatArea();
-        
-        console.log('✅ 会话加载成功');
     } catch (error) {
-        console.error('❌ 选择会话失败:', error);
+        console.error('选择会话失败:', error);
         alert('加载会话失败: ' + error.message);
     }
 };
