@@ -420,7 +420,7 @@ async function loadConfigFormOptions() {
         } else {
             modelSelect.innerHTML = '<option value="">请选择模型</option>' +
                 activeModels.map(m =>
-                    `<option value="${m.id}">${escapeHtml(m.display_name || m.name)}</option>`
+                    `<option value="${m.ID || m.id}">${escapeHtml(m.display_name || m.name)}</option>`
                 ).join('');
         }
 
@@ -431,7 +431,7 @@ async function loadConfigFormOptions() {
         } else {
             endpointSelect.innerHTML = '<option value="">请选择接口</option>' +
                 activeEndpoints.map(e =>
-                    `<option value="${e.id}">${escapeHtml(e.name)}</option>`
+                    `<option value="${e.ID || e.id}">${escapeHtml(e.name)}</option>`
                 ).join('');
         }
 
