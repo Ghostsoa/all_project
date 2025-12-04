@@ -148,125 +148,85 @@
 
             <!-- AI 助手面板 -->
             <div class="right-panel-content" id="aiPanel" style="display: none;">
-                <!-- AI 模式切换 -->
-                <div class="ai-mode-tabs">
-                    <div class="ai-mode-tab active" data-mode="chat" onclick="switchAIMode('chat')">
-                        💬 对话模式
+                <!-- 顶部工具栏 -->
+                <div class="ai-toolbar">
+                    <div class="ai-mode-switch">
+                        <span class="mode-btn active" data-mode="chat" onclick="switchAIMode('chat')">Chat</span>
+                        <span class="mode-divider">|</span>
+                        <span class="mode-btn" data-mode="agent" onclick="switchAIMode('agent')">Agent</span>
                     </div>
-                    <div class="ai-mode-tab" data-mode="agent" onclick="switchAIMode('agent')">
-                        🎯 Agent模式
-                    </div>
-                </div>
-
-                <!-- 对话模式面板 -->
-                <div class="ai-mode-content active" id="chatMode">
-                    <!-- 终端快照显示区 -->
-                    <div class="terminal-snapshot">
-                        <div class="snapshot-header">
-                            <span class="snapshot-title">📸 终端快照</span>
-                            <span class="snapshot-status" id="snapshotStatus">实时</span>
-                        </div>
-                        <div class="snapshot-content" id="snapshotContent">
-                            <div class="snapshot-item">
-                                <span class="snapshot-label">服务器:</span>
-                                <span class="snapshot-value" id="snapshotServer">未连接</span>
-                            </div>
-                            <div class="snapshot-item">
-                                <span class="snapshot-label">工作目录:</span>
-                                <span class="snapshot-value" id="snapshotCwd">-</span>
-                            </div>
-                            <div class="snapshot-item">
-                                <span class="snapshot-label">最近命令:</span>
-                                <span class="snapshot-value" id="snapshotCommand">-</span>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 对话区域 -->
-                    <div class="chat-messages" id="chatMessages">
-                        <div class="chat-welcome">
-                            <div class="welcome-icon">🤖</div>
-                            <h3>AI 对话助手</h3>
-                            <p>我可以帮你执行命令、分析日志、读写文件</p>
-                            <div class="chat-tips">
-                                <div class="tip-item">💡 实时终端快照</div>
-                                <div class="tip-item">🛠️ 自动执行命令</div>
-                                <div class="tip-item">📁 文件读写操作</div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <!-- 输入区 -->
-                    <div class="chat-input-area">
-                        <textarea 
-                            id="chatInput" 
-                            placeholder="输入消息...（Ctrl+Enter发送）"
-                            rows="3"
-                        ></textarea>
-                        <button class="btn-send-chat" onclick="sendChatMessage()">
-                            <span>发送</span>
-                            <span class="shortcut">Ctrl+Enter</span>
+                    <div class="ai-tools">
+                        <button class="tool-btn" onclick="toggleHistory()" title="对话历史">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                        </button>
+                        <button class="tool-btn" onclick="toggleContextInfo()" title="上下文信息">
+                            <i class="fa-solid fa-circle-info"></i>
                         </button>
                     </div>
                 </div>
 
-                <!-- Agent模式面板 -->
-                <div class="ai-mode-content" id="agentMode" style="display: none;">
-                    <!-- Workspace配置 -->
-                    <div class="workspace-config">
-                        <div class="config-header">
-                            <span class="config-title">📁 工作空间</span>
-                            <button class="btn-config-workspace" onclick="showWorkspaceConfig()">
-                                ⚙️ 配置
-                            </button>
+                <!-- 上下文信息气泡（折叠） -->
+                <div class="context-bubble" id="contextBubble" style="display: none;">
+                    <!-- Chat模式：显示服务器和路径 -->
+                    <div class="context-chat" id="contextChat">
+                        <div class="context-item">
+                            <span class="ctx-icon">🖥️</span>
+                            <span class="ctx-value" id="ctxServer">未连接</span>
                         </div>
-                        <div class="workspace-info" id="workspaceInfo">
-                            <div class="workspace-item">
-                                <span class="workspace-label">项目名称:</span>
-                                <span class="workspace-value" id="workspaceName">未配置</span>
-                            </div>
-                            <div class="workspace-item">
-                                <span class="workspace-label">服务器:</span>
-                                <span class="workspace-value" id="workspaceServer">-</span>
-                            </div>
-                            <div class="workspace-item">
-                                <span class="workspace-label">根目录:</span>
-                                <span class="workspace-value" id="workspaceRoot">-</span>
-                            </div>
-                            <div class="workspace-item">
-                                <span class="workspace-label">SFTP状态:</span>
-                                <span class="workspace-value" id="workspaceSftp">
-                                    <span class="status-dot" id="sftpStatusDot"></span>
-                                    <span id="sftpStatusText">未连接</span>
-                                </span>
-                            </div>
+                        <div class="context-item">
+                            <span class="ctx-icon">📂</span>
+                            <span class="ctx-value" id="ctxPath">-</span>
                         </div>
                     </div>
-
-                    <!-- Agent对话区 -->
-                    <div class="agent-messages" id="agentMessages">
-                        <div class="agent-welcome">
-                            <div class="welcome-icon">🎯</div>
-                            <h3>AI Agent 助手</h3>
-                            <p>深度项目分析，代码重构，批量操作</p>
-                            <div class="agent-tips">
-                                <div class="tip-item">📂 项目结构分析</div>
-                                <div class="tip-item">🔍 代码索引搜索</div>
-                                <div class="tip-item">♻️ 批量重构操作</div>
-                            </div>
+                    <!-- Agent模式：显示项目路径 -->
+                    <div class="context-agent" id="contextAgent" style="display: none;">
+                        <div class="context-item">
+                            <span class="ctx-icon">📁</span>
+                            <span class="ctx-value" id="ctxProject">未配置项目</span>
                         </div>
                     </div>
+                </div>
 
-                    <!-- Agent输入区 -->
-                    <div class="agent-input-area">
+                <!-- 对话历史侧栏（折叠） -->
+                <div class="history-sidebar" id="historySidebar" style="display: none;">
+                    <div class="history-header">
+                        <span>对话历史</span>
+                        <button class="close-btn" onclick="toggleHistory()">✕</button>
+                    </div>
+                    <div class="history-list">
+                        <div class="history-empty">暂无历史记录</div>
+                    </div>
+                </div>
+
+                <!-- 对话区域 -->
+                <div class="ai-messages" id="aiMessages">
+                    <div class="ai-welcome">
+                        <div class="welcome-icon">🤖</div>
+                        <h3>AI 助手</h3>
+                        <p>Chat模式：实时终端操作 | Agent模式：项目级分析</p>
+                    </div>
+                </div>
+
+                <!-- 输入区域 -->
+                <div class="ai-input-container">
+                    <div class="input-wrapper">
                         <textarea 
-                            id="agentInput" 
-                            placeholder="输入任务...（Ctrl+Enter发送）"
-                            rows="3"
+                            id="aiInput" 
+                            placeholder="输入消息..."
+                            rows="2"
                         ></textarea>
-                        <button class="btn-send-agent" onclick="sendAgentTask()">
-                            <span>执行任务</span>
-                            <span class="shortcut">Ctrl+Enter</span>
+                    </div>
+                    <div class="input-footer">
+                        <div class="model-selector">
+                            <select id="modelSelect">
+                                <option value="gpt-4">GPT-4</option>
+                                <option value="gpt-3.5">GPT-3.5</option>
+                                <option value="claude">Claude</option>
+                                <option value="local">本地模型</option>
+                            </select>
+                        </div>
+                        <button class="send-btn" onclick="sendAIMessage()">
+                            发送
                         </button>
                     </div>
                 </div>
