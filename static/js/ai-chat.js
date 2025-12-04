@@ -443,7 +443,7 @@ function createMessageElement(role, content, reasoning = null) {
                 <span class="thought-text">Thought</span>
                 <span class="reasoning-arrow">▼</span>
             </div>
-            <div class="reasoning-content">${escapeHtml(reasoning)}</div>
+            <div class="reasoning-content">${formatMessageContent(reasoning)}</div>
         `;
         contentWrapper.appendChild(reasoningDiv);
     }
@@ -511,7 +511,8 @@ function updateReasoningContent(messageElement, reasoning, autoCollapse = false,
     
     const reasoningContent = reasoningDiv.querySelector('.reasoning-content');
     if (reasoningContent) {
-        reasoningContent.textContent = reasoning;
+        // 使用Markdown渲染思维链内容
+        reasoningContent.innerHTML = formatMessageContent(reasoning);
     }
     
     // 自动折叠
@@ -586,8 +587,8 @@ function formatMessageContent(content) {
     const codeBlocks = [];
     const inlineCodes = [];
     
-    // 1. 先提取并保护代码块
-    formatted = formatted.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+    // 1. 先提取并保护代码块（包括末尾换行）
+    formatted = formatted.replace(/```(\w+)?\n([\s\S]*?)```\n?/g, (match, lang, code) => {
         const escapedCode = escapeHtml(code.trim());
         const codeId = 'code-' + Math.random().toString(36).substr(2, 9);
         const placeholder = `__CODEBLOCK_${codeBlocks.length}__`;
@@ -619,41 +620,44 @@ function formatMessageContent(content) {
     // 5. 斜体
     formatted = formatted.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
     
-    // 6. 标题
-    formatted = formatted.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-    formatted = formatted.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-    formatted = formatted.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+    // 6. 标题（消耗末尾换行）
+    formatted = formatted.replace(/^### (.+)\n?$/gm, '<h3>$1</h3>');
+    formatted = formatted.replace(/^## (.+)\n?$/gm, '<h2>$1</h2>');
+    formatted = formatted.replace(/^# (.+)\n?$/gm, '<h1>$1</h1>');
     
     // 7. 无序列表
-    formatted = formatted.replace(/^[-*] (.+)$/gm, '<li>$1</li>');
-    formatted = formatted.replace(/(<li>[\s\S]*?<\/li>\n?)+/g, match => {
-        return '<ul>' + match + '</ul>';
+    formatted = formatted.replace(/^[-*] (.+)\n?$/gm, '<li>$1</li>');
+    formatted = formatted.replace(/(<li>[\s\S]*?<\/li>)+/g, match => {
+        return '<ul>' + match.replace(/\n/g, '') + '</ul>';
     });
     
     // 8. 有序列表
-    formatted = formatted.replace(/^\d+\. (.+)$/gm, '<li>$1</li>');
-    formatted = formatted.replace(/(<li>[\s\S]*?<\/li>\n?)+/g, match => {
+    formatted = formatted.replace(/^\d+\. (.+)\n?$/gm, '<li>$1</li>');
+    formatted = formatted.replace(/(<li>[\s\S]*?<\/li>)+/g, match => {
         if (!match.includes('<ul>')) {
-            return '<ol>' + match + '</ol>';
+            return '<ol>' + match.replace(/\n/g, '') + '</ol>';
         }
         return match;
     });
     
-    // 9. 引用
-    formatted = formatted.replace(/^&gt; (.+)$/gm, '<blockquote>$1</blockquote>');
+    // 9. 引用（消耗末尾换行）
+    formatted = formatted.replace(/^&gt; (.+)\n?$/gm, '<blockquote>$1</blockquote>');
     
     // 10. 链接
     formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
     
-    // 11. 换行
+    // 11. 清理已处理元素后的多余换行
+    formatted = formatted.replace(/<\/(h[123]|blockquote|ul|ol)>\n/g, '</$1>');
+    
+    // 12. 换行转换
     formatted = formatted.replace(/\n/g, '<br>');
     
-    // 12. 恢复行内代码
+    // 13. 恢复行内代码
     inlineCodes.forEach((code, i) => {
         formatted = formatted.replace(`__INLINECODE_${i}__`, code);
     });
     
-    // 13. 恢复代码块
+    // 14. 恢复代码块
     codeBlocks.forEach((block, i) => {
         formatted = formatted.replace(`__CODEBLOCK_${i}__`, block);
     });
