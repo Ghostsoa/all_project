@@ -5,7 +5,7 @@ import { showToast } from './utils.js';
 import { loadServers, searchServers, deleteServer, renderServerList } from './server.js';
 import { createTerminal, connectSSH, openLocalTerminal } from './terminal.js';
 import { loadCommandHistory, clearCurrentCommands, saveCommandToHistory } from './commands.js';
-import { initFileTree, setCurrentServer } from './filetree.js';
+import { initFileTree, setCurrentServer, initDragUpload } from './filetree.js';
 import { openFileEditor } from './editor.js';
 
 // ========== 全局状态灯管理器 ==========
@@ -56,6 +56,7 @@ document.addEventListener('DOMContentLoaded', function() {
     initTagsInput();
     checkAuthStatus();
     initFileTree(); // 初始化文件树
+    initDragUpload(); // 初始化拖拽上传
 });
 
 // 暴露全局函数供HTML调用

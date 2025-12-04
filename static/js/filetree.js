@@ -175,6 +175,15 @@ export async function loadDirectory(path, retryCount = 0) {
     
     const fileTreeContainer = document.getElementById('fileTree');
     
+    if (!currentSessionID) {
+        console.log('⚠️ 未连接SSH，无法加载文件树');
+        fileTreeContainer.innerHTML = '<div class="file-tree-empty"><p>请先连接服务器</p></div>';
+        return;
+    }
+    
+    // 保存当前路径到state
+    state.currentPath = path;
+    
     if (retryCount === 0) {
         // 第一次加载时显示加载状态（不是重试）
         fileTreeContainer.innerHTML = '<div class="file-tree-empty"><p>⏳ 加载中...</p></div>';
@@ -245,8 +254,11 @@ function renderFileTree(files, basePath) {
     
     const html = `
         <div class="file-tree-header">
-            <span class="file-path">${basePath}</span>
+            <span class="file-path" title="${basePath}">${basePath}</span>
             <div class="file-actions">
+                <button class="file-action-btn" onclick="window.uploadFileToDirectory('${basePath}')" title="上传文件">
+                    <i class="fa-solid fa-upload"></i>
+                </button>
                 <button class="file-action-btn" onclick="window.createNewFile('${basePath}')" title="新建文件">📄+</button>
                 <button class="file-action-btn" onclick="window.createNewFolder('${basePath}')" title="新建文件夹">📁+</button>
             </div>
@@ -965,3 +977,177 @@ window.deleteFile = async function(path) {
         await fileCache.rollback(currentSessionID, parentPath);
     }
 };
+
+// ========== 文件上传功能 ==========
+
+// 手动选择文件上传
+window.uploadFileToDirectory = function(basePath) {
+    // 创建隐藏的文件input
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.multiple = true; // 支持多文件
+    input.style.display = 'none';
+    
+    input.onchange = async (e) => {
+        const files = Array.from(e.target.files);
+        if (files.length > 0) {
+            await uploadFiles(files, basePath);
+        }
+        input.remove();
+    };
+    
+    document.body.appendChild(input);
+    input.click();
+};
+
+// 上传文件到服务器
+async function uploadFiles(files, targetPath) {
+    if (!currentSessionID) {
+        showToast('未连接到服务器', 'error');
+        return;
+    }
+    
+    // 显示全局加载状态
+    if (window.updateGlobalStatus) {
+        window.updateGlobalStatus('loading');
+    }
+    
+    showToast(`正在上传 ${files.length} 个文件...`, 'info');
+    
+    let successCount = 0;
+    let failCount = 0;
+    
+    for (const file of files) {
+        try {
+            // 读取文件内容
+            const content = await readFileAsBase64(file);
+            
+            // 构建目标路径
+            const filePath = targetPath === '/' 
+                ? `/${file.name}` 
+                : `${targetPath}/${file.name}`;
+            
+            // 发送上传请求
+            const response = await fetch('/api/files/upload', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: currentSessionID,
+                    path: filePath,
+                    content: content,
+                    encoding: 'base64'
+                })
+            });
+            
+            const data = await response.json();
+            if (data.success) {
+                successCount++;
+            } else {
+                failCount++;
+                console.error(`上传 ${file.name} 失败:`, data.error);
+            }
+        } catch (error) {
+            failCount++;
+            console.error(`上传 ${file.name} 失败:`, error);
+        }
+    }
+    
+    // 显示结果
+    if (successCount > 0) {
+        showToast(`成功上传 ${successCount} 个文件`, 'success');
+        // 刷新当前目录
+        await loadDirectory(targetPath);
+        
+        if (window.updateGlobalStatus) {
+            window.updateGlobalStatus('success');
+        }
+    }
+    
+    if (failCount > 0) {
+        showToast(`${failCount} 个文件上传失败`, 'error');
+        if (window.updateGlobalStatus) {
+            window.updateGlobalStatus('error');
+        }
+    }
+}
+
+// 读取文件为Base64
+function readFileAsBase64(file) {
+    return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+            // 移除 data:*/*;base64, 前缀
+            const base64 = reader.result.split(',')[1];
+            resolve(base64);
+        };
+        reader.onerror = reject;
+        reader.readAsDataURL(file);
+    });
+}
+
+// 初始化拖拽上传功能
+export function initDragUpload() {
+    const fileTree = document.getElementById('fileTree');
+    if (!fileTree) return;
+    
+    // 防止默认拖拽行为
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        fileTree.addEventListener(eventName, preventDefaults, false);
+    });
+    
+    function preventDefaults(e) {
+        e.preventDefault();
+        e.stopPropagation();
+    }
+    
+    // 拖拽进入和悬停
+    ['dragenter', 'dragover'].forEach(eventName => {
+        fileTree.addEventListener(eventName, () => {
+            fileTree.classList.add('drag-over');
+        }, false);
+    });
+    
+    // 拖拽离开
+    ['dragleave', 'drop'].forEach(eventName => {
+        fileTree.addEventListener(eventName, () => {
+            fileTree.classList.remove('drag-over');
+        }, false);
+    });
+    
+    // 处理文件放下
+    fileTree.addEventListener('drop', async (e) => {
+        const dt = e.dataTransfer;
+        const files = Array.from(dt.files);
+        
+        if (files.length > 0) {
+            // 获取当前路径
+            const currentPath = state.currentPath || '/';
+            await uploadFiles(files, currentPath);
+        }
+    }, false);
+}
+
+// 添加拖拽样式
+const style = document.createElement('style');
+style.textContent = `
+    .file-tree.drag-over {
+        background: rgba(59, 130, 246, 0.1);
+        border: 2px dashed rgba(59, 130, 246, 0.5);
+    }
+    
+    .file-tree.drag-over::before {
+        content: '📤 拖放文件到此处上传';
+        position: absolute;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        font-size: 16px;
+        color: rgba(59, 130, 246, 0.9);
+        background: rgba(0, 0, 0, 0.8);
+        padding: 20px 40px;
+        border-radius: 8px;
+        pointer-events: none;
+        z-index: 100;
+    }
+`;
+document.head.appendChild(style);
