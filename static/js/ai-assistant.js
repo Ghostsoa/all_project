@@ -1,64 +1,73 @@
 // AI 助手功能
 
 let currentAIMode = 'chat';  // 'chat' | 'agent'
-let contextBubbleVisible = false;
-let historyVisible = false;
+let selectedModelValue = 'gpt-4';
+let selectedModelName = 'GPT-4';
 
-// 切换AI模式
-window.switchAIMode = function(mode) {
-    currentAIMode = mode;
+// 切换对话历史下拉
+window.toggleHistoryDropdown = function() {
+    const menu = document.getElementById('historyDropdownMenu');
+    const trigger = document.querySelector('.history-trigger');
     
-    // 更新模式按钮
-    document.querySelectorAll('.mode-btn').forEach(btn => {
-        if (btn.dataset.mode === mode) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
-    });
-    
-    // 切换上下文信息显示
-    const chatContext = document.getElementById('contextChat');
-    const agentContext = document.getElementById('contextAgent');
-    
-    if (mode === 'chat') {
-        if (chatContext) chatContext.style.display = 'block';
-        if (agentContext) agentContext.style.display = 'none';
+    if (menu.style.display === 'none' || !menu.style.display) {
+        menu.style.display = 'block';
+        trigger.classList.add('open');
     } else {
-        if (chatContext) chatContext.style.display = 'none';
-        if (agentContext) agentContext.style.display = 'block';
-    }
-    
-    console.log(`🔄 切换到${mode === 'chat' ? 'Chat' : 'Agent'}模式`);
-};
-
-// 切换上下文信息气泡
-window.toggleContextInfo = function() {
-    contextBubbleVisible = !contextBubbleVisible;
-    const bubble = document.getElementById('contextBubble');
-    const btn = event.target.closest('.tool-btn');
-    
-    if (bubble) {
-        bubble.style.display = contextBubbleVisible ? 'block' : 'none';
-    }
-    
-    if (btn) {
-        if (contextBubbleVisible) {
-            btn.classList.add('active');
-        } else {
-            btn.classList.remove('active');
-        }
+        menu.style.display = 'none';
+        trigger.classList.remove('open');
     }
 };
 
-// 切换对话历史
-window.toggleHistory = function() {
-    historyVisible = !historyVisible;
-    const sidebar = document.getElementById('historySidebar');
+// 切换模式下拉
+window.toggleModeDropdown = function() {
+    const menu = document.getElementById('modeDropdownMenu');
+    const trigger = document.querySelector('.mode-trigger');
     
-    if (sidebar) {
-        sidebar.style.display = historyVisible ? 'flex' : 'none';
+    if (menu.style.display === 'none' || !menu.style.display) {
+        menu.style.display = 'block';
+        trigger.classList.add('open');
+    } else {
+        menu.style.display = 'none';
+        trigger.classList.remove('open');
     }
+};
+
+// 选择模式
+window.selectMode = function(mode) {
+    currentAIMode = mode;
+    const modeText = mode === 'chat' ? 'Chat' : 'Agent';
+    
+    document.getElementById('currentMode').textContent = modeText;
+    toggleModeDropdown();
+    
+    console.log(`🔄 切换到${modeText}模式`);
+};
+
+// 打开AI设置
+window.openAISettings = function() {
+    alert('设置功能开发中...');
+};
+
+// 切换模型选择器
+window.toggleModelSelector = function() {
+    const popup = document.getElementById('modelPopup');
+    
+    if (popup.style.display === 'none' || !popup.style.display) {
+        popup.style.display = 'block';
+    } else {
+        popup.style.display = 'none';
+    }
+};
+
+// 选择模型
+window.selectModel = function(value, name) {
+    selectedModelValue = value;
+    selectedModelName = name;
+    
+    document.getElementById('selectedModel').textContent = name;
+    toggleModelSelector();
+    
+    console.log(`🤖 选择模型: ${name}`);
 };
 
 // 发送AI消息（统一入口）
@@ -70,18 +79,18 @@ window.sendAIMessage = function() {
         return;
     }
     
-    const model = document.getElementById('modelSelect').value;
-    console.log(`🤖 [${currentAIMode}模式] [${model}] 发送:`, message);
+    console.log(`🤖 [${currentAIMode}模式] [${selectedModelName}] 发送:`, message);
     
     // 添加用户消息到界面
     addAIMessage('user', message);
     
     // 清空输入框
     input.value = '';
+    input.style.height = 'auto'; // 重置高度
     
     // TODO: 调用AI API
     setTimeout(() => {
-        const response = `模式: ${currentAIMode === 'chat' ? 'Chat' : 'Agent'}\n模型: ${model}\n\n收到消息: ${message}\n\n（AI功能开发中...）`;
+        const response = `模式: ${currentAIMode === 'chat' ? 'Chat' : 'Agent'}\n模型: ${selectedModelName}\n\n收到消息: ${message}\n\n（AI功能开发中...）`;
         addAIMessage('assistant', response);
     }, 500);
 };
@@ -152,6 +161,31 @@ export function updateWorkspaceInfo(workspace) {
         project: workspace.rootPath || workspace.name
     });
 }
+
+// 点击外部关闭下拉菜单
+document.addEventListener('click', (e) => {
+    // 关闭历史下拉
+    const historyDropdown = document.getElementById('historyDropdownMenu');
+    const historyTrigger = document.querySelector('.history-trigger');
+    if (historyDropdown && !e.target.closest('.history-dropdown')) {
+        historyDropdown.style.display = 'none';
+        if (historyTrigger) historyTrigger.classList.remove('open');
+    }
+    
+    // 关闭模式下拉
+    const modeDropdown = document.getElementById('modeDropdownMenu');
+    const modeTrigger = document.querySelector('.mode-trigger');
+    if (modeDropdown && !e.target.closest('.mode-dropdown')) {
+        modeDropdown.style.display = 'none';
+        if (modeTrigger) modeTrigger.classList.remove('open');
+    }
+    
+    // 关闭模型选择
+    const modelPopup = document.getElementById('modelPopup');
+    if (modelPopup && !e.target.closest('.inline-model-selector')) {
+        modelPopup.style.display = 'none';
+    }
+});
 
 // Ctrl+Enter 发送消息
 document.addEventListener('DOMContentLoaded', () => {

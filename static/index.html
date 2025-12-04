@@ -150,51 +150,49 @@
             <div class="right-panel-content" id="aiPanel" style="display: none;">
                 <!-- 顶部工具栏 -->
                 <div class="ai-toolbar">
-                    <div class="ai-mode-switch">
-                        <span class="mode-btn active" data-mode="chat" onclick="switchAIMode('chat')">Chat</span>
-                        <span class="mode-divider">|</span>
-                        <span class="mode-btn" data-mode="agent" onclick="switchAIMode('agent')">Agent</span>
+                    <!-- 左侧：对话历史下拉 -->
+                    <div class="history-dropdown">
+                        <div class="history-trigger" onclick="toggleHistoryDropdown()">
+                            <span class="history-title" id="currentHistoryTitle">新对话</span>
+                            <i class="fa-solid fa-chevron-down"></i>
+                        </div>
+                        <!-- 历史列表下拉 -->
+                        <div class="history-dropdown-menu" id="historyDropdownMenu" style="display: none;">
+                            <div class="history-item active">
+                                <span class="history-item-title">新对话</span>
+                            </div>
+                            <div class="history-divider"></div>
+                            <div class="history-item">
+                                <span class="history-item-title">关于golang的安装配置</span>
+                            </div>
+                            <div class="history-item">
+                                <span class="history-item-title">修复nginx配置错误</span>
+                            </div>
+                            <div class="history-divider"></div>
+                            <div class="history-item new">
+                                <i class="fa-solid fa-plus"></i>
+                                <span>新建对话</span>
+                            </div>
+                        </div>
                     </div>
-                    <div class="ai-tools">
-                        <button class="tool-btn" onclick="toggleHistory()" title="对话历史">
-                            <i class="fa-solid fa-clock-rotate-left"></i>
-                        </button>
-                        <button class="tool-btn" onclick="toggleContextInfo()" title="上下文信息">
-                            <i class="fa-solid fa-circle-info"></i>
-                        </button>
-                    </div>
-                </div>
 
-                <!-- 上下文信息气泡（折叠） -->
-                <div class="context-bubble" id="contextBubble" style="display: none;">
-                    <!-- Chat模式：显示服务器和路径 -->
-                    <div class="context-chat" id="contextChat">
-                        <div class="context-item">
-                            <span class="ctx-icon">🖥️</span>
-                            <span class="ctx-value" id="ctxServer">未连接</span>
+                    <!-- 右侧：模式切换+设置 -->
+                    <div class="ai-controls">
+                        <!-- 模式切换下拉 -->
+                        <div class="mode-dropdown">
+                            <div class="mode-trigger" onclick="toggleModeDropdown()">
+                                <span id="currentMode">Chat</span>
+                                <i class="fa-solid fa-chevron-down"></i>
+                            </div>
+                            <div class="mode-dropdown-menu" id="modeDropdownMenu" style="display: none;">
+                                <div class="mode-option" data-mode="chat" onclick="selectMode('chat')">Chat</div>
+                                <div class="mode-option" data-mode="agent" onclick="selectMode('agent')">Agent</div>
+                            </div>
                         </div>
-                        <div class="context-item">
-                            <span class="ctx-icon">📂</span>
-                            <span class="ctx-value" id="ctxPath">-</span>
-                        </div>
-                    </div>
-                    <!-- Agent模式：显示项目路径 -->
-                    <div class="context-agent" id="contextAgent" style="display: none;">
-                        <div class="context-item">
-                            <span class="ctx-icon">📁</span>
-                            <span class="ctx-value" id="ctxProject">未配置项目</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- 对话历史侧栏（折叠） -->
-                <div class="history-sidebar" id="historySidebar" style="display: none;">
-                    <div class="history-header">
-                        <span>对话历史</span>
-                        <button class="close-btn" onclick="toggleHistory()">✕</button>
-                    </div>
-                    <div class="history-list">
-                        <div class="history-empty">暂无历史记录</div>
+                        <!-- 设置按钮 -->
+                        <button class="tool-btn" onclick="openAISettings()" title="设置">
+                            <i class="fa-solid fa-gear"></i>
+                        </button>
                     </div>
                 </div>
 
@@ -209,25 +207,41 @@
 
                 <!-- 输入区域 -->
                 <div class="ai-input-container">
-                    <div class="input-wrapper">
+                    <div class="input-box">
                         <textarea 
                             id="aiInput" 
                             placeholder="输入消息..."
                             rows="2"
                         ></textarea>
-                    </div>
-                    <div class="input-footer">
-                        <div class="model-selector">
-                            <select id="modelSelect">
-                                <option value="gpt-4">GPT-4</option>
-                                <option value="gpt-3.5">GPT-3.5</option>
-                                <option value="claude">Claude</option>
-                                <option value="local">本地模型</option>
-                            </select>
+                        <div class="input-actions">
+                            <!-- 模型选择（输入框内） -->
+                            <div class="inline-model-selector">
+                                <div class="model-trigger" onclick="toggleModelSelector()">
+                                    <span id="selectedModel">GPT-4</span>
+                                    <i class="fa-solid fa-chevron-up"></i>
+                                </div>
+                                <!-- 向上弹出的模型列表 -->
+                                <div class="model-popup" id="modelPopup" style="display: none;">
+                                    <div class="model-option" data-model="gpt-4" onclick="selectModel('gpt-4', 'GPT-4')">
+                                        <span class="model-name">GPT-4</span>
+                                        <span class="model-tag">推荐</span>
+                                    </div>
+                                    <div class="model-option" data-model="gpt-3.5" onclick="selectModel('gpt-3.5', 'GPT-3.5')">
+                                        <span class="model-name">GPT-3.5</span>
+                                    </div>
+                                    <div class="model-option" data-model="claude" onclick="selectModel('claude', 'Claude')">
+                                        <span class="model-name">Claude</span>
+                                    </div>
+                                    <div class="model-option" data-model="local" onclick="selectModel('local', '本地')">
+                                        <span class="model-name">本地模型</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <!-- 发送按钮（图标） -->
+                            <button class="send-icon-btn" onclick="sendAIMessage()" title="发送 (Ctrl+Enter)">
+                                <i class="fa-solid fa-paper-plane"></i>
+                            </button>
                         </div>
-                        <button class="send-btn" onclick="sendAIMessage()">
-                            发送
-                        </button>
                     </div>
                 </div>
             </div>
