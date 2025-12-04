@@ -39,23 +39,19 @@ function createLoadingTab(filePath, serverID, sessionID) {
     const fileName = filePath.split('/').pop();
     const tabId = 'editor-' + Date.now();
     
-    // 显示编辑器标签栏
-    const editorTabsBar = document.getElementById('editorTabsBar');
-    editorTabsBar.style.display = 'flex';
-    
-    // 添加标签到编辑器标签栏
-    const tabsList = document.getElementById('editorTabsList');
+    // 添加标签到统一内容标签栏
+    const tabsList = document.getElementById('contentTabsList');
     const tabHTML = `
-        <div class="editor-tab-item" data-tab-id="${tabId}" data-path="${filePath}" onclick="window.switchToEditorTab('${tabId}')">
+        <div class="content-tab-item" data-tab-id="${tabId}" data-path="${filePath}" onclick="window.switchContentTab('${tabId}')">
             <span class="tab-icon">${getFileIcon(fileName)}</span>
             <span class="tab-name">${fileName}</span>
-            <span class="tab-close" onclick="event.stopPropagation(); window.closeEditorTab('${tabId}')">×</span>
+            <span class="tab-close" onclick="event.stopPropagation(); window.closeContentTab('${tabId}')">×</span>
         </div>
     `;
     tabsList.insertAdjacentHTML('beforeend', tabHTML);
     
     // 创建加载中容器
-    const terminalsContainer = document.getElementById('terminalsContainer');
+    const contentContainer = document.getElementById('contentContainer');
     const editorHTML = `
         <div class="editor-pane" data-tab-id="${tabId}" data-path="${filePath}">
             <div class="editor-toolbar">
@@ -69,7 +65,7 @@ function createLoadingTab(filePath, serverID, sessionID) {
             </div>
         </div>
     `;
-    terminalsContainer.insertAdjacentHTML('beforeend', editorHTML);
+    contentContainer.insertAdjacentHTML('beforeend', editorHTML);
     
     // 保存文件信息
     openFiles.set(filePath, { serverID, sessionID, tabId, loading: true });
@@ -227,10 +223,10 @@ function switchToTab(filePath) {
     if (!fileInfo) return;
     
     // 切换标签激活状态
-    document.querySelectorAll('.editor-tab-item').forEach(tab => {
+    document.querySelectorAll('.content-tab-item').forEach(tab => {
         tab.classList.remove('active');
     });
-    document.querySelector(`.editor-tab-item[data-tab-id="${fileInfo.tabId}"]`).classList.add('active');
+    document.querySelector(`.content-tab-item[data-tab-id="${fileInfo.tabId}"]`).classList.add('active');
     
     // 切换内容显示
     document.querySelectorAll('.terminal-pane, .editor-pane').forEach(pane => {
@@ -246,7 +242,7 @@ function switchToTab(filePath) {
 }
 
 function markAsModified(tabId) {
-    const tab = document.querySelector(`.editor-tab-item[data-tab-id="${tabId}"]`);
+    const tab = document.querySelector(`.content-tab-item[data-tab-id="${tabId}"]`);
     if (tab && !tab.classList.contains('modified')) {
         tab.classList.add('modified');
         const tabName = tab.querySelector('.tab-name');
@@ -257,7 +253,7 @@ function markAsModified(tabId) {
 }
 
 function markAsUnmodified(tabId) {
-    const tab = document.querySelector(`.editor-tab-item[data-tab-id="${tabId}"]`);
+    const tab = document.querySelector(`.content-tab-item[data-tab-id="${tabId}"]`);
     if (tab) {
         tab.classList.remove('modified');
         const tabName = tab.querySelector('.tab-name');
@@ -265,44 +261,57 @@ function markAsUnmodified(tabId) {
     }
 }
 
-// 全局函数
-window.switchToEditorTab = function(tabId) {
-    const pane = document.querySelector(`.editor-pane[data-tab-id="${tabId}"]`);
-    if (!pane) return;
-    
-    const filePath = pane.dataset.path;
-    switchToTab(filePath);
+// 全局函数 - 统一内容标签切换
+window.switchContentTab = function(id) {
+    // 如果是终端session
+    if (id.startsWith('ssh-') || id.startsWith('local-')) {
+        document.querySelectorAll('.content-tab-item').forEach(tab => {
+            tab.classList.remove('active');
+        });
+        document.querySelector(`.content-tab-item[data-session-id="${id}"]`)?.classList.add('active');
+        
+        document.querySelectorAll('.terminal-pane, .editor-pane').forEach(pane => {
+            pane.classList.remove('active');
+        });
+        document.getElementById(id)?.classList.add('active');
+    } 
+    // 如果是编辑器标签
+    else {
+        const pane = document.querySelector(`.editor-pane[data-tab-id="${id}"]`);
+        if (!pane) return;
+        
+        const filePath = pane.dataset.path;
+        switchToTab(filePath);
+    }
 };
 
-window.closeEditorTab = function(tabId) {
-    // 检查是否有未保存的修改
-    const tab = document.querySelector(`.editor-tab-item[data-tab-id="${tabId}"]`);
-    if (tab && tab.classList.contains('modified')) {
-        if (!confirm('文件未保存，确定关闭吗？')) return;
-    }
-    
-    // 删除标签和编辑器
-    const pane = document.querySelector(`.editor-pane[data-tab-id="${tabId}"]`);
-    const filePath = pane?.dataset.path;
-    
-    tab?.remove();
-    pane?.remove();
-    
-    // 清理数据
-    const editor = editorInstances.get(tabId);
-    if (editor) {
-        editor.dispose();
-        editorInstances.delete(tabId);
-    }
-    
-    if (filePath) {
-        openFiles.delete(filePath);
-    }
-    
-    // 如果没有编辑器标签了，隐藏标签栏
-    const remainingTabs = document.querySelectorAll('.editor-tab-item');
-    if (remainingTabs.length === 0) {
-        document.getElementById('editorTabsBar').style.display = 'none';
+window.closeContentTab = function(id) {
+    // 如果是编辑器标签
+    if (id.startsWith('editor-')) {
+        const tab = document.querySelector(`.content-tab-item[data-tab-id="${id}"]`);
+        if (tab && tab.classList.contains('modified')) {
+            if (!confirm('文件未保存，确定关闭吗？')) return;
+        }
+        
+        const pane = document.querySelector(`.editor-pane[data-tab-id="${id}"]`);
+        const filePath = pane?.dataset.path;
+        
+        tab?.remove();
+        pane?.remove();
+        
+        const editor = editorInstances.get(id);
+        if (editor) {
+            editor.dispose();
+            editorInstances.delete(id);
+        }
+        
+        if (filePath) {
+            openFiles.delete(filePath);
+        }
+    } 
+    // 如果是终端标签（暂时不实现关闭）
+    else {
+        // TODO: 实现终端关闭
     }
 };
 

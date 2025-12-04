@@ -68,11 +68,23 @@ window.selectServer = async function(id) {
         document.getElementById('noSelection').style.display = 'none';
         document.getElementById('terminalWrapper').style.display = 'flex';
         
-        const terminalsContainer = document.getElementById('terminalsContainer');
+        // 创建内容标签
+        const tabsList = document.getElementById('contentTabsList');
+        const tabHTML = `
+            <div class="content-tab-item active" data-session-id="${sessionId}" onclick="window.switchContentTab('${sessionId}')">
+                <span class="tab-icon">💻</span>
+                <span class="tab-name">${server.name}</span>
+                <span class="tab-close" onclick="event.stopPropagation(); window.closeContentTab('${sessionId}')">×</span>
+            </div>
+        `;
+        tabsList.insertAdjacentHTML('beforeend', tabHTML);
+        
+        // 创建终端容器
+        const contentContainer = document.getElementById('contentContainer');
         const terminalPane = document.createElement('div');
         terminalPane.id = sessionId;
-        terminalPane.className = 'terminal-pane';
-        terminalsContainer.appendChild(terminalPane);
+        terminalPane.className = 'terminal-pane active';
+        contentContainer.appendChild(terminalPane);
         
         const { term, fitAddon } = createTerminal();
         term.open(terminalPane);

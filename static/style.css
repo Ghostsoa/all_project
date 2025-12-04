@@ -472,11 +472,9 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    padding: 16px;
-    padding-bottom: 24px;  /* 增加底部内边距 */
     display: none;
+    overflow: hidden;
     background: #000000;
-    border-radius: 12px;
 }
 
 .terminal-pane.active {
@@ -1267,24 +1265,29 @@ body {
     min-width: 0;
 }
 
-/* 编辑器标签栏 */
-.editor-tabs-bar {
+/* 统一内容标签栏：终端 + 文件 */
+.content-tabs-bar {
     display: flex;
     background: rgba(255, 255, 255, 0.02);
     border-bottom: 1px solid rgba(255, 255, 255, 0.06);
     padding: 4px 8px;
-    min-height: 40px;
+    min-height: 42px;
     align-items: center;
 }
 
-.editor-tabs-list {
+.content-tabs-list {
     display: flex;
     gap: 4px;
     flex: 1;
     overflow-x: auto;
+    overflow-y: hidden;
 }
 
-.editor-tab-item {
+.content-tabs-list::-webkit-scrollbar {
+    height: 4px;
+}
+
+.content-tab-item {
     display: flex;
     align-items: center;
     gap: 6px;
@@ -1297,31 +1300,38 @@ body {
     color: rgba(255, 255, 255, 0.7);
     transition: all 0.2s;
     white-space: nowrap;
+    flex-shrink: 0;
 }
 
-.editor-tab-item:hover {
+.content-tab-item:hover {
     background: rgba(255, 255, 255, 0.06);
     border-color: rgba(255, 255, 255, 0.15);
 }
 
-.editor-tab-item.active {
+.content-tab-item.active {
     background: rgba(59, 130, 246, 0.15);
     border-color: rgba(59, 130, 246, 0.4);
     color: rgba(255, 255, 255, 0.95);
 }
 
-.editor-tab-item.modified .tab-name {
+.content-tab-item.modified .tab-name {
     color: #fbbf24;
 }
 
-.editor-tab-item .tab-close {
+.content-tab-item .tab-close {
     margin-left: 4px;
     opacity: 0.5;
     transition: opacity 0.2s;
 }
 
-.editor-tab-item .tab-close:hover {
+.content-tab-item .tab-close:hover {
     opacity: 1;
+}
+
+.content-container {
+    flex: 1;
+    position: relative;
+    overflow: hidden;
 }
 
 /* 编辑器样式 */

@@ -62,11 +62,12 @@ export function connectSSH(sessionId, server) {
         updateStatusLight('connected');
         
         // WebSocket连接成功后，延迟加载文件树（等待SFTP创建）
+        // 增加延迟确保后端SFTP已就绪
         setTimeout(() => {
             if (window.setCurrentServer) {
                 window.setCurrentServer(server.ID, sessionId);
             }
-        }, 500);
+        }, 1500); // 增加到1.5秒，确保SFTP完全就绪
     };
     
     ws.onmessage = (event) => {
@@ -118,11 +119,23 @@ export function openLocalTerminal() {
     document.getElementById('noSelection').style.display = 'none';
     document.getElementById('terminalWrapper').style.display = 'flex';
     
-    const terminalsContainer = document.getElementById('terminalsContainer');
+    // 创建内容标签
+    const tabsList = document.getElementById('contentTabsList');
+    const tabHTML = `
+        <div class="content-tab-item active" data-session-id="${sessionId}" onclick="window.switchContentTab('${sessionId}')">
+            <span class="tab-icon">💻</span>
+            <span class="tab-name">本地终端</span>
+            <span class="tab-close" onclick="event.stopPropagation(); window.closeContentTab('${sessionId}')">×</span>
+        </div>
+    `;
+    tabsList.insertAdjacentHTML('beforeend', tabHTML);
+    
+    // 创建终端容器
+    const contentContainer = document.getElementById('contentContainer');
     const terminalPane = document.createElement('div');
     terminalPane.id = sessionId;
-    terminalPane.className = 'terminal-pane';
-    terminalsContainer.appendChild(terminalPane);
+    terminalPane.className = 'terminal-pane active';
+    contentContainer.appendChild(terminalPane);
     
     const { term, fitAddon } = createTerminal();
     term.open(terminalPane);

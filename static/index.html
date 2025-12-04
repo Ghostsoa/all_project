@@ -72,13 +72,15 @@
 
                     <!-- 主内容区 -->
                     <div class="main-content">
-                        <!-- 编辑器标签栏 -->
-                        <div class="editor-tabs-bar" id="editorTabsBar" style="display: none;">
-                            <div class="editor-tabs-list" id="editorTabsList"></div>
+                        <!-- 统一内容标签栏：终端 + 文件 -->
+                        <div class="content-tabs-bar" id="contentTabsBar">
+                            <div class="content-tabs-list" id="contentTabsList">
+                                <!-- 默认终端标签在 terminal.js 中创建 -->
+                            </div>
                         </div>
                         
-                        <!-- 终端容器 -->
-                        <div class="terminals-container" id="terminalsContainer"></div>
+                        <!-- 内容容器：终端和编辑器 -->
+                        <div class="content-container" id="contentContainer"></div>
                     </div>
                 </div>
 
