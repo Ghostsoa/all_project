@@ -151,28 +151,22 @@
             <div class="right-panel-content" id="aiPanel" style="display: none;">
                 <!-- 顶部工具栏 -->
                 <div class="ai-toolbar">
-                    <!-- 左侧：对话历史下拉 -->
-                    <div class="history-dropdown">
-                        <div class="history-trigger" onclick="toggleHistoryDropdown()">
-                            <span class="history-title" id="currentHistoryTitle">新对话</span>
+                    <!-- 左侧：对话历史 -->
+                    <div class="ai-history-selector">
+                        <button class="history-trigger" onclick="toggleHistoryDropdown()">
+                            <i class="fa-solid fa-clock-rotate-left"></i>
+                            <span class="current-conversation">对话历史</span>
                             <i class="fa-solid fa-chevron-down"></i>
-                        </div>
+                        </button>
                         <!-- 历史列表下拉 -->
                         <div class="history-dropdown-menu" id="historyDropdownMenu" style="display: none;">
-                            <div class="history-item active">
-                                <span class="history-item-title">新对话</span>
-                            </div>
-                            <div class="history-divider"></div>
-                            <div class="history-item">
-                                <span class="history-item-title">关于golang的安装配置</span>
-                            </div>
-                            <div class="history-item">
-                                <span class="history-item-title">修复nginx配置错误</span>
-                            </div>
-                            <div class="history-divider"></div>
-                            <div class="history-item new">
+                            <div class="history-item new" onclick="createNewAISession()">
                                 <i class="fa-solid fa-plus"></i>
                                 <span>新建对话</span>
+                            </div>
+                            <div class="history-divider"></div>
+                            <div id="aiConversationHistory">
+                                <div class="loading">加载中...</div>
                             </div>
                         </div>
                     </div>
@@ -233,6 +227,10 @@
                             </button>
                         </div>
                     </div>
+                    <!-- 清空对话按钮 -->
+                    <button class="clear-chat-btn" onclick="clearCurrentAIChat()" title="清空当前对话">
+                        <i class="fa-solid fa-broom"></i>
+                    </button>
                 </div>
             </div>
 

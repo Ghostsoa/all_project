@@ -9,6 +9,7 @@ import { initFileTree, setCurrentServer, setLocalTerminal, loadDirectory, initDr
 import { openFileEditor } from './editor.js';
 import { updateTerminalSnapshot, updateWorkspaceInfo } from './ai-assistant.js';
 import './ai-settings.js'; // AI设置管理
+import { initAIChat } from './ai-chat.js'; // AI对话功能
 
 // 导出AI助手函数到window
 window.updateTerminalSnapshot = updateTerminalSnapshot;
@@ -57,12 +58,13 @@ const serverContentTabs = new Map(); // sessionId -> HTML string
 const serverActivePane = new Map(); // sessionId -> { type: 'terminal'|'editor', id: string }
 
 // 页面加载
-document.addEventListener('DOMContentLoaded', function() {
+document.addEventListener('DOMContentLoaded', async function() {
     loadServers();
     initTagsInput();
     checkAuthStatus();
     initFileTree(); // 初始化文件树
     initDragUpload(); // 初始化拖拽上传
+    await initAIChat(); // 初始化AI对话功能
     
     // 自动打开本地终端作为默认
     setTimeout(() => {
