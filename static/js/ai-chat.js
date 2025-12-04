@@ -273,7 +273,7 @@ async function streamChat(sessionId, message, thinkingId) {
         
         // 建立WebSocket连接
         const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/ai?session_id=${sessionId}&message=${encodeURIComponent(message)}`;
+        const wsUrl = `${protocol}//${window.location.host}/ws/ai`;
         
         chatWebSocket = new WebSocket(wsUrl);
         
@@ -282,9 +282,17 @@ async function streamChat(sessionId, message, thinkingId) {
         let messageElement = null;
         
         chatWebSocket.onopen = () => {
-            console.log('✅ WebSocket连接已建立, URL:', wsUrl);
+            console.log('✅ WebSocket连接已建立');
             // 移除思考状态
             removeThinking(thinkingId);
+            
+            // 发送消息到后端
+            const payload = {
+                session_id: sessionId,
+                message: message
+            };
+            console.log('📤 发送消息:', payload);
+            chatWebSocket.send(JSON.stringify(payload));
         };
         
         chatWebSocket.onmessage = (event) => {
