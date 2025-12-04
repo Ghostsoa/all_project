@@ -7,6 +7,11 @@ import { getApiEndpoint, getCurrentSessionID } from './filetree.js';
 let editorInstances = new Map(); // 存储编辑器实例
 let openFiles = new Map(); // 存储打开的文件信息
 
+// 导出获取编辑器实例的函数
+export function getEditorInstance(tabId) {
+    return editorInstances.get(tabId);
+}
+
 // 获取文件图标HTML（用于标签页）
 function getFileIconHTML(fileName) {
     const ext = fileName.split('.').pop()?.toLowerCase();

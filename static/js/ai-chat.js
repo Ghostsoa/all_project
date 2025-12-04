@@ -2,6 +2,7 @@
 
 import { apiRequest } from './api.js';
 import { state } from './config.js';
+import { getEditorInstance } from './editor.js';
 
 // 全局变量
 let currentSession = null;
@@ -560,49 +561,47 @@ window.getTerminalBuffer = function(lines = 50) {
 window.getEditorContext = function(contextLines = 10) {
     try {
         // 获取当前激活的编辑器pane
-        const activeEditor = document.querySelector('.editor-pane.active');
-        console.log('🔍 查找编辑器:', activeEditor);
-        if (!activeEditor) {
-            console.log('❌ 没有找到激活的编辑器pane');
+        const activeEditorPane = document.querySelector('.editor-pane.active');
+        if (!activeEditorPane) {
             return null;
         }
         
-        const filePath = activeEditor.dataset.path;
+        const tabId = activeEditorPane.dataset.tabId;
+        const filePath = activeEditorPane.dataset.path;
         const fileName = filePath ? filePath.split('/').pop() : 'unknown';
-        console.log('📄 文件路径:', filePath);
         
-        const editor = activeEditor.querySelector('.CodeMirror');
-        console.log('🔍 CodeMirror元素:', editor);
-        
-        if (!editor || !editor.CodeMirror) {
-            console.log('❌ CodeMirror实例不存在');
+        // 获取Monaco编辑器实例
+        const editor = getEditorInstance(tabId);
+        if (!editor) {
+            console.log('❌ Monaco编辑器实例不存在');
             return null;
         }
         
-        const cm = editor.CodeMirror;
-        const cursor = cm.getCursor();
-        const lineCount = cm.lineCount();
+        // 获取光标位置
+        const position = editor.getPosition();
+        const model = editor.getModel();
+        const lineCount = model.getLineCount();
         
         // 获取光标周围的代码上下文
-        const startLine = Math.max(0, cursor.line - contextLines);
-        const endLine = Math.min(lineCount - 1, cursor.line + contextLines);
+        const startLine = Math.max(1, position.lineNumber - contextLines);
+        const endLine = Math.min(lineCount, position.lineNumber + contextLines);
         const contextCodeLines = [];
         
         for (let i = startLine; i <= endLine; i++) {
-            const lineText = cm.getLine(i);
-            const prefix = i === cursor.line ? '→ ' : '  ';
-            contextCodeLines.push(`${prefix}${i + 1}: ${lineText}`);
+            const lineText = model.getLineContent(i);
+            const prefix = i === position.lineNumber ? '→ ' : '  ';
+            contextCodeLines.push(`${prefix}${i}: ${lineText}`);
         }
         
         // 获取当前行内容
-        const currentLineText = cm.getLine(cursor.line);
+        const currentLineText = model.getLineContent(position.lineNumber);
         
         return {
             filePath: filePath,
             fileName: fileName,
             cursor: {
-                line: cursor.line + 1, // 转为1-based
-                column: cursor.ch + 1
+                line: position.lineNumber,
+                column: position.column
             },
             currentLine: currentLineText,
             contextContent: contextCodeLines.join('\n'),
