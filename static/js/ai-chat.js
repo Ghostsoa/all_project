@@ -86,19 +86,28 @@ function renderSessionList() {
     
     // 添加事件委托
     container.onclick = function(e) {
+        console.log('🖱️ container 点击事件触发', e.target);
         const target = e.target.closest('[data-action]');
-        if (!target) return;
+        console.log('🎯 找到的目标:', target);
+        if (!target) {
+            console.log('❌ 没有找到 data-action 元素');
+            return;
+        }
         
         const action = target.dataset.action;
         const sessionId = target.dataset.sessionId;
+        console.log('📋 action:', action, 'sessionId:', sessionId);
         
         if (action === 'create-new') {
+            console.log('➕ 创建新会话');
             createNewAISession();
             toggleHistoryDropdown();
         } else if (action === 'select-session' && sessionId) {
+            console.log('✅ 选择会话:', sessionId);
             selectAISession(parseInt(sessionId));
             toggleHistoryDropdown();
         } else if (action === 'delete-session' && sessionId) {
+            console.log('🗑️ 删除会话:', sessionId);
             e.stopPropagation();
             deleteAISession(parseInt(sessionId));
         }
