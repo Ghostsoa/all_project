@@ -12,6 +12,22 @@ if (typeof require !== 'undefined' && typeof window.monaco === 'undefined') {
     require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
 }
 
+// 动态导入marked（使用ES模块）
+let markedLib = null;
+const loadMarked = async () => {
+    if (!markedLib) {
+        try {
+            markedLib = await import('https://cdn.jsdelivr.net/npm/marked@11.0.0/+esm');
+            console.log('✅ marked已动态导入');
+            return markedLib;
+        } catch (error) {
+            console.error('❌ marked导入失败:', error);
+            return null;
+        }
+    }
+    return markedLib;
+};
+
 // Office文档格式（需要特殊提示）
 const OFFICE_EXTENSIONS = new Set([
     'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx'
@@ -149,7 +165,7 @@ function createLoadingTab(filePath, serverID, sessionID) {
     return tabId;
 }
 
-function initializeMarkdownEditor(tabId, filePath, content) {
+async function initializeMarkdownEditor(tabId, filePath, content) {
     const container = document.getElementById(tabId);
     container.classList.remove('loading');
     container.innerHTML = ''; // 清空加载提示
@@ -188,41 +204,22 @@ function initializeMarkdownEditor(tabId, filePath, content) {
         </div>
     `;
     
-    // 等待marked加载完成（最多等待3秒）
-    const waitForMarked = () => {
-        return new Promise((resolve) => {
-            let attempts = 0;
-            const maxAttempts = 30; // 3秒
-            
-            const checkMarked = () => {
-                if (window.marked) {
-                    console.log('✅ marked.js已加载');
-                    // 配置marked
-                    window.marked.setOptions({
-                        highlight: function(code, lang) {
-                            if (lang && window.hljs && window.hljs.getLanguage(lang)) {
-                                return window.hljs.highlight(code, { language: lang }).value;
-                            }
-                            return code;
-                        },
-                        breaks: true,
-                        gfm: true
-                    });
-                    resolve(true);
-                } else if (attempts < maxAttempts) {
-                    attempts++;
-                    setTimeout(checkMarked, 100);
-                } else {
-                    console.warn('⚠️ marked.js加载超时');
-                    resolve(false);
+    // 动态加载marked
+    const marked = await loadMarked();
+    if (marked) {
+        // 配置marked
+        marked.marked.setOptions({
+            highlight: function(code, lang) {
+                if (lang && window.hljs && window.hljs.getLanguage(lang)) {
+                    return window.hljs.highlight(code, { language: lang }).value;
                 }
-            };
-            checkMarked();
+                return code;
+            },
+            breaks: true,
+            gfm: true
         });
-    };
-    
-    // 先等待marked加载
-    waitForMarked().then(() => {
+        
+        // 初始化Monaco编辑器
         // 初始化Monaco编辑器
         const fileName = filePath.split('/').pop();
         require(['vs/editor/editor.main'], function() {
@@ -258,17 +255,17 @@ function initializeMarkdownEditor(tabId, filePath, content) {
                 window.saveFile(tabId);
             });
         });
-    });
+    }
 }
 
 function updateMarkdownPreview(tabId, markdown) {
     const previewPane = document.getElementById(`${tabId}-preview`);
     if (!previewPane) return;
     
-    if (window.marked) {
+    if (markedLib) {
         try {
-            // marked.parse 返回字符串，不是Promise
-            const html = window.marked.parse(markdown);
+            // 使用导入的marked
+            const html = markedLib.marked.parse(markdown);
             previewPane.innerHTML = `<div class="markdown-body">${html}</div>`;
             
             // 高亮代码块
