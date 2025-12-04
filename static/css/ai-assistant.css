@@ -44,6 +44,11 @@
     transform: rotate(180deg);
 }
 
+/* 历史选择器容器 - 必须relative才能让下拉菜单absolute定位正确 */
+.ai-history-selector {
+    position: relative;
+}
+
 /* 历史下拉菜单 */
 .history-dropdown-menu {
     position: absolute;
