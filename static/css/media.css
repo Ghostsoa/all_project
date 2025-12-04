@@ -4,7 +4,10 @@
     display: none;
     flex-direction: column;
     height: 100%;
+    width: 100%;
     background: #1e1e1e;
+    position: relative;
+    overflow: hidden;
 }
 
 .media-viewer.active {
@@ -18,12 +21,61 @@
     padding: 12px 16px;
     background: rgba(255, 255, 255, 0.03);
     border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    flex-shrink: 0;
+    z-index: 10;
 }
 
 .media-path {
     font-size: 12px;
     color: rgba(255, 255, 255, 0.6);
     font-family: 'Courier New', monospace;
+    flex: 1;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.media-toolbar-actions {
+    display: flex;
+    gap: 8px;
+    align-items: center;
+}
+
+.media-zoom-controls {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+    padding: 4px 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+}
+
+.btn-zoom {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    font-size: 14px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.btn-zoom:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.zoom-percentage {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+    min-width: 40px;
+    text-align: center;
 }
 
 .btn-download {
@@ -52,21 +104,64 @@
     justify-content: center;
     padding: 20px;
     overflow: auto;
+    position: relative;
+    min-height: 0;
 }
 
-/* 图片查看器 */
-.media-content img {
+.media-content::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+.media-content::-webkit-scrollbar-track {
+    background: rgba(255, 255, 255, 0.05);
+}
+
+.media-content::-webkit-scrollbar-thumb {
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+}
+
+.media-content::-webkit-scrollbar-thumb:hover {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+/* 图片容器 */
+.image-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+    cursor: grab;
+}
+
+.image-container.dragging {
+    cursor: grabbing;
+}
+
+.image-container img {
     max-width: 100%;
-    max-height: 80vh;
+    max-height: 100%;
     object-fit: contain;
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    transition: transform 0.2s ease;
+    user-select: none;
 }
 
-/* 视频播放器 */
-.media-content video {
+/* 视频容器 */
+.video-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 100%;
+}
+
+.video-container video {
     max-width: 100%;
-    max-height: 80vh;
+    max-height: 100%;
     border-radius: 8px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
@@ -75,12 +170,19 @@
 .audio-content {
     flex-direction: column;
     gap: 20px;
+    width: 100%;
+    max-width: 500px;
 }
 
 .audio-icon {
     display: flex;
     align-items: center;
     justify-content: center;
+    width: 120px;
+    height: 120px;
+    margin: 0 auto;
+    background: rgba(59, 130, 246, 0.1);
+    border-radius: 50%;
 }
 
 .audio-name {
@@ -88,12 +190,23 @@
     font-weight: 600;
     color: rgba(255, 255, 255, 0.9);
     text-align: center;
-    max-width: 500px;
     word-break: break-all;
+    padding: 0 20px;
 }
 
 .audio-content audio {
     width: 100%;
-    max-width: 500px;
-    margin-top: 20px;
+    outline: none;
+}
+
+/* 空状态提示 */
+.media-empty {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 100%;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 14px;
+    gap: 8px;
 }

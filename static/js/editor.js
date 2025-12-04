@@ -779,12 +779,28 @@ window.openMediaViewer = async function(filePath, serverID, sessionID, mediaType
             <div class="media-viewer" data-tab-id="${tabId}" data-path="${filePath}">
                 <div class="media-toolbar">
                     <span class="media-path">${filePath}</span>
-                    <button class="btn-download" onclick="window.downloadFile('${filePath}', '${sessionID}')" title="下载">
-                        <i class="fa-solid fa-download"></i> 下载
-                    </button>
+                    <div class="media-toolbar-actions">
+                        <div class="media-zoom-controls">
+                            <button class="btn-zoom" onclick="window.zoomMedia('${tabId}', -0.1)" title="缩小">
+                                <i class="fa-solid fa-minus"></i>
+                            </button>
+                            <span class="zoom-percentage" id="zoom-${tabId}">100%</span>
+                            <button class="btn-zoom" onclick="window.zoomMedia('${tabId}', 0.1)" title="放大">
+                                <i class="fa-solid fa-plus"></i>
+                            </button>
+                            <button class="btn-zoom" onclick="window.resetZoom('${tabId}')" title="重置">
+                                <i class="fa-solid fa-expand"></i>
+                            </button>
+                        </div>
+                        <button class="btn-download" onclick="window.downloadFile('${filePath}', '${sessionID}')" title="下载">
+                            <i class="fa-solid fa-download"></i> 下载
+                        </button>
+                    </div>
                 </div>
-                <div class="media-content">
-                    <img src="${mediaURL}" alt="${fileName}" style="max-width: 100%; max-height: 80vh; object-fit: contain;">
+                <div class="media-content" id="media-content-${tabId}">
+                    <div class="image-container" id="image-container-${tabId}">
+                        <img src="${mediaURL}" alt="${fileName}" data-tab-id="${tabId}">
+                    </div>
                 </div>
             </div>
         `;
@@ -793,15 +809,19 @@ window.openMediaViewer = async function(filePath, serverID, sessionID, mediaType
             <div class="media-viewer" data-tab-id="${tabId}" data-path="${filePath}">
                 <div class="media-toolbar">
                     <span class="media-path">${filePath}</span>
-                    <button class="btn-download" onclick="window.downloadFile('${filePath}', '${sessionID}')" title="下载">
-                        <i class="fa-solid fa-download"></i> 下载
-                    </button>
+                    <div class="media-toolbar-actions">
+                        <button class="btn-download" onclick="window.downloadFile('${filePath}', '${sessionID}')" title="下载">
+                            <i class="fa-solid fa-download"></i> 下载
+                        </button>
+                    </div>
                 </div>
                 <div class="media-content">
-                    <video controls style="max-width: 100%; max-height: 80vh;">
-                        <source src="${mediaURL}" type="video/${filePath.split('.').pop()}">
-                        您的浏览器不支持视频播放
-                    </video>
+                    <div class="video-container">
+                        <video controls>
+                            <source src="${mediaURL}" type="video/${filePath.split('.').pop()}">
+                            您的浏览器不支持视频播放
+                        </video>
+                    </div>
                 </div>
             </div>
         `;
@@ -810,16 +830,18 @@ window.openMediaViewer = async function(filePath, serverID, sessionID, mediaType
             <div class="media-viewer" data-tab-id="${tabId}" data-path="${filePath}">
                 <div class="media-toolbar">
                     <span class="media-path">${filePath}</span>
-                    <button class="btn-download" onclick="window.downloadFile('${filePath}', '${sessionID}')" title="下载">
-                        <i class="fa-solid fa-download"></i> 下载
-                    </button>
+                    <div class="media-toolbar-actions">
+                        <button class="btn-download" onclick="window.downloadFile('${filePath}', '${sessionID}')" title="下载">
+                            <i class="fa-solid fa-download"></i> 下载
+                        </button>
+                    </div>
                 </div>
                 <div class="media-content audio-content">
                     <div class="audio-icon">
-                        <i class="fa-solid fa-music" style="font-size: 64px; color: rgba(255,255,255,0.3);"></i>
+                        <i class="fa-solid fa-music" style="font-size: 64px; color: rgba(59, 130, 246, 0.5);"></i>
                     </div>
                     <div class="audio-name">${fileName}</div>
-                    <audio controls style="width: 100%; max-width: 500px; margin-top: 20px;">
+                    <audio controls>
                         <source src="${mediaURL}" type="audio/${filePath.split('.').pop()}">
                         您的浏览器不支持音频播放
                     </audio>
@@ -836,8 +858,130 @@ window.openMediaViewer = async function(filePath, serverID, sessionID, mediaType
     });
     document.querySelector(`.media-viewer[data-tab-id="${tabId}"]`)?.classList.add('active');
     
+    // 为图片添加缩放和拖拽功能
+    if (mediaType === 'image') {
+        initImageZoom(tabId);
+    }
+    
     // 保存文件信息
     openFiles.set(filePath, { serverID, sessionID, tabId, type: 'media', mediaType });
+};
+
+// 图片缩放数据
+const imageZoomData = new Map();
+
+// 初始化图片缩放功能
+function initImageZoom(tabId) {
+    const img = document.querySelector(`.media-viewer[data-tab-id="${tabId}"] img`);
+    const container = document.getElementById(`image-container-${tabId}`);
+    const content = document.getElementById(`media-content-${tabId}`);
+    
+    if (!img || !container || !content) return;
+    
+    // 初始化缩放数据
+    imageZoomData.set(tabId, {
+        scale: 1,
+        isDragging: false,
+        startX: 0,
+        startY: 0,
+        translateX: 0,
+        translateY: 0
+    });
+    
+    // 滚轮缩放
+    content.addEventListener('wheel', (e) => {
+        e.preventDefault();
+        const delta = e.deltaY > 0 ? -0.1 : 0.1;
+        zoomMedia(tabId, delta);
+    });
+    
+    // 拖拽功能
+    let isDragging = false;
+    let startX = 0;
+    let startY = 0;
+    let scrollLeft = 0;
+    let scrollTop = 0;
+    
+    container.addEventListener('mousedown', (e) => {
+        const data = imageZoomData.get(tabId);
+        if (data.scale > 1) {
+            isDragging = true;
+            container.classList.add('dragging');
+            startX = e.pageX - content.offsetLeft;
+            startY = e.pageY - content.offsetTop;
+            scrollLeft = content.scrollLeft;
+            scrollTop = content.scrollTop;
+        }
+    });
+    
+    document.addEventListener('mousemove', (e) => {
+        if (!isDragging) return;
+        e.preventDefault();
+        const x = e.pageX - content.offsetLeft;
+        const y = e.pageY - content.offsetTop;
+        const walkX = (x - startX) * 2;
+        const walkY = (y - startY) * 2;
+        content.scrollLeft = scrollLeft - walkX;
+        content.scrollTop = scrollTop - walkY;
+    });
+    
+    document.addEventListener('mouseup', () => {
+        isDragging = false;
+        container.classList.remove('dragging');
+    });
+}
+
+// 缩放媒体
+window.zoomMedia = function(tabId, delta) {
+    const data = imageZoomData.get(tabId);
+    if (!data) return;
+    
+    const img = document.querySelector(`.media-viewer[data-tab-id="${tabId}"] img`);
+    const zoomSpan = document.getElementById(`zoom-${tabId}`);
+    
+    if (!img || !zoomSpan) return;
+    
+    // 更新缩放比例
+    data.scale = Math.max(0.1, Math.min(5, data.scale + delta));
+    
+    // 应用缩放
+    img.style.transform = `scale(${data.scale})`;
+    zoomSpan.textContent = Math.round(data.scale * 100) + '%';
+    
+    // 更新容器样式
+    const container = document.getElementById(`image-container-${tabId}`);
+    if (data.scale > 1) {
+        container.style.cursor = 'grab';
+    } else {
+        container.style.cursor = 'default';
+    }
+};
+
+// 重置缩放
+window.resetZoom = function(tabId) {
+    const data = imageZoomData.get(tabId);
+    if (!data) return;
+    
+    const img = document.querySelector(`.media-viewer[data-tab-id="${tabId}"] img`);
+    const zoomSpan = document.getElementById(`zoom-${tabId}`);
+    const content = document.getElementById(`media-content-${tabId}`);
+    
+    if (!img || !zoomSpan || !content) return;
+    
+    // 重置缩放和位置
+    data.scale = 1;
+    data.translateX = 0;
+    data.translateY = 0;
+    
+    img.style.transform = 'scale(1)';
+    zoomSpan.textContent = '100%';
+    content.scrollLeft = 0;
+    content.scrollTop = 0;
+    
+    const container = document.getElementById(`image-container-${tabId}`);
+    if (container) {
+        container.style.cursor = 'default';
+    }
 };
 
 function getMediaIcon(mediaType, fileName) {
