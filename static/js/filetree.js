@@ -12,6 +12,12 @@ let currentPath = '/root';
 // 剪贴板
 let clipboard = null; // {type: 'copy'|'cut', path: '...'}
 
+// 是否显示隐藏文件
+export let showHiddenFiles = false;
+export function setShowHiddenFiles(value) {
+    showHiddenFiles = value;
+}
+
 export function initFileTree() {
     const fileTreeContainer = document.getElementById('fileTree');
     if (!fileTreeContainer) return;
@@ -53,6 +59,18 @@ window.refreshCurrentDirectory = async function() {
         showToast('刷新成功', 'success');
     } catch (error) {
         showToast('刷新失败: ' + error.message, 'error');
+    }
+}
+
+// 切换显示隐藏文件
+window.toggleHiddenFiles = function() {
+    const checkbox = document.getElementById('showHiddenFiles');
+    setShowHiddenFiles(checkbox.checked);
+    
+    // 清除缓存，重新加载当前目录
+    if (currentSessionID && currentPath) {
+        fileCache.cache.clear();
+        loadDirectory(currentPath);
     }
 }
 

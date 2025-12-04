@@ -23,6 +23,7 @@ func NewFileHandler() *FileHandler {
 func (h *FileHandler) ListFiles(c *gin.Context) {
 	sessionID := c.Query("session_id")
 	path := c.Query("path")
+	showHidden := c.Query("show_hidden") == "true"
 
 	if sessionID == "" || path == "" {
 		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少参数"})
@@ -46,7 +47,8 @@ func (h *FileHandler) ListFiles(c *gin.Context) {
 
 	fileList := make([]gin.H, 0)
 	for _, file := range files {
-		if strings.HasPrefix(file.Name(), ".") {
+		// 根据设置过滤隐藏文件
+		if !showHidden && strings.HasPrefix(file.Name(), ".") {
 			continue
 		}
 

@@ -81,6 +81,15 @@ window.selectServer = async function(id) {
         
         const sessionId = 'ssh-' + server.ID; // 使用服务器ID作为sessionId
         
+        // 高亮当前服务器
+        document.querySelectorAll('.server-item').forEach(item => {
+            item.classList.remove('active');
+        });
+        const serverItem = document.getElementById('server-' + server.ID);
+        if (serverItem) {
+            serverItem.classList.add('active');
+        }
+        
         document.getElementById('noSelection').style.display = 'none';
         document.getElementById('terminalWrapper').style.display = 'flex';
         

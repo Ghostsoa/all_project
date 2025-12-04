@@ -1,5 +1,6 @@
 // 文件树缓存管理器 - Stale-While-Revalidate + 智能预加载
 import { showToast } from './utils.js';
+import { showHiddenFiles } from './filetree.js';
 
 class FileTreeCache {
     constructor() {
@@ -258,7 +259,7 @@ class FileTreeCache {
     
     async fetchFiles(sessionID, path) {
         const response = await fetch(
-            `/api/files/list?session_id=${sessionID}&path=${encodeURIComponent(path)}`
+            `/api/files/list?session_id=${sessionID}&path=${encodeURIComponent(path)}&show_hidden=${showHiddenFiles}`
         );
         const data = await response.json();
         

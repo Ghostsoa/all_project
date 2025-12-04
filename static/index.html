@@ -63,7 +63,13 @@
                     <div class="file-sidebar" id="fileSidebar">
                         <div class="file-sidebar-header">
                             <span>文件浏览</span>
-                            <button class="refresh-btn" onclick="window.refreshCurrentDirectory()" title="刷新 (F5)">🔄</button>
+                            <div class="file-header-actions">
+                                <label class="show-hidden-checkbox" title="显示隐藏文件">
+                                    <input type="checkbox" id="showHiddenFiles" onchange="window.toggleHiddenFiles()">
+                                    <span>.隐藏</span>
+                                </label>
+                                <button class="refresh-btn" onclick="window.refreshCurrentDirectory()" title="刷新 (F5)">🔄</button>
+                            </div>
                         </div>
                         <div class="file-tree" id="fileTree">
                             <div class="file-tree-empty">连接服务器后显示文件</div>
