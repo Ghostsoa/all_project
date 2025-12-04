@@ -1141,9 +1141,10 @@ async function uploadSingleFile(file, targetPath, taskId) {
         console.log('Upload success, updating UI and refreshing directory:', targetPath);
         updateUploadProgress(taskId, 100, file.size, 0, 'success');
         
-        // 刷新当前目录
+        // 强制刷新当前目录，清除缓存
         try {
-            await loadDirectory(targetPath);
+            const files = await fileCache.refresh(currentSessionID, targetPath);
+            renderFileTree(files, targetPath);
             console.log('Directory refreshed successfully');
         } catch (refreshError) {
             console.error('Failed to refresh directory:', refreshError);

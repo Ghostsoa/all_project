@@ -7,6 +7,11 @@ import { createTerminal, connectSSH, openLocalTerminal } from './terminal.js';
 import { loadCommandHistory, clearCurrentCommands, saveCommandToHistory } from './commands.js';
 import { initFileTree, setCurrentServer, setLocalTerminal, loadDirectory, initDragUpload } from './filetree.js';
 import { openFileEditor } from './editor.js';
+import { updateTerminalSnapshot, updateWorkspaceInfo } from './ai-assistant.js';
+
+// 导出AI助手函数到window
+window.updateTerminalSnapshot = updateTerminalSnapshot;
+window.updateWorkspaceInfo = updateWorkspaceInfo;
 
 // ========== 全局状态灯管理器 ==========
 let globalStatusTimeout = null;
@@ -583,16 +588,31 @@ window.closeModal = function() {
 };
 
 // 右侧面板切换
-window.showRightPanel = function(tabName) {
-    document.querySelectorAll('.right-tab').forEach(tab => tab.classList.remove('active'));
-    document.querySelectorAll('.right-panel-content').forEach(content => content.classList.remove('active'));
+window.switchRightTab = function(tabName) {
+    console.log('🔄 切换右侧面板:', tabName);
     
-    event.target.classList.add('active');
+    // 更新标签激活状态
+    document.querySelectorAll('.right-tab').forEach(tab => {
+        if (tab.dataset.tab === tabName) {
+            tab.classList.add('active');
+        } else {
+            tab.classList.remove('active');
+        }
+    });
     
-    if (tabName === 'ai') {
-        document.getElementById('aiPanel').classList.add('active');
-    } else if (tabName === 'commands') {
-        document.getElementById('commandsPanel').classList.add('active');
+    // 切换内容面板
+    document.querySelectorAll('.right-panel-content').forEach(content => {
+        content.classList.remove('active');
+        content.style.display = 'none';
+    });
+    
+    const targetPanel = tabName === 'ai' ? 
+        document.getElementById('aiPanel') : 
+        document.getElementById('commandsPanel');
+    
+    if (targetPanel) {
+        targetPanel.classList.add('active');
+        targetPanel.style.display = 'flex';
     }
 };
 
