@@ -9,6 +9,8 @@ let currentSession = null;
 let chatWebSocket = null;
 let sessions = [];
 let availableConfigs = []; // 可用的AI配置列表
+let chatWSHeartbeatInterval = null; // 心跳定时器
+let isReconnecting = false; // 重连标志
 
 // ========== Loading 控制 ==========
 
@@ -637,6 +639,126 @@ function getFileLanguage(fileName) {
     return langMap[ext] || ext.toUpperCase();
 }
 
+// ========== WebSocket 连接管理 ==========
+
+/**
+ * 确保AI WebSocket连接已建立
+ * @returns {Promise<WebSocket>} 返回可用的WebSocket连接
+ */
+async function ensureAIChatConnection() {
+    // 如果连接已存在且正常，直接返回
+    if (chatWebSocket && chatWebSocket.readyState === WebSocket.OPEN) {
+        console.log('✅ AI连接已存在');
+        return chatWebSocket;
+    }
+    
+    // 如果正在连接，等待
+    if (chatWebSocket && chatWebSocket.readyState === WebSocket.CONNECTING) {
+        console.log('⏳ 等待连接建立...');
+        return new Promise((resolve, reject) => {
+            const checkInterval = setInterval(() => {
+                if (chatWebSocket.readyState === WebSocket.OPEN) {
+                    clearInterval(checkInterval);
+                    resolve(chatWebSocket);
+                } else if (chatWebSocket.readyState === WebSocket.CLOSED) {
+                    clearInterval(checkInterval);
+                    reject(new Error('连接失败'));
+                }
+            }, 100);
+        });
+    }
+    
+    // 建立新连接
+    console.log('🔌 建立AI WebSocket连接...');
+    return connectAIChat();
+}
+
+/**
+ * 建立AI聊天WebSocket连接
+ */
+function connectAIChat() {
+    return new Promise((resolve, reject) => {
+        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${window.location.host}/ws/ai`;
+        
+        chatWebSocket = new WebSocket(wsUrl);
+        
+        chatWebSocket.onopen = () => {
+            console.log('✅ AI WebSocket连接已建立');
+            startAIChatHeartbeat();
+            resolve(chatWebSocket);
+        };
+        
+        chatWebSocket.onerror = (error) => {
+            console.error('❌ AI WebSocket连接错误:', error);
+            reject(error);
+        };
+        
+        chatWebSocket.onclose = (event) => {
+            console.log('🔌 AI WebSocket连接已关闭:', event.code, event.reason);
+            stopAIChatHeartbeat();
+            
+            // 非正常关闭，尝试重连
+            if (event.code !== 1000 && !isReconnecting) {
+                attemptReconnect();
+            }
+        };
+    });
+}
+
+/**
+ * 启动心跳
+ */
+function startAIChatHeartbeat() {
+    stopAIChatHeartbeat(); // 先清除旧的
+    
+    chatWSHeartbeatInterval = setInterval(() => {
+        if (chatWebSocket && chatWebSocket.readyState === WebSocket.OPEN) {
+            // 发送心跳ping（后端需要支持）
+            try {
+                chatWebSocket.send(JSON.stringify({ type: 'ping' }));
+            } catch (error) {
+                console.error('心跳发送失败:', error);
+            }
+        }
+    }, 30000); // 每30秒一次
+}
+
+/**
+ * 停止心跳
+ */
+function stopAIChatHeartbeat() {
+    if (chatWSHeartbeatInterval) {
+        clearInterval(chatWSHeartbeatInterval);
+        chatWSHeartbeatInterval = null;
+    }
+}
+
+/**
+ * 尝试重连（最多3次）
+ */
+async function attemptReconnect(retries = 3) {
+    if (isReconnecting) return;
+    isReconnecting = true;
+    
+    console.log(`🔄 尝试重连... (剩余${retries}次)`);
+    
+    for (let i = 0; i < retries; i++) {
+        try {
+            await new Promise(resolve => setTimeout(resolve, 1000 * (i + 1))); // 递增延迟
+            await connectAIChat();
+            console.log('✅ 重连成功');
+            isReconnecting = false;
+            return;
+        } catch (error) {
+            console.error(`❌ 重连失败 (${i + 1}/${retries}):`, error);
+        }
+    }
+    
+    isReconnecting = false;
+    console.error('❌ 重连失败，已达最大重试次数');
+}
+
 // ========== 消息发送 ==========
 
 // 发送AI消息
@@ -675,77 +797,75 @@ window.sendAIMessage = async function() {
 
 // 流式对话
 async function streamChat(sessionId, message, thinkingId) {
-    return new Promise((resolve, reject) => {
-        // 关闭之前的连接
-        if (chatWebSocket) {
-            chatWebSocket.close();
+    return new Promise(async (resolve, reject) => {
+        // 确保连接可用
+        try {
+            await ensureAIChatConnection();
+        } catch (error) {
+            reject(new Error('无法建立连接'));
+            return;
         }
-        
-        // 建立WebSocket连接
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws/ai`;
-        
-        chatWebSocket = new WebSocket(wsUrl);
         
         let assistantMessage = '';
         let reasoningContent = '';
         let messageElement = null;
         
-        chatWebSocket.onopen = () => {
-            console.log('✅ WebSocket连接已建立');
-            // 不删除thinking，等收到消息后无缝切换
-            
-            // 收集上下文信息
-            const terminalInfo = window.getTerminalBuffer(50);
-            const editorInfo = window.getEditorContext(10);
-            
-            // 构建payload
-            const payload = {
-                session_id: sessionId,
-                message: message
-            };
-            
-            // 如果有终端信息，添加实时信息
-            if (terminalInfo) {
-                payload.real_time_info = terminalInfo.content;
-                payload.source_info = `终端 - ${terminalInfo.serverName}`;
-                console.log(`📺 终端上下文 - ${terminalInfo.serverName}, ${terminalInfo.lineCount}行`);
-            }
-            
-            // 如果有编辑器信息，添加指针信息
-            if (editorInfo) {
-                // 构建指针信息文本
-                payload.cursor_info = 
-                    `文件: ${editorInfo.fileName}\n` +
-                    `路径: ${editorInfo.filePath}\n` +
-                    `语言: ${editorInfo.language}\n` +
-                    `光标位置: 行 ${editorInfo.cursor.line}, 列 ${editorInfo.cursor.column}\n` +
-                    `总行数: ${editorInfo.totalLines}\n` +
-                    `当前行: ${editorInfo.currentLine}\n\n` +
-                    `代码上下文:\n${editorInfo.contextContent}`;
-                
-                // 如果没有终端信息，使用编辑器的来源信息
-                if (!terminalInfo) {
-                    payload.source_info = `编辑器 - ${editorInfo.filePath}`;
-                }
-                
-                console.log(`📝 编辑器上下文 - ${editorInfo.fileName}, 光标在 ${editorInfo.cursor.line}:${editorInfo.cursor.column}`);
-            }
-            
-            console.log('📤 发送消息:', {
-                session_id: payload.session_id,
-                message: payload.message,
-                has_real_time_info: !!payload.real_time_info,
-                has_cursor_info: !!payload.cursor_info,
-                source_info: payload.source_info
-            });
-            
-            chatWebSocket.send(JSON.stringify(payload));
+        // 收集上下文信息
+        const terminalInfo = window.getTerminalBuffer(50);
+        const editorInfo = window.getEditorContext(10);
+        
+        // 构建payload
+        const payload = {
+            session_id: sessionId,
+            message: message
         };
+        
+        // 如果有终端信息，添加实时信息
+        if (terminalInfo) {
+            payload.real_time_info = terminalInfo.content;
+            payload.source_info = `终端 - ${terminalInfo.serverName}`;
+            console.log(`📺 终端上下文 - ${terminalInfo.serverName}, ${terminalInfo.lineCount}行`);
+        }
+        
+        // 如果有编辑器信息，添加指针信息
+        if (editorInfo) {
+            // 构建指针信息文本
+            payload.cursor_info = 
+                `文件: ${editorInfo.fileName}\n` +
+                `路径: ${editorInfo.filePath}\n` +
+                `语言: ${editorInfo.language}\n` +
+                `光标位置: 行 ${editorInfo.cursor.line}, 列 ${editorInfo.cursor.column}\n` +
+                `总行数: ${editorInfo.totalLines}\n` +
+                `当前行: ${editorInfo.currentLine}\n\n` +
+                `代码上下文:\n${editorInfo.contextContent}`;
+            
+            // 如果没有终端信息，使用编辑器的来源信息
+            if (!terminalInfo) {
+                payload.source_info = `编辑器 - ${editorInfo.filePath}`;
+            }
+            
+            console.log(`📝 编辑器上下文 - ${editorInfo.fileName}, 光标在 ${editorInfo.cursor.line}:${editorInfo.cursor.column}`);
+        }
+        
+        console.log('📤 发送消息:', {
+            session_id: payload.session_id,
+            message: payload.message,
+            has_real_time_info: !!payload.real_time_info,
+            has_cursor_info: !!payload.cursor_info,
+            source_info: payload.source_info
+        });
+        
+        // 设置消息处理器（临时的，仅用于这次对话）
+        const originalOnMessage = chatWebSocket.onmessage;
         
         chatWebSocket.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
+                
+                // 忽略心跳消息
+                if (data.type === 'pong') {
+                    return;
+                }
                 
                 if (data.type === 'content') {
                     // 内容增量更新
@@ -831,17 +951,15 @@ async function streamChat(sessionId, message, thinkingId) {
             }
         };
         
-        chatWebSocket.onerror = (error) => {
-            console.error('❌ WebSocket错误:', error);
+        // 发送消息
+        try {
+            chatWebSocket.send(JSON.stringify(payload));
+        } catch (error) {
+            console.error('❌ 发送消息失败:', error);
+            chatWebSocket.onmessage = originalOnMessage; // 恢复原处理器
             removeThinking(thinkingId);
             reject(error);
-        };
-        
-        chatWebSocket.onclose = (event) => {
-            console.log('🔌 WebSocket连接已关闭');
-            console.log('关闭代码:', event.code, '原因:', event.reason, '是否正常:', event.wasClean);
-            chatWebSocket = null;
-        };
+        }
     });
 }
 
