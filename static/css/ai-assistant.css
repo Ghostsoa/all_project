@@ -128,23 +128,21 @@
     gap: 8px;
 }
 
-/* 模式切换按钮（单个） */
+/* 模式切换按钮（纯文本） */
 .mode-toggle-btn {
-    padding: 4px 12px;
+    padding: 4px 8px;
     font-size: 12px;
     color: #3b82f6;
     background: transparent;
-    border: 1px solid rgba(59, 130, 246, 0.3);
-    border-radius: 4px;
+    border: none;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: color 0.2s ease;
     user-select: none;
     font-weight: 600;
 }
 
 .mode-toggle-btn:hover {
-    background: rgba(59, 130, 246, 0.1);
-    border-color: rgba(59, 130, 246, 0.5);
+    color: #60a5fa;
 }
 
 /* 工具按钮 */
@@ -284,12 +282,17 @@
 /* 输入框底部操作区 */
 .input-actions {
     position: absolute;
-    bottom: 8px;
-    left: 12px;
-    right: 12px;
+    bottom: 6px;
+    left: 8px;
+    right: 8px;
     display: flex;
     justify-content: space-between;
     align-items: center;
+    pointer-events: none;
+}
+
+.input-actions > * {
+    pointer-events: auto;
 }
 
 /* 内联模型选择器 */
