@@ -84,7 +84,9 @@ func main() {
 		// 文件管理
 		api.GET("/files/list", fileHandler.ListFiles)
 		api.GET("/files/read", fileHandler.ReadFile)
+		api.GET("/files/download", fileHandler.DownloadFile)
 		api.POST("/files/save", fileHandler.SaveFile)
+		api.POST("/files/upload", fileHandler.UploadFile)
 		api.POST("/files/create", fileHandler.CreateFile)
 		api.POST("/files/delete", fileHandler.DeleteFile)
 		api.POST("/files/rename", fileHandler.RenameFile)

@@ -735,12 +735,21 @@ window.showFileContextMenu = function(event, path, isDir) {
     menu.style.left = event.pageX + 'px';
     menu.style.top = event.pageY + 'px';
     
-    const menuHTML = `
-        <div class="context-menu-item" onclick="window.copyFile('${path}')"> 复制</div>
-        <div class="context-menu-item" onclick="window.cutFile('${path}')"> 剪切</div>
+    let menuHTML = `
+        <div class="context-menu-item" onclick="window.copyFile('${path}')">📄 复制</div>
+        <div class="context-menu-item" onclick="window.cutFile('${path}')">✂️ 剪切</div>
         <div class="context-menu-divider"></div>
-        <div class="context-menu-item" onclick="window.renameFile('${path}')"> 重命名</div>
-        <div class="context-menu-item" onclick="window.deleteFile('${path}')"> 删除</div>
+    `;
+    
+    // 如果是文件（不是目录），添加下载选项
+    if (!isDir) {
+        menuHTML += `<div class="context-menu-item" onclick="window.downloadFile('${path}', '${currentSessionID}')">⬇️ 下载</div>`;
+        menuHTML += `<div class="context-menu-divider"></div>`;
+    }
+    
+    menuHTML += `
+        <div class="context-menu-item" onclick="window.renameFile('${path}')">✏️ 重命名</div>
+        <div class="context-menu-item" onclick="window.deleteFile('${path}')">🗑️ 删除</div>
     `;
     
     menu.innerHTML = menuHTML;

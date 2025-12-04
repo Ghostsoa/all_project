@@ -771,7 +771,7 @@ window.openMediaViewer = async function(filePath, serverID, sessionID, mediaType
     
     // 创建媒体查看器面板
     const contentContainer = document.querySelector('.terminal-wrapper');
-    const mediaURL = `/api/files/read?session_id=${sessionID}&path=${encodeURIComponent(filePath)}`;
+    const mediaURL = `/api/files/download?session_id=${sessionID}&path=${encodeURIComponent(filePath)}`;
     
     let mediaHTML = '';
     if (mediaType === 'image') {
@@ -857,9 +857,11 @@ function getMediaIcon(mediaType, fileName) {
 
 // 下载文件
 window.downloadFile = function(filePath, sessionID) {
-    const url = `/api/files/read?session_id=${sessionID}&path=${encodeURIComponent(filePath)}`;
+    const url = `/api/files/download?session_id=${sessionID}&path=${encodeURIComponent(filePath)}`;
     const a = document.createElement('a');
     a.href = url;
     a.download = filePath.split('/').pop();
+    document.body.appendChild(a);
     a.click();
+    document.body.removeChild(a);
 };

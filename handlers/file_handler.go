@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"encoding/base64"
 	"io"
 	"net/http"
 	"path/filepath"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -285,4 +287,108 @@ func (h *FileHandler) removeDir(client *sftp.Client, path string) error {
 	}
 
 	return client.RemoveDirectory(path)
+}
+
+// UploadFile 上传文件
+func (h *FileHandler) UploadFile(c *gin.Context) {
+	var req struct {
+		SessionID string `json:"session_id"`
+		Path      string `json:"path"`
+		Content   string `json:"content"`
+		Encoding  string `json:"encoding"` // "base64" 或 "text"
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		return
+	}
+
+	session := GetSessionManager().GetSession(req.SessionID)
+	if session == nil || session.SFTPClient == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "SSH会话不存在或已断开"})
+		return
+	}
+
+	sftpClient := session.SFTPClient
+
+	// 创建文件
+	file, err := sftpClient.Create(req.Path)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建文件失败: " + err.Error()})
+		return
+	}
+	defer file.Close()
+
+	// 解码并写入内容
+	var content []byte
+	if req.Encoding == "base64" {
+		// Base64解码（用于二进制文件）
+		content, err = base64.StdEncoding.DecodeString(req.Content)
+		if err != nil {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "Base64解码失败: " + err.Error()})
+			return
+		}
+	} else {
+		// 文本内容
+		content = []byte(req.Content)
+	}
+
+	_, err = file.Write(content)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "写入文件失败: " + err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "文件上传成功",
+	})
+}
+
+// DownloadFile 下载文件（返回原始文件流）
+func (h *FileHandler) DownloadFile(c *gin.Context) {
+	sessionID := c.Query("session_id")
+	path := c.Query("path")
+
+	if sessionID == "" || path == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少参数"})
+		return
+	}
+
+	// 从会话管理器获取SFTP客户端
+	session := GetSessionManager().GetSession(sessionID)
+	if session == nil || session.SFTPClient == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "SSH会话不存在或已断开"})
+		return
+	}
+
+	sftpClient := session.SFTPClient
+
+	// 打开文件
+	file, err := sftpClient.Open(path)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "打开文件失败: " + err.Error()})
+		return
+	}
+	defer file.Close()
+
+	// 获取文件信息
+	stat, err := file.Stat()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "获取文件信息失败"})
+		return
+	}
+
+	// 获取文件名
+	fileName := filepath.Base(path)
+
+	// 设置响应头
+	c.Header("Content-Description", "File Transfer")
+	c.Header("Content-Transfer-Encoding", "binary")
+	c.Header("Content-Disposition", "attachment; filename="+fileName)
+	c.Header("Content-Type", "application/octet-stream")
+	c.Header("Content-Length", strconv.FormatInt(stat.Size(), 10))
+
+	// 流式传输文件内容
+	io.Copy(c.Writer, file)
 }
