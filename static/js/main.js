@@ -13,6 +13,7 @@ document.addEventListener('DOMContentLoaded', function() {
     loadServers();
     initTagsInput();
     checkAuthStatus();
+    initFileTree(); // 初始化文件树
 });
 
 // 暴露全局函数供HTML调用
