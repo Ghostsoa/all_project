@@ -398,7 +398,7 @@ async function loadMessages(sessionId) {
         
         // 渲染消息
         messages.forEach(msg => {
-            appendMessage(msg.role, msg.content, msg.reasoning_content);
+            appendMessage(msg.role, msg.content, msg.reasoning_content, msg.ID);
         });
         
         // 滚动到底部
@@ -505,6 +505,149 @@ window.clearCurrentAIChat = async function() {
         alert('清空对话失败: ' + error.message);
     }
 };
+
+// ========== 消息操作处理 ==========
+
+/**
+ * 开始编辑消息
+ */
+window.startEditMessage = function(messageId) {
+    const messageEl = document.querySelector(`.ai-message[data-message-id="${messageId}"]`);
+    if (!messageEl) return;
+    
+    const contentDiv = messageEl.querySelector('.message-content');
+    const originalContent = contentDiv.textContent.trim();
+    
+    // 创建编辑界面
+    const textarea = document.createElement('textarea');
+    textarea.className = 'message-edit-textarea';
+    textarea.value = originalContent;
+    textarea.rows = 3;
+    
+    const buttons = document.createElement('div');
+    buttons.className = 'message-edit-buttons';
+    buttons.innerHTML = `
+        <button class="btn-edit-save" onclick="saveEditedMessage(${messageId})">保存</button>
+        <button class="btn-edit-cancel" onclick="cancelEditMessage(${messageId})">取消</button>
+    `;
+    
+    // 保存原始内容用于取消
+    contentDiv.dataset.originalContent = originalContent;
+    
+    // 替换内容
+    contentDiv.innerHTML = '';
+    contentDiv.appendChild(textarea);
+    contentDiv.appendChild(buttons);
+    textarea.focus();
+};
+
+/**
+ * 保存编辑的消息
+ */
+window.saveEditedMessage = async function(messageId) {
+    const messageEl = document.querySelector(`.ai-message[data-message-id="${messageId}"]`);
+    if (!messageEl) return;
+    
+    const contentDiv = messageEl.querySelector('.message-content');
+    const textarea = contentDiv.querySelector('textarea');
+    const newContent = textarea.value.trim();
+    
+    if (!newContent) {
+        alert('消息内容不能为空');
+        return;
+    }
+    
+    try {
+        await editMessage(messageId, newContent);
+        // 更新显示
+        contentDiv.innerHTML = escapeHtml(newContent).replace(/\n/g, '<br>');
+        // 重新加载消息以更新历史
+        await loadMessages(currentSession.ID);
+    } catch (error) {
+        alert('编辑失败: ' + error.message);
+        // 恢复原始内容
+        const originalContent = contentDiv.dataset.originalContent;
+        contentDiv.innerHTML = escapeHtml(originalContent).replace(/\n/g, '<br>');
+    }
+};
+
+/**
+ * 取消编辑消息
+ */
+window.cancelEditMessage = function(messageId) {
+    const messageEl = document.querySelector(`.ai-message[data-message-id="${messageId}"]`);
+    if (!messageEl) return;
+    
+    const contentDiv = messageEl.querySelector('.message-content');
+    const originalContent = contentDiv.dataset.originalContent;
+    
+    // 恢复原始显示
+    contentDiv.innerHTML = escapeHtml(originalContent).replace(/\n/g, '<br>');
+};
+
+/**
+ * 确认撤回消息
+ */
+window.confirmRevokeMessage = function(messageId) {
+    if (confirm('确定要撤回此消息及之后的所有消息吗？此操作不可恢复！')) {
+        revokeMessageHandler(messageId);
+    }
+};
+
+/**
+ * 撤回消息处理
+ */
+async function revokeMessageHandler(messageId) {
+    try {
+        await revokeMessage(messageId);
+        // 重新加载消息
+        await loadMessages(currentSession.ID);
+    } catch (error) {
+        alert('撤回失败: ' + error.message);
+    }
+}
+
+// ========== 消息操作API ==========
+
+/**
+ * 编辑消息
+ */
+async function editMessage(messageId, content) {
+    try {
+        const data = await apiRequest('/api/ai/message/edit', 'POST', {
+            message_id: messageId,
+            content: content
+        });
+        return data;
+    } catch (error) {
+        console.error('编辑消息失败:', error);
+        throw error;
+    }
+}
+
+/**
+ * 删除单条消息
+ */
+async function deleteMessage(messageId) {
+    try {
+        await apiRequest(`/api/ai/message/delete?id=${messageId}`, 'POST');
+    } catch (error) {
+        console.error('删除消息失败:', error);
+        throw error;
+    }
+}
+
+/**
+ * 撤回消息（删除该消息及后续所有消息）
+ */
+async function revokeMessage(messageId) {
+    try {
+        await apiRequest(`/api/ai/message/revoke?id=${messageId}`, 'POST');
+    } catch (error) {
+        console.error('撤回消息失败:', error);
+        throw error;
+    }
+}
 
 // ========== 上下文信息获取接口 ==========
 
@@ -1038,7 +1181,7 @@ function showChatArea() {
 }
 
 // 添加消息
-function appendMessage(role, content, reasoning = null) {
+function appendMessage(role, content, reasoning = null, messageId = null) {
     const messagesContainer = document.getElementById('aiMessages');
     if (!messagesContainer) return;
     
@@ -1048,14 +1191,17 @@ function appendMessage(role, content, reasoning = null) {
         welcome.remove();
     }
     
-    const messageDiv = createMessageElement(role, content, reasoning);
+    const messageDiv = createMessageElement(role, content, reasoning, messageId);
     messagesContainer.appendChild(messageDiv);
 }
 
 // 创建消息元素
-function createMessageElement(role, content, reasoning = null) {
+function createMessageElement(role, content, reasoning = null, messageId = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `ai-message ${role}`;
+    if (messageId) {
+        messageDiv.dataset.messageId = messageId;
+    }
     
     const avatar = document.createElement('div');
     avatar.className = 'message-avatar';
@@ -1089,6 +1235,21 @@ function createMessageElement(role, content, reasoning = null) {
     }
     
     contentWrapper.appendChild(contentDiv);
+    
+    // 为用户消息添加操作按钮
+    if (role === 'user' && messageId) {
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'message-actions';
+        actionsDiv.innerHTML = `
+            <button class="message-action-btn" onclick="startEditMessage(${messageId})" title="编辑">
+                <i class="fa-solid fa-pen"></i>
+            </button>
+            <button class="message-action-btn" onclick="confirmRevokeMessage(${messageId})" title="撤回">
+                <i class="fa-solid fa-rotate-left"></i>
+            </button>
+        `;
+        contentWrapper.appendChild(actionsDiv);
+    }
     
     messageDiv.appendChild(avatar);
     messageDiv.appendChild(contentWrapper);

@@ -291,6 +291,12 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 
 			systemPrompt = strings.Join(parts, "")
 			log.Printf("📝 终端快照已注入系统提示词")
+			// 打印系统提示词的前500字符用于调试
+			if len(systemPrompt) > 500 {
+				log.Printf("   系统提示词(前500字符): %s...", systemPrompt[:500])
+			} else {
+				log.Printf("   系统提示词: %s", systemPrompt)
+			}
 		}
 
 		// 添加系统提示词
@@ -550,7 +556,84 @@ func (h *AIHandler) ClearSession(c *gin.Context) {
 		return
 	}
 
-	if err := h.sessionRepo.Clear(uint(id)); err != nil {
+	if err := h.messageRepo.DeleteBySessionID(uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// EditMessage 编辑消息（仅用户消息）
+func (h *AIHandler) EditMessage(c *gin.Context) {
+	var req struct {
+		MessageID uint   `json:"message_id"`
+		Content   string `json:"content"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	// 获取消息
+	message, err := h.messageRepo.GetByID(req.MessageID)
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "消息不存在"})
+		return
+	}
+
+	// 只能编辑用户消息
+	if message.Role != "user" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "只能编辑用户消息"})
+		return
+	}
+
+	// 更新内容
+	message.Content = req.Content
+	if err := h.messageRepo.Update(message); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": message})
+}
+
+// DeleteMessage 删除单条消息
+func (h *AIHandler) DeleteMessage(c *gin.Context) {
+	idStr := c.Query("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "无效的消息ID"})
+		return
+	}
+
+	if err := h.messageRepo.Delete(uint(id)); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// RevokeMessage 撤回消息（删除该消息及其后所有消息）
+func (h *AIHandler) RevokeMessage(c *gin.Context) {
+	idStr := c.Query("id")
+	id, err := strconv.ParseUint(idStr, 10, 32)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "无效的消息ID"})
+		return
+	}
+
+	// 获取消息
+	message, err := h.messageRepo.GetByID(uint(id))
+	if err != nil {
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": "消息不存在"})
+		return
+	}
+
+	// 删除该消息及其后的所有消息
+	if err := h.messageRepo.DeleteFromMessage(message.SessionID, uint(id)); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}

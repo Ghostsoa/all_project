@@ -150,14 +150,42 @@ func (r *ChatMessageRepository) GetRecentMessages(sessionID uint, rounds int) ([
 	return messages, nil
 }
 
-// Delete 删除消息
-func (r *ChatMessageRepository) Delete(id uint) error {
-	return r.db.Delete(&ChatMessage{}, id).Error
+// GetByID 根据ID获取消息
+func (r *ChatMessageRepository) GetByID(messageID uint) (*ChatMessage, error) {
+	var message ChatMessage
+	err := r.db.First(&message, messageID).Error
+	if err != nil {
+		return nil, err
+	}
+	return &message, nil
+}
+
+// Update 更新消息
+func (r *ChatMessageRepository) Update(message *ChatMessage) error {
+	return r.db.Save(message).Error
+}
+
+// Delete 删除单条消息
+func (r *ChatMessageRepository) Delete(messageID uint) error {
+	return r.db.Delete(&ChatMessage{}, messageID).Error
 }
 
 // DeleteBySessionID 删除会话的所有消息
 func (r *ChatMessageRepository) DeleteBySessionID(sessionID uint) error {
 	return r.db.Where("session_id = ?", sessionID).Delete(&ChatMessage{}).Error
+}
+
+// DeleteFromMessage 删除指定消息及其后的所有消息
+func (r *ChatMessageRepository) DeleteFromMessage(sessionID, messageID uint) error {
+	// 首先获取该消息的创建时间
+	var message ChatMessage
+	if err := r.db.First(&message, messageID).Error; err != nil {
+		return err
+	}
+
+	// 删除该消息及其后创建的所有消息
+	return r.db.Where("session_id = ? AND created_at >= ?", sessionID, message.CreatedAt).
+		Delete(&ChatMessage{}).Error
 }
 
 // ConvertToOpenAIMessages 批量转换为OpenAI消息格式

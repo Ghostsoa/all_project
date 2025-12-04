@@ -246,6 +246,12 @@ function connectLocalTerminal(sessionId) {
         session.status = 'connected';
         updateStatusLight('connected');
         
+        // 调整终端大小以适配容器
+        setTimeout(() => {
+            session.fitAddon.fit();
+            console.log('🔧 终端大小已调整');
+        }, 100);
+        
         // 启动心跳
         heartbeatInterval = setInterval(() => {
             if (ws.readyState === WebSocket.OPEN) {
@@ -259,7 +265,7 @@ function connectLocalTerminal(sessionId) {
                 ws.send('\r'); // 发送回车，触发提示符
                 console.log('✅ 本地终端已就绪');
             }
-        }, 100); // 等待100ms让shell启动完成
+        }, 200); // 等待200ms让shell启动完成
         
         // 加载本地文件树
         if (window.setLocalTerminal) {

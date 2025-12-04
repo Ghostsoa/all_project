@@ -171,6 +171,11 @@ func main() {
 		api.POST("/ai/session/delete", aiHandler.DeleteSession)
 		api.POST("/ai/session/clear", aiHandler.ClearSession)
 		api.GET("/ai/messages", aiHandler.GetMessages)
+
+		// AI消息操作
+		api.POST("/ai/message/edit", aiHandler.EditMessage)
+		api.POST("/ai/message/delete", aiHandler.DeleteMessage)
+		api.POST("/ai/message/revoke", aiHandler.RevokeMessage)
 	}
 
 	// WebSocket 路由（需要认证，未登录则重定向）

@@ -90,8 +90,3 @@ func (r *ChatSessionRepository) UpdateLastActive(id uint) error {
 func (r *ChatSessionRepository) Delete(id uint) error {
 	return r.db.Delete(&ChatSession{}, id).Error
 }
-
-// Clear 清空会话消息
-func (r *ChatSessionRepository) Clear(id uint) error {
-	return r.db.Where("session_id = ?", id).Delete(&ChatMessage{}).Error
-}

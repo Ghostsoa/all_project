@@ -964,3 +964,80 @@
 .stop-generate-btn:active {
     transform: scale(0.95);
 }
+
+/* 消息操作按钮 */
+.message-actions {
+    display: none;
+    gap: 4px;
+    margin-top: 8px;
+}
+
+.ai-message.user:hover .message-actions {
+    display: flex;
+}
+
+.message-action-btn {
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.6);
+    border-radius: 4px;
+    padding: 4px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.message-action-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* 消息编辑界面 */
+.message-edit-textarea {
+    width: 100%;
+    min-height: 80px;
+    padding: 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: #fff;
+    font-family: inherit;
+    font-size: 14px;
+    line-height: 1.6;
+    resize: vertical;
+}
+
+.message-edit-buttons {
+    display: flex;
+    gap: 8px;
+    margin-top: 8px;
+}
+
+.btn-edit-save,
+.btn-edit-cancel {
+    padding: 6px 16px;
+    border: none;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 13px;
+    transition: all 0.2s ease;
+}
+
+.btn-edit-save {
+    background: #3b82f6;
+    color: white;
+}
+
+.btn-edit-save:hover {
+    background: #2563eb;
+}
+
+.btn-edit-cancel {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.btn-edit-cancel:hover {
+    background: rgba(255, 255, 255, 0.15);
+}
