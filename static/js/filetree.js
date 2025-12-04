@@ -50,6 +50,20 @@ export function initFileTree() {
         }
     });
     
+    // 全局点击事件：关闭所有右键菜单
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.context-menu')) {
+            closeAllContextMenus();
+        }
+    });
+    
+    // ESC键关闭菜单
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape') {
+            closeAllContextMenus();
+        }
+    });
+    
     // 空白区域右键菜单
     fileTreeContainer.addEventListener('contextmenu', (e) => {
         // 如果点击的是文件项或文件操作按钮，让它们自己处理
@@ -459,8 +473,16 @@ window.createNewFolder = async function(basePath) {
     });
 };
 
+// 关闭所有右键菜单
+function closeAllContextMenus() {
+    document.querySelectorAll('.context-menu').forEach(menu => menu.remove());
+}
+
 window.showFileContextMenu = function(event, path, isDir) {
     event.preventDefault();
+    
+    // 先关闭所有已存在的菜单
+    closeAllContextMenus();
     
     // 创建右键菜单
     const menu = document.createElement('div');
@@ -478,19 +500,13 @@ window.showFileContextMenu = function(event, path, isDir) {
     
     menu.innerHTML = menuHTML;
     document.body.appendChild(menu);
-    
-    // 点击其他地方关闭菜单
-    setTimeout(() => {
-        const closeMenu = () => {
-            menu.remove();
-            document.removeEventListener('click', closeMenu);
-        };
-        document.addEventListener('click', closeMenu);
-    }, 0);
 };
 
 // 空白区域右键菜单
 function showBlankContextMenu(event, basePath) {
+    // 先关闭所有已存在的菜单
+    closeAllContextMenus();
+    
     const menu = document.createElement('div');
     menu.className = 'context-menu';
     menu.style.left = event.pageX + 'px';
@@ -516,14 +532,6 @@ function showBlankContextMenu(event, basePath) {
     
     menu.innerHTML = menuHTML;
     document.body.appendChild(menu);
-    
-    setTimeout(() => {
-        const closeMenu = () => {
-            menu.remove();
-            document.removeEventListener('click', closeMenu);
-        };
-        document.addEventListener('click', closeMenu);
-    }, 0);
 }
 
 // 复制文件
