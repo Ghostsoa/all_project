@@ -1,0 +1,99 @@
+/* ========== 媒体查看器样式 ========== */
+
+.media-viewer {
+    display: none;
+    flex-direction: column;
+    height: 100%;
+    background: #1e1e1e;
+}
+
+.media-viewer.active {
+    display: flex;
+}
+
+.media-toolbar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: rgba(255, 255, 255, 0.03);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.media-path {
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    font-family: 'Courier New', monospace;
+}
+
+.btn-download {
+    padding: 6px 12px;
+    background: rgba(59, 130, 246, 0.15);
+    border: 1px solid rgba(59, 130, 246, 0.3);
+    border-radius: 6px;
+    color: #60a5fa;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.2s;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.btn-download:hover {
+    background: rgba(59, 130, 246, 0.25);
+    border-color: rgba(59, 130, 246, 0.5);
+}
+
+.media-content {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    overflow: auto;
+}
+
+/* 图片查看器 */
+.media-content img {
+    max-width: 100%;
+    max-height: 80vh;
+    object-fit: contain;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* 视频播放器 */
+.media-content video {
+    max-width: 100%;
+    max-height: 80vh;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+/* 音频播放器 */
+.audio-content {
+    flex-direction: column;
+    gap: 20px;
+}
+
+.audio-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.audio-name {
+    font-size: 18px;
+    font-weight: 600;
+    color: rgba(255, 255, 255, 0.9);
+    text-align: center;
+    max-width: 500px;
+    word-break: break-all;
+}
+
+.audio-content audio {
+    width: 100%;
+    max-width: 500px;
+    margin-top: 20px;
+}

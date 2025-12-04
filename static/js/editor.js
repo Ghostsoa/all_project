@@ -653,3 +653,118 @@ window.switchToTerminalTab = function() {
         }
     });
 };
+
+// 媒体文件查看器（图片、音频、视频）
+window.openMediaViewer = async function(filePath, serverID, sessionID, mediaType) {
+    // 如果文件已打开，切换到该标签
+    if (openFiles.has(filePath)) {
+        switchToTab(filePath);
+        return;
+    }
+    
+    const fileName = filePath.split('/').pop();
+    const tabId = 'media-' + Date.now();
+    
+    // 创建标签
+    const tabsList = document.getElementById('contentTabsList');
+    const tabHTML = `
+        <div class="content-tab-item active" data-tab-id="${tabId}" data-path="${filePath}" onclick="window.switchContentTab('${tabId}')">
+            <span class="tab-icon">${getMediaIcon(mediaType)}</span>
+            <span class="tab-name">${fileName}</span>
+            <span class="tab-close" onclick="event.stopPropagation(); window.closeContentTab('${tabId}')">×</span>
+        </div>
+    `;
+    
+    tabsList.querySelectorAll('.content-tab-item[data-tab-id]').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    tabsList.insertAdjacentHTML('beforeend', tabHTML);
+    
+    // 创建媒体查看器面板
+    const contentContainer = document.querySelector('.terminal-wrapper');
+    const mediaURL = `/api/files/read?session_id=${sessionID}&path=${encodeURIComponent(filePath)}`;
+    
+    let mediaHTML = '';
+    if (mediaType === 'image') {
+        mediaHTML = `
+            <div class="media-viewer" data-tab-id="${tabId}" data-path="${filePath}">
+                <div class="media-toolbar">
+                    <span class="media-path">${filePath}</span>
+                    <button class="btn-download" onclick="window.downloadFile('${filePath}', '${sessionID}')" title="下载">
+                        <i class="fa-solid fa-download"></i> 下载
+                    </button>
+                </div>
+                <div class="media-content">
+                    <img src="${mediaURL}" alt="${fileName}" style="max-width: 100%; max-height: 80vh; object-fit: contain;">
+                </div>
+            </div>
+        `;
+    } else if (mediaType === 'video') {
+        mediaHTML = `
+            <div class="media-viewer" data-tab-id="${tabId}" data-path="${filePath}">
+                <div class="media-toolbar">
+                    <span class="media-path">${filePath}</span>
+                    <button class="btn-download" onclick="window.downloadFile('${filePath}', '${sessionID}')" title="下载">
+                        <i class="fa-solid fa-download"></i> 下载
+                    </button>
+                </div>
+                <div class="media-content">
+                    <video controls style="max-width: 100%; max-height: 80vh;">
+                        <source src="${mediaURL}" type="video/${filePath.split('.').pop()}">
+                        您的浏览器不支持视频播放
+                    </video>
+                </div>
+            </div>
+        `;
+    } else if (mediaType === 'audio') {
+        mediaHTML = `
+            <div class="media-viewer" data-tab-id="${tabId}" data-path="${filePath}">
+                <div class="media-toolbar">
+                    <span class="media-path">${filePath}</span>
+                    <button class="btn-download" onclick="window.downloadFile('${filePath}', '${sessionID}')" title="下载">
+                        <i class="fa-solid fa-download"></i> 下载
+                    </button>
+                </div>
+                <div class="media-content audio-content">
+                    <div class="audio-icon">
+                        <i class="fa-solid fa-music" style="font-size: 64px; color: rgba(255,255,255,0.3);"></i>
+                    </div>
+                    <div class="audio-name">${fileName}</div>
+                    <audio controls style="width: 100%; max-width: 500px; margin-top: 20px;">
+                        <source src="${mediaURL}" type="audio/${filePath.split('.').pop()}">
+                        您的浏览器不支持音频播放
+                    </audio>
+                </div>
+            </div>
+        `;
+    }
+    
+    contentContainer.insertAdjacentHTML('beforeend', mediaHTML);
+    
+    // 隐藏其他面板
+    document.querySelectorAll('.terminal-pane, .editor-pane, .media-viewer').forEach(pane => {
+        pane.classList.remove('active');
+    });
+    document.querySelector(`.media-viewer[data-tab-id="${tabId}"]`)?.classList.add('active');
+    
+    // 保存文件信息
+    openFiles.set(filePath, { serverID, sessionID, tabId, type: 'media', mediaType });
+};
+
+function getMediaIcon(mediaType) {
+    const icons = {
+        'image': '🖼️',
+        'video': '🎬',
+        'audio': '🎵'
+    };
+    return icons[mediaType] || '📄';
+}
+
+// 下载文件
+window.downloadFile = function(filePath, sessionID) {
+    const url = `/api/files/read?session_id=${sessionID}&path=${encodeURIComponent(filePath)}`;
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filePath.split('/').pop();
+    a.click();
+};

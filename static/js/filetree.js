@@ -496,7 +496,31 @@ window.handleFileDoubleClick = function(filePath, isDir, fileSize = 0) {
     if (isDir) {
         loadDirectory(filePath);
     } else {
-        // 打开文件编辑器，传递文件大小
+        // 检查文件类型
+        const ext = filePath.split('.').pop()?.toLowerCase();
+        
+        // 图片文件
+        const imageExts = ['jpg', 'jpeg', 'png', 'gif', 'bmp', 'webp', 'svg', 'ico'];
+        if (imageExts.includes(ext)) {
+            openMediaViewer(filePath, currentServerID, currentSessionID, 'image');
+            return;
+        }
+        
+        // 视频文件
+        const videoExts = ['mp4', 'webm', 'ogg', 'mov', 'avi', 'mkv'];
+        if (videoExts.includes(ext)) {
+            openMediaViewer(filePath, currentServerID, currentSessionID, 'video');
+            return;
+        }
+        
+        // 音频文件
+        const audioExts = ['mp3', 'wav', 'ogg', 'flac', 'm4a', 'aac'];
+        if (audioExts.includes(ext)) {
+            openMediaViewer(filePath, currentServerID, currentSessionID, 'audio');
+            return;
+        }
+        
+        // 其他文件打开编辑器
         openFileEditor(filePath, currentServerID, currentSessionID, fileSize);
     }
 };
