@@ -248,6 +248,7 @@ function createLoadingTab(filePath, serverID, sessionID) {
     
     // 创建加载中容器
     const contentContainer = document.getElementById('contentContainer');
+    const loadingIcon = getFileIconHTML(fileName);
     const editorHTML = `
         <div class="editor-pane" data-tab-id="${tabId}" data-path="${filePath}">
             <div class="editor-toolbar">
@@ -255,8 +256,9 @@ function createLoadingTab(filePath, serverID, sessionID) {
                 <button class="editor-save-btn" disabled>💾 保存 (Ctrl+S)</button>
             </div>
             <div class="editor-container loading" id="${tabId}">
-                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: rgba(255,255,255,0.5);">
-                    📂 加载中...
+                <div style="display: flex; align-items: center; justify-content: center; height: 100%; color: rgba(255,255,255,0.5); gap: 8px;">
+                    <span style="font-size: 24px;">${loadingIcon}</span>
+                    <span>加载中...</span>
                 </div>
             </div>
         </div>
@@ -880,11 +882,17 @@ window.openMediaViewer = async function(filePath, serverID, sessionID, mediaType
     
     contentContainer.insertAdjacentHTML('beforeend', mediaHTML);
     
-    // 隐藏其他面板
+    // 隐藏其他面板，显示媒体查看器
     document.querySelectorAll('.terminal-pane, .editor-pane, .media-viewer').forEach(pane => {
         pane.classList.remove('active');
     });
     document.querySelector(`.media-viewer[data-tab-id="${tabId}"]`)?.classList.add('active');
+    
+    // 更新标签选中状态（移除终端标签的选中状态）
+    document.querySelectorAll('.content-tab-item').forEach(tab => {
+        tab.classList.remove('active');
+    });
+    document.querySelector(`.content-tab-item[data-tab-id="${tabId}"]`)?.classList.add('active');
     
     // 为图片添加缩放和拖拽功能
     if (mediaType === 'image') {
