@@ -209,8 +209,8 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 		// 添加历史消息
 		apiMessages = append(apiMessages, models.ConvertToOpenAIMessages(messages)...)
 
-		// 创建流式请求
-		stream, err := client.CreateChatCompletionStream(context.Background(), openai.ChatCompletionRequest{
+		// 构建请求参数
+		apiRequest := openai.ChatCompletionRequest{
 			Model:            config.AIModel.Name,
 			Messages:         apiMessages,
 			Temperature:      config.Temperature,
@@ -218,7 +218,25 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 			TopP:             config.TopP,
 			FrequencyPenalty: config.FrequencyPenalty,
 			PresencePenalty:  config.PresencePenalty,
-		})
+		}
+
+		// 打印完整的API请求信息（调试用）
+		log.Printf("🚀 [AI API请求] ========================================")
+		log.Printf("📌 模型: %s", config.AIModel.Name)
+		log.Printf("📌 API端点: %s", config.Endpoint.BaseURL)
+		log.Printf("📌 温度: %.2f, MaxTokens: %d, TopP: %.2f", config.Temperature, config.MaxTokens, config.TopP)
+		log.Printf("📌 消息数量: %d", len(apiMessages))
+		for i, msg := range apiMessages {
+			contentPreview := msg.Content
+			if len(contentPreview) > 100 {
+				contentPreview = contentPreview[:100] + "..."
+			}
+			log.Printf("   [%d] Role: %s, Content: %s", i, msg.Role, contentPreview)
+		}
+		log.Printf("====================================================")
+
+		// 创建流式请求
+		stream, err := client.CreateChatCompletionStream(context.Background(), apiRequest)
 
 		if err != nil {
 			return fmt.Errorf("创建流式请求失败: %w", err)
