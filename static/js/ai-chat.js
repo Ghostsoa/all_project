@@ -302,6 +302,7 @@ async function streamChat(sessionId, message, thinkingId) {
                 
                 if (data.type === 'content') {
                     // 内容增量更新
+                    const isFirstContent = assistantMessage === '';
                     assistantMessage += data.content;
                     
                     if (!messageElement) {
@@ -310,9 +311,16 @@ async function streamChat(sessionId, message, thinkingId) {
                         updateMessageContent(messageElement, assistantMessage);
                     }
                     
-                    // 收到第一条正文内容时，自动折叠思维链
-                    if (reasoningContent && assistantMessage.length <= data.content.length) {
-                        updateReasoningContent(messageElement, reasoningContent, true);
+                    // 收到第一条正文内容时：1) 自动折叠思维链 2) 停止流光
+                    if (isFirstContent) {
+                        if (reasoningContent) {
+                            updateReasoningContent(messageElement, reasoningContent, true, false);
+                        }
+                        // 停止思维链header的流光
+                        const reasoningHeader = messageElement.querySelector('.reasoning-header');
+                        if (reasoningHeader) {
+                            reasoningHeader.classList.remove('shimmer-text');
+                        }
                     }
                     
                     scrollToBottom();
@@ -321,19 +329,26 @@ async function streamChat(sessionId, message, thinkingId) {
                     // 思维链内容
                     reasoningContent += data.content;
                     
-                    // 如果还没有消息元素，先创建一个
+                    // 如果还没有消息元素，先创建一个空的
                     if (!messageElement) {
-                        messageElement = createMessageElement('assistant', '正在思考...');
+                        messageElement = createMessageElement('assistant', '');
                     }
                     
-                    updateReasoningContent(messageElement, reasoningContent);
+                    // 更新思维链，第一次创建时带流光
+                    updateReasoningContent(messageElement, reasoningContent, false, true);
                     scrollToBottom();
                     
                 } else if (data.type === 'done') {
                     // 完成
                     console.log('✅ 对话完成');
                     
-                    // 如果只有reasoning没有content，清除"正在思考..."
+                    // 停止所有流光效果
+                    if (messageElement) {
+                        const shimmerElements = messageElement.querySelectorAll('.shimmer-text');
+                        shimmerElements.forEach(el => el.classList.remove('shimmer-text'));
+                    }
+                    
+                    // 如果只有reasoning没有content，清除空内容
                     if (messageElement && assistantMessage === '') {
                         updateMessageContent(messageElement, '');
                     }
@@ -410,7 +425,7 @@ function createMessageElement(role, content, reasoning = null) {
         reasoningDiv.className = 'message-reasoning';
         reasoningDiv.innerHTML = `
             <div class="reasoning-header" onclick="toggleReasoning(this)">
-                <span>Thought</span>
+                <span class="thought-text">Thought</span>
                 <span class="reasoning-arrow">▼</span>
             </div>
             <div class="reasoning-content">${escapeHtml(reasoning)}</div>
@@ -450,15 +465,17 @@ function updateMessageContent(messageElement, content) {
 }
 
 // 更新思维链内容
-function updateReasoningContent(messageElement, reasoning, autoCollapse = false) {
+function updateReasoningContent(messageElement, reasoning, autoCollapse = false, addShimmer = false) {
     let reasoningDiv = messageElement.querySelector('.message-reasoning');
+    let isNewDiv = false;
     
     if (!reasoningDiv) {
+        isNewDiv = true;
         reasoningDiv = document.createElement('div');
         reasoningDiv.className = 'message-reasoning';
         reasoningDiv.innerHTML = `
             <div class="reasoning-header" onclick="toggleReasoning(this)">
-                <span>Thought</span>
+                <span class="thought-text">Thought</span>
                 <span class="reasoning-arrow">▼</span>
             </div>
             <div class="reasoning-content"></div>
@@ -466,6 +483,14 @@ function updateReasoningContent(messageElement, reasoning, autoCollapse = false)
         const contentWrapper = messageElement.querySelector('.message-content-wrapper');
         if (contentWrapper) {
             contentWrapper.insertBefore(reasoningDiv, contentWrapper.firstChild);
+        }
+        
+        // 第一次创建时添加流光
+        if (addShimmer) {
+            const header = reasoningDiv.querySelector('.reasoning-header');
+            if (header) {
+                header.classList.add('shimmer-text');
+            }
         }
     }
     
@@ -497,11 +522,7 @@ function showThinking() {
         <div class="message-avatar">🤖</div>
         <div class="message-content-wrapper">
             <div class="message-content">
-                <div class="typing-indicator">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </div>
+                <span class="typing-indicator shimmer-text">running</span>
             </div>
         </div>
     `;

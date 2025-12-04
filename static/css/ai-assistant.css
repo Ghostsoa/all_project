@@ -477,7 +477,8 @@
     font-size: 13px;
     max-width: 80%;
     word-break: keep-all;
-    overflow-wrap: normal;
+    word-wrap: break-word;
+    overflow-wrap: break-word;
 }
 
 /* Markdown样式 */
@@ -648,9 +649,29 @@
     color: rgba(255, 255, 255, 0.6);
 }
 
+.reasoning-header.shimmer-text .thought-text {
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.3) 0%,
+        rgba(255, 255, 255, 0.8) 50%,
+        rgba(255, 255, 255, 0.3) 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 2s infinite linear;
+}
+
 .reasoning-arrow {
     transition: transform 0.2s ease;
     display: inline-block;
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.reasoning-header.shimmer-text .reasoning-arrow {
+    -webkit-text-fill-color: rgba(255, 255, 255, 0.4);
+    background: none;
 }
 
 .reasoning-header.collapsed .reasoning-arrow {
@@ -672,12 +693,37 @@
     display: none;
 }
 
+/* 流光动画 */
+@keyframes shimmer {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+.shimmer-text {
+    background: linear-gradient(
+        90deg,
+        rgba(255, 255, 255, 0.3) 0%,
+        rgba(255, 255, 255, 0.8) 50%,
+        rgba(255, 255, 255, 0.3) 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer 2s infinite linear;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
 /* 思考中状态 */
 .typing-indicator {
-    display: flex;
-    gap: 4px;
-    align-items: center;
-    padding: 4px 0;
+    display: inline-block;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.5);
 }
 
 .typing-indicator span {
