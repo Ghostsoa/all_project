@@ -181,8 +181,9 @@ export async function loadDirectory(path, retryCount = 0) {
         return;
     }
     
-    // 保存当前路径到state
+    // 保存当前路径到state和全局变量
     state.currentPath = path;
+    currentPath = path; // 更新全局变量，用于右键菜单
     
     if (retryCount === 0) {
         // 第一次加载时显示加载状态（不是重试）
@@ -812,7 +813,16 @@ window.pasteFile = async function(targetPath) {
     closeAllContextMenus();
     
     const fileName = clipboard.path.split('/').pop();
-    const newPath = targetPath + '/' + fileName;
+    let newPath = targetPath + '/' + fileName;
+    
+    // 检测是否在同一目录粘贴
+    const sourcePath = clipboard.path;
+    if (sourcePath === newPath && clipboard.type === 'copy') {
+        // 同目录复制，添加副本后缀
+        const ext = fileName.includes('.') ? fileName.substring(fileName.lastIndexOf('.')) : '';
+        const baseName = ext ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
+        newPath = targetPath + '/' + baseName + '_副本' + ext;
+    }
     
     try {
         if (clipboard.type === 'copy') {
