@@ -163,9 +163,11 @@ func (h *AIHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 			Content:   req.Message,
 		}
 		if err := h.messageRepo.Create(userMsg); err != nil {
+			log.Printf("❌ 保存用户消息失败: %v", err)
 			h.sendError(conn, fmt.Sprintf("保存消息失败: %v", err))
 			continue
 		}
+		log.Printf("✅ 用户消息已保存 - ID: %d, Content: %s", userMsg.ID, userMsg.Content)
 
 		// 处理对话
 		if err := h.processChat(conn, session); err != nil {
@@ -191,6 +193,15 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 	messages, err := h.messageRepo.GetRecentMessages(session.ID, config.MaxHistoryRounds)
 	if err != nil {
 		return err
+	}
+
+	log.Printf("📚 获取历史消息 - SessionID: %d, 消息数量: %d", session.ID, len(messages))
+	for i, msg := range messages {
+		preview := msg.Content
+		if len(preview) > 50 {
+			preview = preview[:50] + "..."
+		}
+		log.Printf("   [历史%d] Role: %s, Content: %s", i, msg.Role, preview)
 	}
 
 	// 工具调用循环
