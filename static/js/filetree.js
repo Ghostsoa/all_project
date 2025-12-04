@@ -1089,46 +1089,59 @@ async function uploadSingleFile(file, targetPath, taskId) {
     }
 }
 
-// 完整上传小文件（<100MB）
+// 完整上传小文件（<100MB）- 使用FormData和XMLHttpRequest实现真实进度
 async function uploadFileComplete(file, filePath, taskId, task, startTime) {
-    // 显示编码状态
-    updateUploadProgress(taskId, 10, file.size, 0, 'uploading');
-    const speedSpan = document.querySelector(`#upload-${taskId} .upload-speed`);
-    if (speedSpan) speedSpan.textContent = '编码中...';
-    
-    const content = await readFileAsBase64(file);
-    
-    // 显示上传状态
-    updateUploadProgress(taskId, 50, file.size, 0, 'uploading');
-    if (speedSpan) speedSpan.textContent = '上传中...';
-    
-    const uploadStartTime = Date.now();
-    
-    const response = await fetch('/api/files/upload', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-            session_id: currentSessionID,
-            path: filePath,
-            content: content,
-            encoding: 'base64'
-        }),
-        signal: task.controller.signal
+    return new Promise((resolve, reject) => {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('session_id', currentSessionID);
+        formData.append('path', filePath);
+        
+        const xhr = new XMLHttpRequest();
+        
+        // 监听上传进度
+        let lastTime = Date.now();
+        let lastLoaded = 0;
+        
+        xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+                const progress = (e.loaded / e.total) * 100;
+                
+                // 计算实时速度
+                const now = Date.now();
+                const timeDiff = (now - lastTime) / 1000;
+                const bytesDiff = e.loaded - lastLoaded;
+                const speed = timeDiff > 0 ? bytesDiff / timeDiff : 0;
+                
+                lastTime = now;
+                lastLoaded = e.loaded;
+                
+                updateUploadProgress(taskId, progress, file.size, speed, 'uploading');
+            }
+        };
+        
+        xhr.onload = () => {
+            if (xhr.status === 200) {
+                const data = JSON.parse(xhr.responseText);
+                if (data.success) {
+                    resolve();
+                } else {
+                    reject(new Error(data.error || '上传失败'));
+                }
+            } else {
+                reject(new Error(`上传失败: HTTP ${xhr.status}`));
+            }
+        };
+        
+        xhr.onerror = () => reject(new Error('网络错误'));
+        xhr.onabort = () => reject(new Error('已取消'));
+        
+        // 支持取消
+        task.xhr = xhr;
+        
+        xhr.open('POST', '/api/files/upload', true);
+        xhr.send(formData);
     });
-    
-    if (task.cancelled) {
-        throw new Error('已取消');
-    }
-    
-    const data = await response.json();
-    if (!data.success) {
-        throw new Error(data.error || '上传失败');
-    }
-    
-    // 计算平均速度
-    const timeDiff = (Date.now() - uploadStartTime) / 1000;
-    const speed = timeDiff > 0 ? file.size / timeDiff : 0;
-    updateUploadProgress(taskId, 90, file.size, speed, 'uploading');
 }
 
 // 分片上传大文件（>100MB）
@@ -1291,7 +1304,16 @@ window.cancelUpload = function(taskId) {
     const task = uploadTasks.get(taskId);
     if (task) {
         task.cancelled = true;
-        task.controller.abort();
+        
+        // 取消XMLHttpRequest
+        if (task.xhr) {
+            task.xhr.abort();
+        }
+        
+        // 取消Fetch请求（分片上传）
+        if (task.controller) {
+            task.controller.abort();
+        }
     } else {
         // 如果任务已完成，直接移除UI
         removeUploadProgress(taskId);

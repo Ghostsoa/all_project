@@ -291,21 +291,17 @@ func (h *FileHandler) removeDir(client *sftp.Client, path string) error {
 	return client.RemoveDirectory(path)
 }
 
-// UploadFile 上传文件
+// UploadFile 上传文件（支持FormData二进制上传，无需Base64编码）
 func (h *FileHandler) UploadFile(c *gin.Context) {
-	var req struct {
-		SessionID string `json:"session_id"`
-		Path      string `json:"path"`
-		Content   string `json:"content"`
-		Encoding  string `json:"encoding"` // "base64" 或 "text"
-	}
+	sessionID := c.PostForm("session_id")
+	path := c.PostForm("path")
 
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+	if sessionID == "" || path == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "缺少参数"})
 		return
 	}
 
-	session := GetSessionManager().GetSession(req.SessionID)
+	session := GetSessionManager().GetSession(sessionID)
 	if session == nil || session.SFTPClient == nil {
 		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "SSH会话不存在或已断开"})
 		return
@@ -313,30 +309,31 @@ func (h *FileHandler) UploadFile(c *gin.Context) {
 
 	sftpClient := session.SFTPClient
 
-	// 创建文件
-	file, err := sftpClient.Create(req.Path)
+	// 获取上传的文件
+	fileHeader, err := c.FormFile("file")
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "获取文件失败: " + err.Error()})
+		return
+	}
+
+	// 打开上传的文件
+	uploadedFile, err := fileHeader.Open()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "打开文件失败: " + err.Error()})
+		return
+	}
+	defer uploadedFile.Close()
+
+	// 创建远程文件
+	remoteFile, err := sftpClient.Create(path)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建文件失败: " + err.Error()})
 		return
 	}
-	defer file.Close()
+	defer remoteFile.Close()
 
-	// 解码并写入内容
-	var content []byte
-	if req.Encoding == "base64" {
-		// Base64解码（用于二进制文件）
-		content, err = base64.StdEncoding.DecodeString(req.Content)
-		if err != nil {
-			c.JSON(http.StatusBadRequest, gin.H{"error": "Base64解码失败: " + err.Error()})
-			return
-		}
-	} else {
-		// 文本内容
-		content = []byte(req.Content)
-	}
-
-	_, err = file.Write(content)
-	if err != nil {
+	// 直接流式复制（不加载到内存，支持大文件）
+	if _, err := io.Copy(remoteFile, uploadedFile); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "写入文件失败: " + err.Error()})
 		return
 	}
