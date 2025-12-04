@@ -22,14 +22,23 @@ export function initFileTree() {
     const fileTreeContainer = document.getElementById('fileTree');
     if (!fileTreeContainer) return;
     
-    // 加载初始目录
-    loadDirectory(currentPath);
+    // 显示隐藏文件勾选框事件
+    const showHiddenCheckbox = document.getElementById('showHiddenFiles');
+    if (showHiddenCheckbox) {
+        showHiddenCheckbox.addEventListener('change', toggleHiddenFiles);
+    }
+    
+    // 刷新按钮事件
+    const refreshBtn = document.getElementById('refreshBtn');
+    if (refreshBtn) {
+        refreshBtn.addEventListener('click', refreshCurrentDirectory);
+    }
     
     // 添加F5刷新快捷键
     document.addEventListener('keydown', (e) => {
         if (e.key === 'F5' && !e.ctrlKey && !e.shiftKey && !e.altKey) {
             e.preventDefault();
-            window.refreshCurrentDirectory();
+            refreshCurrentDirectory();
         }
     });
     
@@ -50,7 +59,7 @@ export function initFileTree() {
 }
 
 // 手动刷新当前目录
-window.refreshCurrentDirectory = async function() {
+async function refreshCurrentDirectory() {
     if (!currentSessionID || !currentPath) return;
     
     try {
@@ -63,7 +72,7 @@ window.refreshCurrentDirectory = async function() {
 }
 
 // 切换显示隐藏文件
-window.toggleHiddenFiles = function() {
+function toggleHiddenFiles() {
     const checkbox = document.getElementById('showHiddenFiles');
     setShowHiddenFiles(checkbox.checked);
     
