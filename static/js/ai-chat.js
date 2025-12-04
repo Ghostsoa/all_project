@@ -1,6 +1,7 @@
 // AI对话管理模块
 
 import { apiRequest } from './api.js';
+import { state } from './config.js';
 
 // 全局变量
 let currentSession = null;
@@ -517,7 +518,7 @@ window.getTerminalBuffer = function(lines = 50) {
         }
         
         const sessionId = activeTerminal.id;
-        const terminalSession = window.state?.terminals?.get(sessionId);
+        const terminalSession = state.terminals.get(sessionId);
         
         if (!terminalSession || !terminalSession.term) {
             return null;
@@ -739,7 +740,6 @@ async function streamChat(sessionId, message, thinkingId) {
         
         chatWebSocket.onmessage = (event) => {
             try {
-                console.log('📥 收到消息:', event.data);
                 const data = JSON.parse(event.data);
                 
                 if (data.type === 'content') {
