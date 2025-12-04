@@ -809,33 +809,30 @@ window.pasteFile = async function(targetPath) {
         return;
     }
     
+    closeAllContextMenus();
+    
     const fileName = clipboard.path.split('/').pop();
     const newPath = targetPath + '/' + fileName;
     
     try {
         if (clipboard.type === 'copy') {
-            // 复制：先读取再创建
-            const response = await fetch(`/api/files/read?session_id=${currentSessionID}&path=${encodeURIComponent(clipboard.path)}`);
-            const data = await response.json();
+            // 复制：在SSH服务器上直接执行cp命令
+            const response = await fetch('/api/files/copy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    session_id: currentSessionID,
+                    source_path: clipboard.path,
+                    target_path: newPath
+                })
+            });
             
+            const data = await response.json();
             if (data.success) {
-                const createResponse = await fetch('/api/files/save', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        session_id: currentSessionID,
-                        path: newPath,
-                        content: data.content
-                    })
-                });
-                
-                const createData = await createResponse.json();
-                if (createData.success) {
-                    showToast('复制成功', 'success');
-                    await fileCache.rollback(currentSessionID, targetPath);
-                } else {
-                    showToast('复制失败', 'error');
-                }
+                showToast('复制成功', 'success');
+                await loadDirectory(targetPath); // 刷新目录
+            } else {
+                showToast('复制失败: ' + data.error, 'error');
             }
         } else if (clipboard.type === 'cut') {
             // 剪切：重命名（移动）
@@ -853,10 +850,8 @@ window.pasteFile = async function(targetPath) {
             if (data.success) {
                 showToast('移动成功', 'success');
                 
-                // 刷新两个目录
-                const oldParent = clipboard.path.split('/').slice(0, -1).join('/') || '/';
-                await fileCache.rollback(currentSessionID, oldParent);
-                await fileCache.rollback(currentSessionID, targetPath);
+                // 刷新目标目录
+                await loadDirectory(targetPath);
                 
                 clipboard = null; // 清空剪贴板
             } else {

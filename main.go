@@ -91,6 +91,7 @@ func main() {
 		api.POST("/files/create", fileHandler.CreateFile)
 		api.POST("/files/delete", fileHandler.DeleteFile)
 		api.POST("/files/rename", fileHandler.RenameFile)
+		api.POST("/files/copy", fileHandler.CopyFile) // 复制文件
 	}
 
 	// WebSocket 路由（需要认证，未登录则重定向）

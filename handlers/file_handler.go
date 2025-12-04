@@ -269,6 +269,49 @@ func (h *FileHandler) RenameFile(c *gin.Context) {
 	})
 }
 
+// CopyFile 复制文件或目录（在SSH服务器上执行cp命令）
+func (h *FileHandler) CopyFile(c *gin.Context) {
+	var req struct {
+		SessionID  string `json:"session_id"`
+		SourcePath string `json:"source_path"`
+		TargetPath string `json:"target_path"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "参数错误"})
+		return
+	}
+
+	session := GetSessionManager().GetSession(req.SessionID)
+	if session == nil || session.SSHClient == nil {
+		c.JSON(http.StatusServiceUnavailable, gin.H{"error": "SSH会话不存在或已断开"})
+		return
+	}
+
+	// 创建SSH会话执行cp命令
+	sshSession, err := session.SSHClient.NewSession()
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建SSH会话失败"})
+		return
+	}
+	defer sshSession.Close()
+
+	// 使用cp -r命令支持文件和目录复制
+	cmd := fmt.Sprintf("cp -r %s %s", req.SourcePath, req.TargetPath)
+	output, err := sshSession.CombinedOutput(cmd)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"error": "复制失败: " + err.Error() + " | " + string(output),
+		})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{
+		"success": true,
+		"message": "复制成功",
+	})
+}
+
 // removeDir 递归删除目录
 func (h *FileHandler) removeDir(client *sftp.Client, path string) error {
 	files, err := client.ReadDir(path)
@@ -336,8 +379,10 @@ func (h *FileHandler) UploadFile(c *gin.Context) {
 	}
 	defer remoteFile.Close()
 
-	// 使用带缓冲的复制提升性能
-	buf := make([]byte, 1024*1024) // 1MB缓冲区
+	// 使用大缓冲区提升SFTP传输性能
+	// SFTP over SSH的加密开销很大，使用更大的缓冲区可以减少往返次数
+	// 8MB是平衡内存使用和性能的最佳值
+	buf := make([]byte, 8*1024*1024) // 8MB缓冲区
 	written, err := io.CopyBuffer(remoteFile, uploadedFile, buf)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "写入文件失败: " + err.Error()})
@@ -470,7 +515,7 @@ func (h *FileHandler) UploadChunk(c *gin.Context) {
 	}
 }
 
-// DownloadFile 下载文件（返回原始文件流）
+// DownloadFile 下载文件（返回原始文件流，支持Range请求用于视频播放）
 func (h *FileHandler) DownloadFile(c *gin.Context) {
 	sessionID := c.Query("session_id")
 	path := c.Query("path")
@@ -504,21 +549,74 @@ func (h *FileHandler) DownloadFile(c *gin.Context) {
 		return
 	}
 
-	// 获取文件名并处理中文编码
+	fileSize := stat.Size()
 	fileName := filepath.Base(path)
 
-	// 设置响应头（支持中文文件名）
-	c.Header("Content-Description", "File Transfer")
-	c.Header("Content-Transfer-Encoding", "binary")
-	c.Header("Content-Disposition", fmt.Sprintf(`attachment; filename="%s"; filename*=UTF-8''%s`,
-		fileName,
-		strings.ReplaceAll(fileName, " ", "%20")))
-	c.Header("Content-Type", "application/octet-stream")
-	c.Header("Content-Length", strconv.FormatInt(stat.Size(), 10))
-	c.Header("Accept-Ranges", "bytes") // 支持断点续传
-	c.Header("Cache-Control", "public, max-age=0")
-	c.Header("X-Content-Type-Options", "nosniff")
+	// 获取文件扩展名，判断MIME类型
+	ext := strings.ToLower(filepath.Ext(path))
+	contentType := "application/octet-stream"
+	disposition := "attachment"
 
-	// 流式传输文件内容（高效，不占用内存）
-	io.Copy(c.Writer, file)
+	// 视频/音频/图片使用inline，支持在线播放
+	mimeTypes := map[string]string{
+		".mp4":  "video/mp4",
+		".webm": "video/webm",
+		".ogg":  "video/ogg",
+		".mp3":  "audio/mpeg",
+		".wav":  "audio/wav",
+		".m4a":  "audio/mp4",
+		".jpg":  "image/jpeg",
+		".jpeg": "image/jpeg",
+		".png":  "image/png",
+		".gif":  "image/gif",
+		".webp": "image/webp",
+	}
+
+	if mime, ok := mimeTypes[ext]; ok {
+		contentType = mime
+		disposition = "inline" // 在线播放
+	}
+
+	// 处理Range请求（用于视频seek和流式播放）
+	rangeHeader := c.GetHeader("Range")
+	if rangeHeader != "" {
+		// 解析Range头: bytes=start-end
+		var start, end int64
+		if _, err := fmt.Sscanf(rangeHeader, "bytes=%d-%d", &start, &end); err != nil {
+			// 只有start: bytes=start-
+			fmt.Sscanf(rangeHeader, "bytes=%d-", &start)
+			end = fileSize - 1
+		}
+
+		if end >= fileSize {
+			end = fileSize - 1
+		}
+
+		contentLength := end - start + 1
+
+		// 设置206 Partial Content响应
+		c.Header("Content-Type", contentType)
+		c.Header("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, end, fileSize))
+		c.Header("Content-Length", strconv.FormatInt(contentLength, 10))
+		c.Header("Accept-Ranges", "bytes")
+		c.Header("Cache-Control", "public, max-age=3600") // 缓存1小时
+		c.Status(http.StatusPartialContent)
+
+		// 移动文件指针到起始位置
+		file.Seek(start, 0)
+
+		// 只传输请求的范围
+		io.CopyN(c.Writer, file, contentLength)
+	} else {
+		// 完整文件传输
+		c.Header("Content-Type", contentType)
+		c.Header("Content-Disposition", fmt.Sprintf(`%s; filename="%s"; filename*=UTF-8''%s`,
+			disposition, fileName, strings.ReplaceAll(fileName, " ", "%20")))
+		c.Header("Content-Length", strconv.FormatInt(fileSize, 10))
+		c.Header("Accept-Ranges", "bytes")
+		c.Header("Cache-Control", "public, max-age=3600")
+
+		// 流式传输
+		io.Copy(c.Writer, file)
+	}
 }
