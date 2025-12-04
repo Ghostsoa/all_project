@@ -5,7 +5,7 @@ import { showToast } from './utils.js';
 let editorInstances = new Map(); // 存储编辑器实例
 let openFiles = new Map(); // 存储打开的文件信息
 
-export async function openFileEditor(filePath, serverID) {
+export async function openFileEditor(filePath, serverID, sessionID) {
     // 如果文件已打开，切换到该标签
     if (openFiles.has(filePath)) {
         switchToTab(filePath);
@@ -13,8 +13,8 @@ export async function openFileEditor(filePath, serverID) {
     }
     
     try {
-        // 读取文件内容
-        const response = await fetch(`/api/files/read?server_id=${serverID}&path=${encodeURIComponent(filePath)}`);
+        // 读取文件内容（使用session_id）
+        const response = await fetch(`/api/files/read?session_id=${sessionID}&path=${encodeURIComponent(filePath)}`);
         const data = await response.json();
         
         if (!data.success) {
@@ -23,14 +23,14 @@ export async function openFileEditor(filePath, serverID) {
         }
         
         // 创建编辑器标签
-        createEditorTab(filePath, serverID, data.content);
+        createEditorTab(filePath, serverID, sessionID, data.content);
     } catch (error) {
         console.error('打开文件失败:', error);
         showToast('打开文件失败', 'error');
     }
 }
 
-function createEditorTab(filePath, serverID, content) {
+function createEditorTab(filePath, serverID, sessionID, content) {
     const fileName = filePath.split('/').pop();
     const tabId = 'editor-' + Date.now();
     
@@ -87,11 +87,7 @@ function createEditorTab(filePath, serverID, content) {
     });
     
     // 保存文件信息
-    openFiles.set(filePath, {
-        tabId,
-        serverID,
-        modified: false
-    });
+    openFiles.set(filePath, { serverID, sessionID, tabId, modified: false });
     
     // 切换到新标签
     switchToTab(filePath);

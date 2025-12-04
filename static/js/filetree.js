@@ -164,7 +164,7 @@ window.handleFileDoubleClick = function(path, isDir) {
         currentPath = path;
         loadDirectory(path);
     } else {
-        openFileEditor(path, currentServerID);
+        openFileEditor(path, currentServerID, currentSessionID);
     }
 };
 
