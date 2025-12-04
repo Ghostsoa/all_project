@@ -441,11 +441,13 @@
 }
 
 .sidebar.collapsed .server-list {
-    padding: 0;
+    padding: 0 !important;
+    margin: 0 !important;
     gap: 8px;
     display: flex;
     flex-direction: column;
     align-items: center;
+    width: 100%;
 }
 
 .sidebar.collapsed .server-item {
@@ -463,7 +465,9 @@
 .sidebar.collapsed .server-compact {
     width: 44px;
     height: 44px;
-    padding: 0;
+    padding: 0 !important;
+    margin: 0 !important;
+    gap: 0 !important;
     flex-direction: column;
     align-items: center;
     justify-content: center;
@@ -502,7 +506,8 @@
 
 .sidebar.collapsed .server-icon {
     display: flex !important;
-    margin: 0;
+    margin: 0 auto !important;
+    padding: 0 !important;
     font-size: 14px;
     width: 36px;
     height: 36px;
