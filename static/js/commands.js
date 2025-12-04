@@ -3,13 +3,33 @@ import { state } from './config.js';
 import { api } from './api.js';
 import { escapeHtml, formatTime } from './utils.js';
 
+// 内存缓存：每个服务器的命令历史
+const commandCache = new Map(); // Map<serverID, commands[]>
+
 let commandSaveQueue = [];
 let commandSaveTimer = null;
 let loadHistoryTimer = null;
 
 export function saveCommandToHistory(serverId, command) {
-    commandSaveQueue.push({ serverId, command });
+    // 1. 立即更新内存缓存
+    const cached = commandCache.get(serverId) || [];
+    const newCommand = {
+        id: Date.now(),
+        server_id: serverId,
+        command: command,
+        created_at: new Date().toISOString()
+    };
+    cached.unshift(newCommand); // 添加到开头
+    commandCache.set(serverId, cached);
     
+    // 2. 立即更新UI（无延迟）
+    const session = state.terminals.get(state.activeSessionId);
+    if (session && session.server.ID === serverId) {
+        renderCommandHistory(cached);
+    }
+    
+    // 3. 异步保存到服务器（批量）
+    commandSaveQueue.push({ serverId, command });
     if (commandSaveTimer) clearTimeout(commandSaveTimer);
     
     commandSaveTimer = setTimeout(async () => {
@@ -18,20 +38,24 @@ export function saveCommandToHistory(serverId, command) {
         
         for (const item of queue) {
             try {
-                api.saveCommand(item.serverId, item.command).catch(console.error);
+                await api.saveCommand(item.serverId, item.command);
             } catch (error) {
                 console.error('保存命令失败:', error);
             }
         }
-        
-        const session = state.terminals.get(state.activeSessionId);
-        if (session) {
-            loadCommandHistory(session.server.ID, session.server.name);
-        }
-    }, 500);
+    }, 2000); // 2秒批量保存
 }
 
 export async function loadCommandHistory(serverId, serverName) {
+    const displayName = serverId === 0 ? '💻 本地终端' : serverName || '未知服务器';
+    document.getElementById('commandsServerName').textContent = displayName;
+    
+    // 1. 先从缓存读取（立即显示）
+    if (commandCache.has(serverId)) {
+        renderCommandHistory(commandCache.get(serverId));
+    }
+    
+    // 2. 后台静默刷新
     if (loadHistoryTimer) clearTimeout(loadHistoryTimer);
     
     loadHistoryTimer = setTimeout(async () => {
@@ -39,13 +63,17 @@ export async function loadCommandHistory(serverId, serverName) {
             const data = await api.getCommands(serverId);
             
             if (data.success) {
-                const displayName = serverId === 0 ? '💻 本地终端' : serverName || '未知服务器';
-                document.getElementById('commandsServerName').textContent = displayName;
-                renderCommandHistory(data.data || []);
+                const commands = data.data || [];
+                commandCache.set(serverId, commands); // 更新缓存
+                
+                // 如果还在查看这个服务器，静默更新UI
+                const session = state.terminals.get(state.activeSessionId);
+                if (session && session.server.ID === serverId) {
+                    renderCommandHistory(commands);
+                }
             }
         } catch (error) {
             console.error('加载命令历史失败:', error);
-            renderCommandHistory([]);
         }
     }, 300);
 }

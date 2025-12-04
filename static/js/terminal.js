@@ -60,6 +60,13 @@ export function connectSSH(sessionId, server) {
     ws.onopen = () => {
         session.status = 'connected';
         updateStatusLight('connected');
+        
+        // WebSocket连接成功后，延迟加载文件树（等待SFTP创建）
+        setTimeout(() => {
+            if (window.setCurrentServer) {
+                window.setCurrentServer(server.ID, sessionId);
+            }
+        }, 500);
     };
     
     ws.onmessage = (event) => {

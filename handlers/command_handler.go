@@ -27,6 +27,7 @@ func (h *CommandHandler) GinSaveCommand(c *gin.Context) {
 		return
 	}
 
+	// 1. 先保存到数据库
 	if err := h.repo.Create(&history); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
 			"success": false,
@@ -34,6 +35,9 @@ func (h *CommandHandler) GinSaveCommand(c *gin.Context) {
 		})
 		return
 	}
+
+	// 2. 更新内存缓存
+	GetCommandCache().Add(history.ServerID, &history)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
@@ -61,6 +65,16 @@ func (h *CommandHandler) GinGetServerCommands(c *gin.Context) {
 		}
 	}
 
+	// 1. 先从缓存读取
+	if cached, ok := GetCommandCache().Get(uint(serverID)); ok {
+		c.JSON(http.StatusOK, gin.H{
+			"success": true,
+			"data":    cached,
+		})
+		return
+	}
+
+	// 2. 缓存miss，从数据库读取
 	histories, err := h.repo.GetByServerID(uint(serverID), limit)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{
@@ -69,6 +83,9 @@ func (h *CommandHandler) GinGetServerCommands(c *gin.Context) {
 		})
 		return
 	}
+
+	// 3. 更新缓存
+	GetCommandCache().Set(uint(serverID), histories)
 
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,

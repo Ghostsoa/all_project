@@ -94,8 +94,7 @@ window.selectServer = async function(id) {
         connectSSH(sessionId, server);
         loadCommandHistory(server.ID, server.name);
         
-        // 初始化文件树（传入sessionID）
-        setCurrentServer(server.ID, sessionId);
+        // 文件树会在WebSocket连接成功后自动加载
     } catch (error) {
         console.error('连接失败:', error);
         alert('连接失败');
@@ -333,20 +332,5 @@ window.showRightPanel = function(tabName) {
     }
 };
 
-// 文件侧边栏折叠
-window.toggleFileSidebar = function() {
-    const sidebar = document.getElementById('fileSidebar');
-    const toggleBtn = sidebar.querySelector('.sidebar-toggle');
-    
-    if (sidebar.classList.contains('collapsed')) {
-        sidebar.classList.remove('collapsed');
-        toggleBtn.textContent = '◀';
-        toggleBtn.title = '折叠';
-    } else {
-        sidebar.classList.add('collapsed');
-        toggleBtn.textContent = '▶';
-        toggleBtn.title = '展开';
-    }
-};
 
 console.log('✅ Web SSH Client Loaded');
