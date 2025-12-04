@@ -656,6 +656,8 @@ window.createNewFile = async function(basePath) {
             const data = await response.json();
             if (data.success) {
                 showToast('文件创建成功', 'success');
+                // 刷新目录，确保显示真实文件
+                await loadDirectory(basePath);
             } else {
                 showToast('创建失败: ' + data.error, 'error');
                 await fileCache.rollback(currentSessionID, basePath);
@@ -744,6 +746,8 @@ window.createNewFolder = async function(basePath) {
             const data = await response.json();
             if (data.success) {
                 showToast('文件夹创建成功', 'success');
+                // 刷新目录，确保显示真实文件夹
+                await loadDirectory(basePath);
             } else {
                 showToast('创建失败: ' + data.error, 'error');
                 await fileCache.rollback(currentSessionID, basePath);
@@ -980,6 +984,8 @@ window.renameFile = async function(oldPath) {
             const data = await response.json();
             if (data.success) {
                 showToast('重命名成功', 'success');
+                // 刷新目录，确保显示真实文件
+                await loadDirectory(parentPath);
             } else {
                 showToast('重命名失败: ' + data.error, 'error');
                 await fileCache.rollback(currentSessionID, parentPath);
