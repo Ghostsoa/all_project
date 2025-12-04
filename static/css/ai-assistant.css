@@ -247,11 +247,13 @@
 }
 
 .input-box {
-    position: relative;
+    display: flex;
+    flex-direction: column;
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
     transition: border-color 0.2s ease;
+    padding: 8px 12px;
 }
 
 .input-box:focus-within {
@@ -260,8 +262,7 @@
 
 .input-box textarea {
     width: 100%;
-    padding: 8px 12px;
-    padding-bottom: 28px; /* 为底部按钮留空间 */
+    padding: 0;
     background: transparent;
     border: none;
     color: white;
@@ -273,6 +274,7 @@
     min-height: 20px; /* 1行高度 */
     max-height: 108px; /* 6行高度 (18px * 6) */
     overflow-y: auto;
+    margin-bottom: 6px;
 }
 
 .input-box textarea::placeholder {
@@ -281,18 +283,11 @@
 
 /* 输入框底部操作区 */
 .input-actions {
-    position: absolute;
-    bottom: 6px;
-    left: 8px;
-    right: 8px;
     display: flex;
     justify-content: space-between;
     align-items: center;
-    pointer-events: none;
-}
-
-.input-actions > * {
-    pointer-events: auto;
+    padding-top: 2px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
 }
 
 /* 内联模型选择器 */
