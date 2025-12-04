@@ -265,20 +265,26 @@ window.switchToTerminal = function(sessionId) {
 window.switchTab = function(sessionId) {
     const prevSessionId = state.activeSessionId;
     
-    // 保存当前服务器的状态
-    if (prevSessionId) {
+    console.log(`[切换开始] 从 ${prevSessionId} 切换到 ${sessionId}`);
+    
+    // 在修改DOM之前，保存当前服务器的状态
+    if (prevSessionId && prevSessionId !== sessionId) {
         const contentTabsList = document.getElementById('contentTabsList');
+        const activeTerminal = document.querySelector('.terminal-pane.active');
+        const activeEditor = document.querySelector('.editor-pane.active');
+        
+        // 保存content-tabs的HTML
         serverContentTabs.set(prevSessionId, contentTabsList.innerHTML);
         
         // 保存当前激活的pane
-        const activeTerminal = document.querySelector('.terminal-pane.active');
-        const activeEditor = document.querySelector('.editor-pane.active');
         if (activeTerminal) {
             serverActivePane.set(prevSessionId, { type: 'terminal', id: activeTerminal.id });
+            console.log(`[保存状态] ${prevSessionId} → terminal-pane: ${activeTerminal.id}`);
         } else if (activeEditor) {
             const tabId = activeEditor.dataset.tabId;
             const path = activeEditor.dataset.path;
             serverActivePane.set(prevSessionId, { type: 'editor', id: tabId, path });
+            console.log(`[保存状态] ${prevSessionId} → editor: ${tabId}`);
         }
     }
     
