@@ -57,11 +57,11 @@ func (h *LocalFileHandler) ListLocalFiles(c *gin.Context) {
 
 		fullPath := filepath.Join(path, entry.Name())
 		files = append(files, gin.H{
-			"name":  entry.Name(),
-			"path":  fullPath,
-			"size":  info.Size(),
-			"mtime": info.ModTime().Unix(),
-			"isDir": entry.IsDir(),
+			"name":   entry.Name(),
+			"path":   fullPath,
+			"size":   info.Size(),
+			"mtime":  info.ModTime().Unix(),
+			"is_dir": entry.IsDir(), // 使用下划线，与SSH API一致
 		})
 	}
 
