@@ -621,27 +621,26 @@ window.createNewFile = async function(basePath) {
     input.focus();
     input.select(); // 全选文件名
     
+    // 防止重复调用标志
+    let isCreating = false;
+    
     // 处理创建
     const handleCreate = async () => {
+        if (isCreating) return; // 防止重复调用
+        
         const fileName = input.value.trim();
         if (!fileName) {
             tempDiv.remove();
             return;
         }
         
+        isCreating = true; // 设置标志
         const filePath = basePath + '/' + fileName;
         
-        // 移除临时项，添加到缓存
+        // 移除临时项
         tempDiv.remove();
-        const newFile = {
-            name: fileName,
-            path: filePath,
-            is_dir: false,
-            size: 0,
-            mod_time: new Date().toISOString()
-        };
-        fileCache.optimisticCreate(currentSessionID, basePath, newFile);
         
+        // 直接等待后端创建，不使用乐观更新（避免重复显示）
         try {
             const response = await fetch(getApiEndpoint('create'), {
                 method: 'POST',
@@ -656,15 +655,13 @@ window.createNewFile = async function(basePath) {
             const data = await response.json();
             if (data.success) {
                 showToast('文件创建成功', 'success');
-                // 刷新目录，确保显示真实文件
+                // 刷新目录，显示真实文件
                 await loadDirectory(basePath);
             } else {
                 showToast('创建失败: ' + data.error, 'error');
-                await fileCache.rollback(currentSessionID, basePath);
             }
         } catch (error) {
             showToast('创建失败', 'error');
-            await fileCache.rollback(currentSessionID, basePath);
         }
     };
     
@@ -711,27 +708,26 @@ window.createNewFolder = async function(basePath) {
     input.focus();
     input.select(); // 全选文件夹名
     
+    // 防止重复调用标志
+    let isCreating = false;
+    
     // 处理创建
     const handleCreate = async () => {
+        if (isCreating) return; // 防止重复调用
+        
         const folderName = input.value.trim();
         if (!folderName) {
             tempDiv.remove();
             return;
         }
         
+        isCreating = true; // 设置标志
         const folderPath = basePath + '/' + folderName;
         
-        // 移除临时项，添加到缓存
+        // 移除临时项
         tempDiv.remove();
-        const newFolder = {
-            name: folderName,
-            path: folderPath,
-            is_dir: true,
-            size: 0,
-            mod_time: new Date().toISOString()
-        };
-        fileCache.optimisticCreate(currentSessionID, basePath, newFolder);
         
+        // 直接等待后端创建，不使用乐观更新（避免重复显示）
         try {
             const response = await fetch(getApiEndpoint('create'), {
                 method: 'POST',
@@ -746,15 +742,13 @@ window.createNewFolder = async function(basePath) {
             const data = await response.json();
             if (data.success) {
                 showToast('文件夹创建成功', 'success');
-                // 刷新目录，确保显示真实文件夹
+                // 刷新目录，显示真实文件夹
                 await loadDirectory(basePath);
             } else {
                 showToast('创建失败: ' + data.error, 'error');
-                await fileCache.rollback(currentSessionID, basePath);
             }
         } catch (error) {
             showToast('创建失败', 'error');
-            await fileCache.rollback(currentSessionID, basePath);
         }
     };
     
@@ -953,23 +947,26 @@ window.renameFile = async function(oldPath) {
     input.focus();
     input.select();
     
+    // 防止重复调用标志
+    let isRenaming = false;
+    
     // 处理重命名
     const handleRename = async () => {
+        if (isRenaming) return; // 防止重复调用
+        
         const newName = input.value.trim();
         if (!newName || newName === oldName) {
             input.replaceWith(nameSpan);
             return;
         }
         
+        isRenaming = true; // 设置标志
         const newPath = parentPath + '/' + newName;
         
-        // 替换回名称
-        nameSpan.textContent = newName;
+        // 先恢复输入框为原名称
         input.replaceWith(nameSpan);
         
-        // 乐观更新
-        fileCache.optimisticRename(currentSessionID, parentPath, oldPath, newPath, newName);
-        
+        // 直接等待后端重命名，不使用乐观更新（避免重复显示）
         try {
             const response = await fetch(getApiEndpoint('rename'), {
                 method: 'POST',
@@ -984,15 +981,13 @@ window.renameFile = async function(oldPath) {
             const data = await response.json();
             if (data.success) {
                 showToast('重命名成功', 'success');
-                // 刷新目录，确保显示真实文件
+                // 刷新目录，显示真实文件名
                 await loadDirectory(parentPath);
             } else {
                 showToast('重命名失败: ' + data.error, 'error');
-                await fileCache.rollback(currentSessionID, parentPath);
             }
         } catch (error) {
             showToast('重命名失败', 'error');
-            await fileCache.rollback(currentSessionID, parentPath);
         }
     };
     
@@ -1022,9 +1017,7 @@ window.deleteFile = async function(path) {
     
     const parentPath = path.split('/').slice(0, -1).join('/') || '/';
     
-    // 乐观更新：立即从UI删除
-    fileCache.optimisticDelete(currentSessionID, parentPath, path);
-    
+    // 直接等待后端删除，不使用乐观更新（避免UI闪烁）
     try {
         const response = await fetch(getApiEndpoint('delete'), {
             method: 'POST',
@@ -1038,15 +1031,13 @@ window.deleteFile = async function(path) {
         const data = await response.json();
         if (data.success) {
             showToast('删除成功', 'success');
-            // 刷新当前目录确保列表更新
+            // 刷新当前目录
             await loadDirectory(parentPath);
         } else {
             showToast('删除失败: ' + data.error, 'error');
-            await fileCache.rollback(currentSessionID, parentPath);
         }
     } catch (error) {
         showToast('删除失败', 'error');
-        await fileCache.rollback(currentSessionID, parentPath);
     }
 };
 
