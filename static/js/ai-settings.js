@@ -514,6 +514,9 @@ window.saveConfig = async function() {
         is_default: document.getElementById('configIsDefault').checked
     };
 
+    // 调试日志
+    console.log('准备保存配置:', data);
+
     try {
         let savedId = id;
         if (id) {
