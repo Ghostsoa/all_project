@@ -1,13 +1,12 @@
-/* AI 助手面板样式 - 下拉式布局 */
+/* AI 助手面板样式 - 一体化布局 */
 
 /* 顶部工具栏 */
 .ai-toolbar {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 12px;
+    padding: 10px 12px;
     background: rgba(0, 0, 0, 0.2);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
     position: relative;
 }
 
@@ -129,74 +128,30 @@
     gap: 8px;
 }
 
-/* 模式切换下拉 */
-.mode-dropdown {
-    position: relative;
+/* 模式切换按钮 */
+.mode-switch {
+    display: flex;
+    gap: 2px;
 }
 
-.mode-trigger {
-    display: flex;
-    align-items: center;
-    gap: 4px;
-    padding: 4px 8px;
+.mode-switch-btn {
+    padding: 4px 10px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+    background: transparent;
+    border: none;
     cursor: pointer;
-    border-radius: 4px;
-    transition: background 0.2s ease;
+    transition: all 0.2s ease;
     user-select: none;
 }
 
-.mode-trigger:hover {
-    background: rgba(255, 255, 255, 0.05);
+.mode-switch-btn:hover {
+    color: rgba(255, 255, 255, 0.8);
 }
 
-.mode-trigger span {
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.9);
-    font-weight: 500;
-}
-
-.mode-trigger i {
-    font-size: 10px;
-    color: rgba(255, 255, 255, 0.5);
-    transition: transform 0.2s ease;
-}
-
-.mode-trigger.open i {
-    transform: rotate(180deg);
-}
-
-.mode-dropdown-menu {
-    position: absolute;
-    top: calc(100% + 4px);
-    right: 0;
-    min-width: 100px;
-    background: rgba(20, 20, 20, 0.98);
-    border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 6px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-    z-index: 100;
-    animation: slideDown 0.15s ease;
-}
-
-.mode-option {
-    padding: 8px 12px;
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.7);
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.mode-option:hover {
-    background: rgba(255, 255, 255, 0.08);
-    color: rgba(255, 255, 255, 0.9);
-}
-
-.mode-option:first-child {
-    border-radius: 6px 6px 0 0;
-}
-
-.mode-option:last-child {
-    border-radius: 0 0 6px 6px;
+.mode-switch-btn.active {
+    color: #3b82f6;
+    font-weight: 600;
 }
 
 /* 工具按钮 */
@@ -296,9 +251,8 @@
 
 /* 输入区域 */
 .ai-input-container {
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
-    background: rgba(0, 0, 0, 0.3);
-    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 8px 12px;
 }
 
 .input-box {
@@ -315,15 +269,16 @@
 
 .input-box textarea {
     width: 100%;
-    padding: 10px 12px;
-    padding-bottom: 36px; /* 为底部按钮留空间 */
+    padding: 8px 12px;
+    padding-bottom: 32px; /* 为底部按钮留空间 */
     background: transparent;
     border: none;
     color: white;
-    font-size: 13px;
+    font-size: 12px;
     font-family: inherit;
     resize: none;
     outline: none;
+    line-height: 1.5;
 }
 
 .input-box textarea::placeholder {
@@ -350,28 +305,27 @@
     display: flex;
     align-items: center;
     gap: 4px;
-    padding: 4px 8px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 4px;
+    padding: 2px 4px;
+    background: transparent;
+    border: none;
     cursor: pointer;
     transition: all 0.2s ease;
     user-select: none;
 }
 
-.model-trigger:hover {
-    background: rgba(255, 255, 255, 0.08);
-    border-color: rgba(255, 255, 255, 0.2);
+.model-trigger:hover span {
+    color: rgba(255, 255, 255, 0.9);
 }
 
 .model-trigger span {
     font-size: 11px;
-    color: rgba(255, 255, 255, 0.7);
+    color: rgba(255, 255, 255, 0.5);
+    transition: color 0.2s ease;
 }
 
 .model-trigger i {
-    font-size: 9px;
-    color: rgba(255, 255, 255, 0.5);
+    font-size: 8px;
+    color: rgba(255, 255, 255, 0.3);
 }
 
 /* 向上弹出的模型列表 */
@@ -462,23 +416,23 @@
 
 /* 滚动条样式 */
 .ai-messages::-webkit-scrollbar,
-.history-list::-webkit-scrollbar {
+.history-dropdown-menu::-webkit-scrollbar {
     width: 6px;
 }
 
 .ai-messages::-webkit-scrollbar-track,
-.history-list::-webkit-scrollbar-track {
+.history-dropdown-menu::-webkit-scrollbar-track {
     background: rgba(0, 0, 0, 0.2);
 }
 
 .ai-messages::-webkit-scrollbar-thumb,
-.history-list::-webkit-scrollbar-thumb {
+.history-dropdown-menu::-webkit-scrollbar-thumb {
     background: rgba(255, 255, 255, 0.2);
     border-radius: 3px;
 }
 
 .ai-messages::-webkit-scrollbar-thumb:hover,
-.history-list::-webkit-scrollbar-thumb:hover {
+.history-dropdown-menu::-webkit-scrollbar-thumb:hover {
     background: rgba(255, 255, 255, 0.3);
 }
 

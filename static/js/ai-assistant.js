@@ -18,27 +18,19 @@ window.toggleHistoryDropdown = function() {
     }
 };
 
-// 切换模式下拉
-window.toggleModeDropdown = function() {
-    const menu = document.getElementById('modeDropdownMenu');
-    const trigger = document.querySelector('.mode-trigger');
-    
-    if (menu.style.display === 'none' || !menu.style.display) {
-        menu.style.display = 'block';
-        trigger.classList.add('open');
-    } else {
-        menu.style.display = 'none';
-        trigger.classList.remove('open');
-    }
-};
-
-// 选择模式
-window.selectMode = function(mode) {
+// 切换模式
+window.switchMode = function(mode) {
     currentAIMode = mode;
     const modeText = mode === 'chat' ? 'Chat' : 'Agent';
     
-    document.getElementById('currentMode').textContent = modeText;
-    toggleModeDropdown();
+    // 更新按钮激活状态
+    document.querySelectorAll('.mode-switch-btn').forEach(btn => {
+        if (btn.dataset.mode === mode) {
+            btn.classList.add('active');
+        } else {
+            btn.classList.remove('active');
+        }
+    });
     
     console.log(`🔄 切换到${modeText}模式`);
 };
@@ -170,14 +162,6 @@ document.addEventListener('click', (e) => {
     if (historyDropdown && !e.target.closest('.history-dropdown')) {
         historyDropdown.style.display = 'none';
         if (historyTrigger) historyTrigger.classList.remove('open');
-    }
-    
-    // 关闭模式下拉
-    const modeDropdown = document.getElementById('modeDropdownMenu');
-    const modeTrigger = document.querySelector('.mode-trigger');
-    if (modeDropdown && !e.target.closest('.mode-dropdown')) {
-        modeDropdown.style.display = 'none';
-        if (modeTrigger) modeTrigger.classList.remove('open');
     }
     
     // 关闭模型选择
