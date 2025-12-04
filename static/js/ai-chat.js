@@ -561,15 +561,21 @@ window.getEditorContext = function(contextLines = 10) {
     try {
         // 获取当前激活的编辑器pane
         const activeEditor = document.querySelector('.editor-pane.active');
+        console.log('🔍 查找编辑器:', activeEditor);
         if (!activeEditor) {
+            console.log('❌ 没有找到激活的编辑器pane');
             return null;
         }
         
         const filePath = activeEditor.dataset.path;
         const fileName = filePath ? filePath.split('/').pop() : 'unknown';
+        console.log('📄 文件路径:', filePath);
+        
         const editor = activeEditor.querySelector('.CodeMirror');
+        console.log('🔍 CodeMirror元素:', editor);
         
         if (!editor || !editor.CodeMirror) {
+            console.log('❌ CodeMirror实例不存在');
             return null;
         }
         
