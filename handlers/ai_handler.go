@@ -270,37 +270,8 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 		// 构建API消息列表
 		apiMessages := []openai.ChatCompletionMessage{}
 
-		// 构建动态系统提示词（注入实时信息）
-		systemPrompt := config.SystemPrompt
-
-		// 如果有实时信息，动态注入到系统提示词
-		if realTimeInfo != "" {
-			var parts []string
-
-			if systemPrompt != "" {
-				parts = append(parts, systemPrompt)
-			}
-
-			// 注入实时信息（带来源标记）
-			parts = append(parts, "\n\n---\n## 【实时环境信息】用户终端当前状态\n")
-			if sourceInfo != "" {
-				parts = append(parts, "**来源**: "+sourceInfo+"\n\n")
-			}
-			parts = append(parts, "**⚠️ 关键提示 - 请仔细阅读**: \n")
-			parts = append(parts, "- 这是**系统自动捕获**的用户终端**最新实时快照**（最近50行输出）\n")
-			parts = append(parts, "- **每次对话时都会重新获取最新内容**，内容会随着对话实时变化\n")
-			parts = append(parts, "- 包含用户刚刚执行的命令和最新输出结果\n")
-			parts = append(parts, "- 直接分析下面的内容，这就是用户**此刻**看到的终端界面\n\n")
-			parts = append(parts, "**终端最新输出（请仔细查看，可能与历史对话中的描述不同）**:\n```\n"+realTimeInfo+"\n```")
-
-			systemPrompt = strings.Join(parts, "")
-			log.Printf("📝 终端快照已注入系统提示词")
-			log.Printf("=" + strings.Repeat("=", 80))
-			log.Printf("完整系统提示词:\n%s", systemPrompt)
-			log.Printf("=" + strings.Repeat("=", 80))
-		}
-
 		// 添加系统提示词
+		systemPrompt := config.SystemPrompt
 		if systemPrompt != "" {
 			apiMessages = append(apiMessages, openai.ChatCompletionMessage{
 				Role:    "system",
@@ -311,27 +282,37 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 		// 添加历史消息（转换为OpenAI格式）
 		historyMessages := models.ConvertToOpenAIMessages(messages)
 
-		// 如果有指针信息，注入到最后一条用户消息（即当前发送的消息）
-		if cursorInfo != "" && len(historyMessages) > 0 {
+		// 注入实时信息和指针信息到最后一条用户消息
+		if (realTimeInfo != "" || cursorInfo != "") && len(historyMessages) > 0 {
 			// 找到最后一条用户消息
 			for i := len(historyMessages) - 1; i >= 0; i-- {
 				if historyMessages[i].Role == "user" {
-					// 拼接指针信息到用户消息（带来源标记）
-					var cursorParts []string
-					cursorParts = append(cursorParts, historyMessages[i].Content)
-					cursorParts = append(cursorParts, "\n\n---\n## 【实时环境信息】用户编辑器当前状态\n")
-					if sourceInfo != "" {
-						cursorParts = append(cursorParts, "**来源**: "+sourceInfo+"\n\n")
-					}
-					cursorParts = append(cursorParts, "**重要说明**:\n")
-					cursorParts = append(cursorParts, "- 这是**系统自动捕获**的用户编辑器实时状态\n")
-					cursorParts = append(cursorParts, "- 包含用户**当前光标位置**和周围代码上下文（前后10行）\n")
-					cursorParts = append(cursorParts, "- 箭头(→)标记的是光标所在行\n")
-					cursorParts = append(cursorParts, "- 你可以直接引用这些代码回答问题，这就是用户**正在查看**的代码\n\n")
-					cursorParts = append(cursorParts, "**代码上下文**:\n```\n"+cursorInfo+"\n```")
+					var contextParts []string
+					contextParts = append(contextParts, historyMessages[i].Content)
 
-					historyMessages[i].Content = strings.Join(cursorParts, "")
-					log.Printf("📝 编辑器上下文已注入用户消息")
+					// 注入终端实时信息
+					if realTimeInfo != "" {
+						contextParts = append(contextParts, "\n\n---\n## 【实时环境信息】用户终端当前状态\n")
+						if sourceInfo != "" {
+							contextParts = append(contextParts, "**来源**: "+sourceInfo+"\n\n")
+						}
+						contextParts = append(contextParts, "**说明**: 这是系统自动捕获的用户终端实时快照（最近200行输出），包含用户刚刚执行的命令和最新输出结果。\n\n")
+						contextParts = append(contextParts, "**终端输出**:\n```\n"+realTimeInfo+"\n```")
+						log.Printf("📝 终端快照已注入用户消息 - 长度: %d 字符", len(realTimeInfo))
+					}
+
+					// 注入编辑器上下文
+					if cursorInfo != "" {
+						contextParts = append(contextParts, "\n\n---\n## 【实时环境信息】用户编辑器当前状态\n")
+						if sourceInfo != "" && realTimeInfo == "" {
+							contextParts = append(contextParts, "**来源**: "+sourceInfo+"\n\n")
+						}
+						contextParts = append(contextParts, "**说明**: 这是系统自动捕获的用户编辑器实时状态，包含当前光标位置和周围代码上下文（前后10行），箭头(→)标记光标所在行。\n\n")
+						contextParts = append(contextParts, "**代码上下文**:\n```\n"+cursorInfo+"\n```")
+						log.Printf("📝 编辑器上下文已注入用户消息")
+					}
+
+					historyMessages[i].Content = strings.Join(contextParts, "")
 					break
 				}
 			}

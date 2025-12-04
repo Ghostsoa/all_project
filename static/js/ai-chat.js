@@ -1009,7 +1009,7 @@ async function streamChat(sessionId, message, thinkingId) {
         let messageElement = null;
         
         // 收集上下文信息
-        const terminalInfo = window.getTerminalBuffer(50);
+        const terminalInfo = window.getTerminalBuffer(200);  // 增加到200行
         const editorInfo = window.getEditorContext(10);
         
         // 构建payload
