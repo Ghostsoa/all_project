@@ -127,27 +127,34 @@ class FileTreeCache {
         this.processPreloadQueue();
     }
     
-    // 处理预加载队列（错开请求）
+    // 处理预加载队列（并发加载）
     async processPreloadQueue() {
         if (this.preloading) return;
         this.preloading = true;
         
-        while (this.preloadQueue.length > 0) {
-            const item = this.preloadQueue.shift();
-            const { sessionID, path, key } = item;
+        // 获取所有待加载项
+        const items = [...this.preloadQueue];
+        this.preloadQueue = [];
+        
+        // 过滤掉已缓存或正在加载的
+        const toLoad = items.filter(item => 
+            !this.cache.has(item.key) && !this.loading.has(item.key)
+        );
+        
+        if (toLoad.length > 0) {
+            console.log(`🚀 并发预加载 ${toLoad.length} 个目录...`);
             
-            // 再次检查是否需要加载
-            if (this.cache.has(key) || this.loading.has(key)) continue;
-            
-            try {
-                await this.fetchAndCache(sessionID, path, key);
-                console.log('🔄 预加载:', path);
-                
-                // 错开100ms，避免并发过多
-                await this.sleep(100);
-            } catch (error) {
-                console.error('预加载失败:', path);
-            }
+            // 并发加载所有目录
+            await Promise.allSettled(
+                toLoad.map(async ({ sessionID, path, key }) => {
+                    try {
+                        await this.fetchAndCache(sessionID, path, key);
+                        console.log('✅ 预加载完成:', path);
+                    } catch (error) {
+                        console.error('❌ 预加载失败:', path, error.message);
+                    }
+                })
+            );
         }
         
         this.preloading = false;
