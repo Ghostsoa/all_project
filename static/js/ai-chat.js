@@ -528,7 +528,7 @@ window.startEditMessage = function(messageId) {
     buttons.className = 'message-edit-buttons';
     buttons.innerHTML = `
         <button class="btn-edit-save" onclick="saveEditedMessage(${messageId})" title="保存">✓</button>
-        <button class="btn-edit-cancel" onclick="cancelEditMessage(${messageId})" title="取消">✕</button>
+        <button class="btn-edit-cancel" onclick="cancelEditMessage(${messageId})" title="取消">×</button>
     `;
     
     // 保存原始内容用于取消
@@ -1286,19 +1286,19 @@ function createMessageElement(role, content, reasoning = null, messageId = null)
     
     contentWrapper.appendChild(contentDiv);
     
-    // 为用户消息添加操作按钮
+    messageDiv.appendChild(avatar);
+    messageDiv.appendChild(contentWrapper);
+    
+    // 为用户消息添加操作按钮（在气泡外下方）
     if (role === 'user' && messageId) {
         const actionsDiv = document.createElement('div');
         actionsDiv.className = 'message-actions';
         actionsDiv.innerHTML = `
-            <button class="message-action-btn" onclick="startEditMessage(${messageId})" title="编辑">✏️</button>
-            <button class="message-action-btn" onclick="confirmRevokeMessage(${messageId})" title="撤回">↩️</button>
+            <button class="message-action-btn" onclick="startEditMessage(${messageId})" title="编辑">🖊</button>
+            <button class="message-action-btn" onclick="confirmRevokeMessage(${messageId})" title="撤回">⎌</button>
         `;
-        contentWrapper.appendChild(actionsDiv);
+        messageDiv.appendChild(actionsDiv);
     }
-    
-    messageDiv.appendChild(avatar);
-    messageDiv.appendChild(contentWrapper);
     
     const messagesContainer = document.getElementById('aiMessages');
     if (messagesContainer) {

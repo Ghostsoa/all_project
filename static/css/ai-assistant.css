@@ -621,9 +621,15 @@
 
 /* 用户消息wrapper：右对齐，自适应宽度 */
 .ai-message.user .message-content-wrapper {
-    display: flex;
-    justify-content: flex-end;
+    display: inline-block;
     max-width: 100%;
+}
+
+/* 用户消息整体右对齐 */
+.ai-message.user {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
 }
 
 /* AI消息：无气泡样式 */

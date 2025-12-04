@@ -45,6 +45,15 @@ export function createTerminal() {
     const fitAddon = new FitAddon.FitAddon();
     term.loadAddon(fitAddon);
     
+    // 启用WebGL渲染器以提升性能和颜色显示
+    try {
+        const webglAddon = new WebglAddon.WebglAddon();
+        term.loadAddon(webglAddon);
+        console.log('✅ WebGL渲染器已启用');
+    } catch (e) {
+        console.warn('⚠️ WebGL渲染器加载失败，使用Canvas渲染:', e.message);
+    }
+    
     return { term, fitAddon };
 }
 
