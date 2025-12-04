@@ -57,17 +57,12 @@ export function connectSSH(sessionId, server) {
     const ws = new WebSocket(`${config.WS_PROTOCOL}//${config.WS_HOST}/ws?server_id=${server.ID}&session_id=${sessionId}`);
     ws.binaryType = 'arraybuffer';
     
+    let fileTreeLoaded = false; // 标记文件树是否已加载
+    let firstDataReceived = false; // 标记是否收到第一次数据
+    
     ws.onopen = () => {
         session.status = 'connected';
         updateStatusLight('connected');
-        
-        // WebSocket连接成功后，延迟加载文件树
-        // 使用较短延迟+重试逻辑处理SFTP未就绪情况
-        setTimeout(() => {
-            if (window.setCurrentServer) {
-                window.setCurrentServer(server.ID, sessionId);
-            }
-        }, 500); // 500ms初始延迟，如果未就绪会自动重试
     };
     
     ws.onmessage = (event) => {
@@ -75,6 +70,19 @@ export function connectSSH(sessionId, server) {
             term.write(event.data);
         } else {
             term.write(new Uint8Array(event.data));
+        }
+        
+        // 收到第一次数据后，说明SSH已就绪，延迟加载文件树
+        if (!firstDataReceived) {
+            firstDataReceived = true;
+            
+            // 收到SSH输出后，等待500ms确保SFTP也初始化完成
+            if (!fileTreeLoaded && window.setCurrentServer) {
+                fileTreeLoaded = true;
+                setTimeout(() => {
+                    window.setCurrentServer(server.ID, sessionId);
+                }, 500);
+            }
         }
     };
     
