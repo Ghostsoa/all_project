@@ -291,12 +291,9 @@ func (h *AIHandler) processChat(conn *websocket.Conn, session *models.ChatSessio
 
 			systemPrompt = strings.Join(parts, "")
 			log.Printf("📝 终端快照已注入系统提示词")
-			// 打印系统提示词的前500字符用于调试
-			if len(systemPrompt) > 500 {
-				log.Printf("   系统提示词(前500字符): %s...", systemPrompt[:500])
-			} else {
-				log.Printf("   系统提示词: %s", systemPrompt)
-			}
+			log.Printf("=" + strings.Repeat("=", 80))
+			log.Printf("完整系统提示词:\n%s", systemPrompt)
+			log.Printf("=" + strings.Repeat("=", 80))
 		}
 
 		// 添加系统提示词
