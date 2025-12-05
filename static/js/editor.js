@@ -639,6 +639,31 @@ export function saveCurrentContentTabsState() {
 }
 
 // 全局函数 - 内容标签切换（只处理文件标签）
+// 找到相邻的标签（优先左边，其次右边，最后终端）
+function findAdjacentTab(currentTabId) {
+    const allTabs = Array.from(document.querySelectorAll('.content-tab-item'));
+    const currentIndex = allTabs.findIndex(tab => 
+        tab.dataset.tabId === currentTabId || tab.dataset.sessionId === currentTabId
+    );
+    
+    if (currentIndex === -1) return null;
+    
+    // 优先选择前一个标签（左边）
+    if (currentIndex > 0) {
+        const prevTab = allTabs[currentIndex - 1];
+        return prevTab.dataset.tabId || prevTab.dataset.sessionId;
+    }
+    
+    // 其次选择后一个标签（右边）
+    if (currentIndex < allTabs.length - 1) {
+        const nextTab = allTabs[currentIndex + 1];
+        return nextTab.dataset.tabId || nextTab.dataset.sessionId;
+    }
+    
+    // 都没有，返回null
+    return null;
+}
+
 window.switchContentTab = function(id) {
     // 更新标签状态
     document.querySelectorAll('.content-tab-item').forEach(t => t.classList.remove('active'));
@@ -668,6 +693,10 @@ window.switchContentTab = function(id) {
 };
 
 window.closeContentTab = async function(id) {
+    // 记录当前标签是否激活
+    const currentTab = document.querySelector(`.content-tab-item[data-tab-id="${id}"]`);
+    const isCurrentlyActive = currentTab?.classList.contains('active');
+    
     // 如果是编辑器标签
     if (id.startsWith('editor-')) {
         const tab = document.querySelector(`.content-tab-item[data-tab-id="${id}"]`);
@@ -677,6 +706,12 @@ window.closeContentTab = async function(id) {
                 '关闭文件'
             );
             if (!confirmed) return;
+        }
+        
+        // 如果关闭的是当前激活的标签，找到要切换到的标签
+        let targetTabId = null;
+        if (isCurrentlyActive) {
+            targetTabId = findAdjacentTab(id);
         }
         
         const pane = document.querySelector(`.editor-pane[data-tab-id="${id}"]`);
@@ -694,9 +729,20 @@ window.closeContentTab = async function(id) {
         if (filePath) {
             openFiles.delete(filePath);
         }
+        
+        // 如果关闭的是当前标签，切换到相邻标签
+        if (isCurrentlyActive && targetTabId) {
+            window.switchContentTab(targetTabId);
+        }
     
     // 如果是媒体查看器标签
     } else if (id.startsWith('media-')) {
+        // 如果关闭的是当前激活的标签，找到要切换到的标签
+        let targetTabId = null;
+        if (isCurrentlyActive) {
+            targetTabId = findAdjacentTab(id);
+        }
+        
         const tab = document.querySelector(`.content-tab-item[data-tab-id="${id}"]`);
         const pane = document.querySelector(`.media-viewer[data-tab-id="${id}"]`);
         const filePath = pane?.dataset.path;
@@ -711,17 +757,9 @@ window.closeContentTab = async function(id) {
             openFiles.delete(filePath);
         }
         
-        // 检查是否还有文件标签
-        const remainingFileTabs = document.querySelectorAll('.content-tab-item[data-tab-id]');
-        if (remainingFileTabs.length === 0) {
-            // 没有文件标签了，自动切回终端
-            const terminalTab = document.querySelector('.content-tab-item[data-type="terminal"]');
-            if (terminalTab) {
-                const sessionId = terminalTab.dataset.sessionId;
-                if (sessionId && window.switchToTerminal) {
-                    window.switchToTerminal(sessionId);
-                }
-            }
+        // 如果关闭的是当前标签，切换到相邻标签
+        if (isCurrentlyActive && targetTabId) {
+            window.switchContentTab(targetTabId);
         }
     } 
     // 如果是终端标签（不允许关闭）
