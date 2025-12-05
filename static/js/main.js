@@ -66,6 +66,9 @@ document.addEventListener('DOMContentLoaded', async function() {
     initDragUpload(); // 初始化拖拽上传
     await initAIChat(); // 初始化AI对话功能
     
+    // 默认加载本地命令记录
+    loadCommandHistory(0, '本地终端');
+    
     // 自动打开本地终端作为默认
     setTimeout(() => {
         openLocalTerminal();
@@ -160,7 +163,7 @@ window.selectServer = async function(id) {
         // 检查是否已经有该服务器的会话
         let existingSession = null;
         for (const [sid, sess] of state.terminals.entries()) {
-            if (sess.server.ID === server.ID) {
+            if (sess.server.id === server.id) {
                 existingSession = sid;
                 break;
             }
@@ -172,7 +175,7 @@ window.selectServer = async function(id) {
             return;
         }
         
-        const sessionId = 'ssh-' + server.ID; // 使用服务器ID作为sessionId
+        const sessionId = 'ssh-' + server.id; // 使用服务器ID作为sessionId
         
         // 立即清空文件树，显示加载中状态
         const fileTreeContainer = document.getElementById('fileTree');
@@ -218,7 +221,7 @@ window.selectServer = async function(id) {
         state.activeSessionId = sessionId;
         
         connectSSH(sessionId, server);
-        loadCommandHistory(server.ID, server.name);
+        loadCommandHistory(server.id, server.name);
         
         // 渲染顶部SSH服务器标签
         renderTabs();
@@ -396,7 +399,7 @@ window.switchTab = function(sessionId) {
         const isLocal = sessionId.startsWith('local');
         
         if (!isLocal) {
-            loadCommandHistory(session.server.ID, session.server.name);
+            loadCommandHistory(session.server.id, session.server.name);
         }
         
         // 只在首次切换或上次sessionID不同时更新文件树（避免闪烁）
@@ -406,7 +409,7 @@ window.switchTab = function(sessionId) {
                 setLocalTerminal();
             } else {
                 // SSH终端
-                setCurrentServer(session.server.ID, sessionId);
+                setCurrentServer(session.server.id, sessionId);
             }
         }
     }
@@ -531,7 +534,7 @@ window.editServer = async function(id) {
         if (data.success) {
             const server = data.data;
             document.getElementById('modalTitle').textContent = '编辑服务器';
-            document.getElementById('serverId').value = server.ID;
+            document.getElementById('serverId').value = server.id;
             document.getElementById('serverName').value = server.name;
             document.getElementById('serverHost').value = server.host;
             document.getElementById('serverPort').value = server.port;
@@ -569,7 +572,7 @@ window.saveServer = async function() {
     try {
         let data;
         if (id) {
-            server.ID = parseInt(id);
+            server.id = id;
             data = await api.updateServer(server);
         } else {
             if (!server.password) {

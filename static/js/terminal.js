@@ -65,7 +65,7 @@ export function connectSSH(sessionId, server) {
     
     updateStatusLight('connecting');
     
-    const ws = new WebSocket(`${config.WS_PROTOCOL}//${config.WS_HOST}/ws?server_id=${server.ID}&session_id=${sessionId}`);
+    const ws = new WebSocket(`${config.WS_PROTOCOL}//${config.WS_HOST}/ws?server_id=${server.id}&session_id=${sessionId}`);
     ws.binaryType = 'arraybuffer';
     
     let fileTreeLoaded = false; // 标记文件树是否已加载
@@ -99,7 +99,7 @@ export function connectSSH(sessionId, server) {
                 fileTreeLoaded = true;
                 setTimeout(async () => {
                     console.log('🔌 SSH已连接，开始加载文件树...');
-                    await window.setCurrentServer(server.ID, sessionId);
+                    await window.setCurrentServer(server.id, sessionId);
                     // 文件树加载完成后，更新状态
                     session.status = 'connected';
                     updateStatusLight('connected');
@@ -142,7 +142,7 @@ export function connectSSH(sessionId, server) {
             if (data === '\r' || data === '\n') {
                 const command = currentSession.commandBuffer.trim();
                 if (command && command.length > 0) {
-                    saveCommandToHistory(server.ID, command);
+                    saveCommandToHistory(server.id, command);
                 }
                 currentSession.commandBuffer = '';
             } else if (data === '\u007F' || data === '\b') {

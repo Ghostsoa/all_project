@@ -179,8 +179,7 @@ function showWelcomeScreen() {
     if (messagesContainer) {
         messagesContainer.innerHTML = `
             <div class="ai-welcome">
-                <div class="welcome-icon">🤖</div>
-                <h3>AI 助手</h3>
+                <h3>Agent</h3>
                 <p>开始对话，获取智能帮助</p>
             </div>
         `;
@@ -354,7 +353,6 @@ window.createNewAISession = async function() {
         if (messagesContainer) {
             messagesContainer.innerHTML = `
                 <div class="ai-welcome">
-                    <div class="welcome-icon">🤖</div>
                     <h3>新对话已创建</h3>
                     <p>开始对话吧</p>
                 </div>
@@ -386,8 +384,7 @@ window.deleteAISession = async function(sessionId) {
             if (messagesContainer) {
                 messagesContainer.innerHTML = `
                     <div class="ai-welcome">
-                        <div class="welcome-icon">🤖</div>
-                        <h3>AI 助手</h3>
+                        <h3>Agent</h3>
                         <p>选择一个对话或创建新对话</p>
                     </div>
                 `;
@@ -419,7 +416,6 @@ window.clearCurrentAIChat = async function() {
         if (messagesContainer) {
             messagesContainer.innerHTML = `
                 <div class="ai-welcome">
-                    <div class="welcome-icon">🤖</div>
                     <h3>对话已清空</h3>
                     <p>开始新的对话吧</p>
                 </div>
@@ -1188,21 +1184,21 @@ function createMessageElement(role, content, reasoning = null, messageId = null)
     
     const avatar = document.createElement('div');
     avatar.className = 'message-avatar';
-    avatar.textContent = role === 'user' ? '👤' : '🤖';
+    avatar.textContent = role === 'user' ? 'User' : 'Agent';
     
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'message-content-wrapper';
     
-    // 如果有思维链内容，先添加思维链
+    // 如果有思维链内容，先添加思维链（默认折叠）
     if (reasoning) {
         const reasoningDiv = document.createElement('div');
         reasoningDiv.className = 'message-reasoning';
         reasoningDiv.innerHTML = `
             <div class="reasoning-header" onclick="toggleReasoning(this)">
                 <span class="thought-text">Thought</span>
-                <span class="reasoning-arrow">▼</span>
+                <span class="reasoning-arrow">▶</span>
             </div>
-            <div class="reasoning-content">${formatMessageContent(reasoning)}</div>
+            <div class="reasoning-content" style="display: none;">${formatMessageContent(reasoning)}</div>
         `;
         contentWrapper.appendChild(reasoningDiv);
     }
@@ -1305,7 +1301,7 @@ function showThinking() {
     thinkingDiv.className = 'ai-message assistant thinking';
     thinkingDiv.id = 'thinking-' + Date.now();
     thinkingDiv.innerHTML = `
-        <div class="message-avatar">🤖</div>
+        <div class="message-avatar">Agent</div>
         <div class="message-content-wrapper">
             <div class="message-content">
                 <span class="typing-indicator shimmer-text">Running</span>
@@ -1398,27 +1394,33 @@ function formatMessageContent(content) {
     // 5. 斜体
     formatted = formatted.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
     
-    // 6. 标题（消耗末尾换行）
+    // 6. 分隔线（--- 或 *** 或 ___）
+    formatted = formatted.replace(/^(?:---|\*\*\*|___)\s*$/gm, '<hr>');
+    
+    // 7. 标题（消耗末尾换行）
     formatted = formatted.replace(/^### (.+)\n?$/gm, '<h3>$1</h3>');
     formatted = formatted.replace(/^## (.+)\n?$/gm, '<h2>$1</h2>');
     formatted = formatted.replace(/^# (.+)\n?$/gm, '<h1>$1</h1>');
     
-    // 7. 无序列表
-    formatted = formatted.replace(/^[-*] (.+)\n?$/gm, '<li>$1</li>');
-    formatted = formatted.replace(/(<li>[\s\S]*?<\/li>)+/g, match => {
-        return '<ul>' + match.replace(/\n/g, '') + '</ul>';
+    // 8. 无序列表（标记为UL）
+    formatted = formatted.replace(/^[-*] (.+)\n?$/gm, '<li class="ul-item">$1</li>');
+    
+    // 9. 有序列表（标记为OL）
+    formatted = formatted.replace(/^\d+\. (.+)\n?$/gm, '<li class="ol-item">$1</li>');
+    
+    // 10. 合并连续的无序列表项
+    formatted = formatted.replace(/(<li class="ul-item">[\s\S]*?<\/li>(?:\n*<li class="ul-item">[\s\S]*?<\/li>)*)/g, match => {
+        const cleaned = match.replace(/\n/g, '').replace(/ class="ul-item"/g, '');
+        return '<ul>' + cleaned + '</ul>';
     });
     
-    // 8. 有序列表
-    formatted = formatted.replace(/^\d+\. (.+)\n?$/gm, '<li>$1</li>');
-    formatted = formatted.replace(/(<li>[\s\S]*?<\/li>)+/g, match => {
-        if (!match.includes('<ul>')) {
-            return '<ol>' + match.replace(/\n/g, '') + '</ol>';
-        }
-        return match;
+    // 11. 合并连续的有序列表项
+    formatted = formatted.replace(/(<li class="ol-item">[\s\S]*?<\/li>(?:\n*<li class="ol-item">[\s\S]*?<\/li>)*)/g, match => {
+        const cleaned = match.replace(/\n/g, '').replace(/ class="ol-item"/g, '');
+        return '<ol>' + cleaned + '</ol>';
     });
     
-    // 9. 引用（消耗末尾换行）
+    // 12. 引用（消耗末尾换行）
     formatted = formatted.replace(/^&gt; (.+)\n?$/gm, '<blockquote>$1</blockquote>');
     
     // 10. 链接

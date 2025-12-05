@@ -33,9 +33,9 @@ export function renderServerList(filterServers = null) {
         const firstChar = server.name ? server.name.charAt(0).toUpperCase() : '?';
         
         return `
-            <div class="server-item" id="server-${server.ID}">
+            <div class="server-item" id="server-${server.id}">
                 <!-- 折叠状态：名字+标签 | 按钮 -->
-                <div class="server-compact" onclick="window.toggleServerExpand(${server.ID})">
+                <div class="server-compact" onclick="window.toggleServerExpand('${server.id}')">
                     <div class="server-status"></div>
                     <div class="server-icon">${firstChar}</div>
                     <div class="server-info-left">
@@ -45,15 +45,15 @@ export function renderServerList(filterServers = null) {
                         </div>
                         ${tagsHtml}
                     </div>
-                    <button class="btn-small connect" onclick="event.stopPropagation(); window.selectServer(${server.ID})">🔌</button>
+                    <button class="btn-small connect" onclick="event.stopPropagation(); window.selectServer('${server.id}')">🔌</button>
                 </div>
                 
                 <!-- 展开内容：地址和操作按钮 -->
                 <div class="server-expanded">
                     <div class="server-address">📍 ${escapeHtml(server.username)}@${escapeHtml(server.host)}:${server.port}</div>
                     <div class="server-actions-expanded">
-                        <button class="btn-small" onclick="window.editServer(${server.ID})">✏️ 编辑</button>
-                        <button class="btn-small delete" onclick="window.deleteServer(${server.ID})">🗑️ 删除</button>
+                        <button class="btn-small" onclick="window.editServer('${server.id}')">✏️ 编辑</button>
+                        <button class="btn-small delete" onclick="window.deleteServer('${server.id}')">🗑️ 删除</button>
                     </div>
                 </div>
             </div>
@@ -87,7 +87,7 @@ export async function deleteServer(id) {
         if (data.success) {
             // 关闭相关终端
             for (const [sessionId, session] of state.terminals.entries()) {
-                if (session.server.ID === id) {
+                if (session.server.id === id) {
                     if (session.ws) session.ws.close();
                     state.terminals.delete(sessionId);
                 }

@@ -41,7 +41,7 @@ export function saveCommandToHistory(serverId, command) {
     
     // 2. 立即更新UI（无延迟）
     const session = state.terminals.get(state.activeSessionId);
-    if (session && session.server.ID === serverId) {
+    if (session && session.server.id === serverId) {
         renderCommandHistory(cached);
     }
     
@@ -85,7 +85,7 @@ export async function loadCommandHistory(serverId, serverName) {
                 
                 // 如果还在查看这个服务器，静默更新UI
                 const session = state.terminals.get(state.activeSessionId);
-                if (session && session.server.ID === serverId) {
+                if (session && session.server.id === serverId) {
                     renderCommandHistory(commands);
                 }
             }
@@ -157,7 +157,7 @@ export function enterSelectMode() {
     selectedCommands.clear();
     const session = state.terminals.get(state.activeSessionId);
     if (session) {
-        loadCommandHistory(session.server.ID, session.server.name);
+        loadCommandHistory(session.server.id, session.server.name);
     }
 }
 
@@ -169,7 +169,7 @@ window.toggleCommandSelect = function(id) {
     }
     const session = state.terminals.get(state.activeSessionId);
     if (session) {
-        loadCommandHistory(session.server.ID, session.server.name);
+        loadCommandHistory(session.server.id, session.server.name);
     }
 };
 
@@ -186,7 +186,7 @@ window.selectAllCommands = function() {
     });
     const session = state.terminals.get(state.activeSessionId);
     if (session) {
-        loadCommandHistory(session.server.ID, session.server.name);
+        loadCommandHistory(session.server.id, session.server.name);
     }
 };
 
@@ -195,7 +195,7 @@ window.cancelSelectMode = function() {
     selectedCommands.clear();
     const session = state.terminals.get(state.activeSessionId);
     if (session) {
-        loadCommandHistory(session.server.ID, session.server.name);
+        loadCommandHistory(session.server.id, session.server.name);
     }
 };
 
@@ -214,7 +214,7 @@ window.deleteSelectedCommands = async function() {
         selectedCommands.clear();
         const session = state.terminals.get(state.activeSessionId);
         if (session) {
-            loadCommandHistory(session.server.ID, session.server.name);
+            loadCommandHistory(session.server.id, session.server.name);
         }
     } catch (error) {
         console.error('删除失败:', error);
