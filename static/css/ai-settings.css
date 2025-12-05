@@ -562,18 +562,31 @@
 }
 
 .provider-form .model-row {
-    display: flex;
+    display: grid;
+    grid-template-columns: 1fr 1fr auto;
     gap: 10px;
     margin-bottom: 10px;
     align-items: center;
+    padding: 10px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 6px;
+    transition: all 0.2s ease;
+}
+
+.provider-form .model-row:hover {
+    background: rgba(255, 255, 255, 0.03);
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
 .provider-form .model-row input {
-    flex: 1;
+    min-width: 0;
 }
 
 .provider-form .remove-model-btn {
-    padding: 8px 12px;
+    width: 36px;
+    height: 36px;
+    padding: 0;
     background: rgba(239, 68, 68, 0.1);
     border: 1px solid rgba(239, 68, 68, 0.3);
     color: #ef4444;
@@ -581,11 +594,15 @@
     cursor: pointer;
     font-size: 14px;
     transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .provider-form .remove-model-btn:hover {
     background: rgba(239, 68, 68, 0.2);
     border-color: #ef4444;
+    transform: scale(1.05);
 }
 
 /* 服务器表单特定样式 */
