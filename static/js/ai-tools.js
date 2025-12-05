@@ -1,7 +1,5 @@
 // AI 工具调用管理器
 
-import { getFileIcon } from './editor.js';
-
 class AIToolsManager {
     constructor() {
         // 待处理的编辑预览
@@ -11,6 +9,35 @@ class AIToolsManager {
         this.appliedEdits = new Set(
             JSON.parse(localStorage.getItem('appliedEdits') || '[]')
         );
+    }
+
+    /**
+     * 获取文件图标HTML
+     * @param {string} fileName 
+     * @returns {string} HTML字符串
+     */
+    getFileIconHTML(fileName) {
+        const ext = fileName.split('.').pop()?.toLowerCase();
+        const iconMap = {
+            'js': '<i class="devicon-javascript-plain colored"></i>',
+            'ts': '<i class="devicon-typescript-plain colored"></i>',
+            'jsx': '<i class="devicon-react-original colored"></i>',
+            'tsx': '<i class="devicon-react-original colored"></i>',
+            'vue': '<i class="devicon-vuejs-plain colored"></i>',
+            'html': '<i class="devicon-html5-plain colored"></i>',
+            'css': '<i class="devicon-css3-plain colored"></i>',
+            'scss': '<i class="devicon-sass-original colored"></i>',
+            'py': '<i class="devicon-python-plain colored"></i>',
+            'java': '<i class="devicon-java-plain colored"></i>',
+            'go': '<i class="devicon-go-original-wordmark colored"></i>',
+            'cpp': '<i class="devicon-cplusplus-plain colored"></i>',
+            'c': '<i class="devicon-c-plain colored"></i>',
+            'rs': '<i class="devicon-rust-original"></i>',
+            'json': '<i class="devicon-json-plain"></i>',
+            'md': '<i class="devicon-markdown-original"></i>',
+            'txt': '<i class="fa-solid fa-file-lines" style="color: #9ca3af;"></i>',
+        };
+        return iconMap[ext] || '<i class="fa-solid fa-file" style="color: #9ca3af;"></i>';
     }
 
     // ==================== 渲染工具调用消息 ====================
@@ -86,7 +113,7 @@ class AIToolsManager {
     renderEditTool(result) {
         const { preview_id, server_id, file_path, operations } = result;
         const fileName = file_path.split('/').pop();
-        const fileIcon = getFileIcon(fileName);
+        const fileIcon = this.getFileIconHTML(fileName);
         
         // 保存到待处理列表
         this.pendingEdits.set(preview_id, {
@@ -103,7 +130,7 @@ class AIToolsManager {
                 <div class="tool-container" data-preview-id="${preview_id}" onclick="aiToolsManager.handleToolClick('${preview_id}')">
                     <div class="tool-header">
                         <div class="tool-file-icon">
-                            <img src="${fileIcon}" alt="${fileName}">
+                            ${fileIcon}
                         </div>
                         <div class="tool-file-info">
                             <div class="tool-file-name">${fileName}</div>
@@ -135,14 +162,14 @@ class AIToolsManager {
     renderWriteTool(result) {
         const { server_id, file_path, size } = result;
         const fileName = file_path.split('/').pop();
-        const fileIcon = getFileIcon(fileName);
+        const fileIcon = this.getFileIconHTML(fileName);
         
         return `
             <div class="tool-call">
                 <div class="tool-container">
                     <div class="tool-header">
                         <div class="tool-file-icon">
-                            <img src="${fileIcon}" alt="${fileName}">
+                            ${fileIcon}
                         </div>
                         <div class="tool-file-info">
                             <div class="tool-file-name">${fileName}</div>
@@ -173,6 +200,99 @@ class AIToolsManager {
     }
 
     // ==================== 渲染执行中的工具 ====================
+    
+    /**
+     * 渲染已完成的工具调用（用于历史消息）
+     * @param {Object} toolData - {tool_call_id, name, arguments}
+     * @param {Object} argsObj - 解析后的参数对象
+     * @returns {string} HTML
+     */
+    renderToolCallCompleted(toolData, argsObj) {
+        const { name } = toolData;
+        
+        if (name !== 'file_operation') {
+            return `
+                <div class="tool-call">
+                    <div class="tool-simple completed">
+                        <i class="fa-solid fa-check tool-simple-icon"></i>
+                        ${name} completed
+                    </div>
+                </div>
+            `;
+        }
+
+        const { type, file_path } = argsObj;
+
+        if (type === 'read') {
+            const fileName = file_path.split('/').pop();
+            return `
+                <div class="tool-call">
+                    <div class="tool-simple completed">
+                        <i class="fa-solid fa-book-open tool-simple-icon"></i>
+                        Read <strong>${fileName}</strong>
+                    </div>
+                </div>
+            `;
+        } else if (type === 'list') {
+            const dirName = file_path.split('/').pop() || file_path;
+            return `
+                <div class="tool-call">
+                    <div class="tool-simple completed">
+                        <i class="fa-solid fa-folder-open tool-simple-icon"></i>
+                        List <strong>${dirName}</strong>
+                    </div>
+                </div>
+            `;
+        } else if (type === 'edit') {
+            const fileName = file_path.split('/').pop();
+            const fileIcon = this.getFileIconHTML(fileName);
+            
+            return `
+                <div class="tool-call">
+                    <div class="tool-container">
+                        <div class="tool-header">
+                            <div class="tool-file-icon">
+                                ${fileIcon}
+                            </div>
+                            <div class="tool-file-info">
+                                <div class="tool-file-name">${fileName}</div>
+                                <div class="tool-file-path">${file_path}</div>
+                            </div>
+                            <div class="tool-status">
+                                <span class="tool-type-badge tool-type-edit">Edit</span>
+                                <span class="tool-status-badge tool-status-accepted">✓ Completed</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else if (type === 'write') {
+            const fileName = file_path.split('/').pop();
+            const fileIcon = this.getFileIconHTML(fileName);
+            
+            return `
+                <div class="tool-call">
+                    <div class="tool-container">
+                        <div class="tool-header">
+                            <div class="tool-file-icon">
+                                ${fileIcon}
+                            </div>
+                            <div class="tool-file-info">
+                                <div class="tool-file-name">${fileName}</div>
+                                <div class="tool-file-path">${file_path}</div>
+                            </div>
+                            <div class="tool-status">
+                                <span class="tool-type-badge tool-type-write">Create</span>
+                                <span class="tool-status-badge tool-status-accepted">✓ Created</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+        
+        return '';
+    }
     
     /**
      * 渲染执行中的工具调用
@@ -212,7 +332,7 @@ class AIToolsManager {
         } else {
             // edit/write 显示横条 + spinner
             const fileName = file_path.split('/').pop();
-            const fileIcon = getFileIcon(fileName);
+            const fileIcon = this.getFileIconHTML(fileName);
             const actionType = type === 'edit' ? 'Edit' : 'Create';
             
             return `
@@ -220,7 +340,7 @@ class AIToolsManager {
                     <div class="tool-container">
                         <div class="tool-header">
                             <div class="tool-file-icon">
-                                <img src="${fileIcon}" alt="${fileName}">
+                                ${fileIcon}
                             </div>
                             <div class="tool-file-info">
                                 <div class="tool-file-name">${fileName}</div>

@@ -1357,18 +1357,12 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
         messageDiv.dataset.messageId = messageId;
     }
     
-    // 处理 tool role（工具执行结果）
-    if (role === 'tool' && fullMessage) {
-        // 工具执行结果，渲染为工具横条
-        const resultObj = JSON.parse(content);
-        const toolHTML = window.aiToolsManager ? 
-            window.aiToolsManager.renderToolResult(resultObj, fullMessage.tool_name) :
-            `<div>Tool: ${fullMessage.tool_name}</div>`;
-        
-        messageDiv.innerHTML = `
-            <div class="message-avatar">🔧</div>
-            <div class="message-content">${toolHTML}</div>
-        `;
+    // 处理 tool role（工具执行结果）- 不单独显示，跳过
+    // tool消息会在下一个assistant消息中合并显示
+    if (role === 'tool') {
+        // 返回空的隐藏消息
+        messageDiv.style.display = 'none';
+        messageDiv.dataset.toolMessage = 'true';
         return messageDiv;
     }
     
@@ -1391,6 +1385,41 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
             <div class="reasoning-content collapsed">${formatMessageContent(reasoning)}</div>
         `;
         contentWrapper.appendChild(reasoningDiv);
+    }
+    
+    // 如果是 assistant 且有工具调用，先渲染工具调用
+    if (role === 'assistant' && fullMessage && fullMessage.tool_calls && fullMessage.tool_calls.length > 0) {
+        fullMessage.tool_calls.forEach(toolCall => {
+            if (window.aiToolsManager) {
+                // 解析工具调用参数
+                const functionData = toolCall.function || {};
+                const functionName = functionData.name || '';
+                const functionArgs = functionData.arguments || '{}';
+                
+                // 解析参数获取文件信息
+                let argsObj = {};
+                try {
+                    argsObj = JSON.parse(functionArgs);
+                } catch (e) {
+                    console.error('解析工具参数失败:', e);
+                }
+                
+                // 渲染工具调用结果（已完成状态）
+                const toolData = {
+                    tool_call_id: toolCall.id,
+                    name: functionName,
+                    arguments: functionArgs
+                };
+                
+                // 获取工具执行结果（从下一条tool消息中）
+                // 这里先渲染为已完成状态的工具横条
+                const toolHTML = window.aiToolsManager.renderToolCallCompleted(toolData, argsObj);
+                
+                const toolDiv = document.createElement('div');
+                toolDiv.innerHTML = toolHTML;
+                contentWrapper.appendChild(toolDiv.firstChild);
+            }
+        });
     }
     
     // 然后添加正文内容
