@@ -940,7 +940,7 @@ window.sendAIMessage = async function() {
     
     try {
         // 建立WebSocket连接进行流式对话
-        await streamChat(currentSession.ID, message, thinkingId);
+        await streamChat(currentSession.id, message, thinkingId);
     } catch (error) {
         console.error('发送消息失败:', error);
         removeThinking(thinkingId);
