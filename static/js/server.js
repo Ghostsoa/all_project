@@ -81,7 +81,11 @@ export async function searchServers() {
 }
 
 export async function deleteServer(id) {
-    if (!confirm('确定要删除这个服务器吗？')) return;
+    const confirmed = await window.showConfirm(
+        '确定要删除这个服务器吗？',
+        '删除服务器'
+    );
+    if (!confirmed) return;
     
     try {
         const data = await api.deleteServer(id);

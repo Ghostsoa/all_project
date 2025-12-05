@@ -3,6 +3,8 @@ import { state } from './config.js';
 import { api } from './api.js';
 import './toast.js'; // Toast组件（自动初始化到全局）
 import { showToast } from './toast.js';
+import './confirm.js'; // 确认对话框组件
+import { showConfirm } from './confirm.js';
 import { loadServers, searchServers, deleteServer, renderServerList } from './server.js';
 import { createTerminal, connectSSH, openLocalTerminal } from './terminal.js';
 import { loadCommandHistory, saveCommandToHistory } from './commands.js';
@@ -82,6 +84,7 @@ window.searchServers = searchServers;
 window.deleteServer = deleteServer;
 window.openLocalTerminal = openLocalTerminal;
 window.showToast = showToast;
+window.showConfirm = showConfirm; // 确认对话框
 window.setCurrentServer = setCurrentServer; // 暴露文件树加载函数
 window.setLocalTerminal = setLocalTerminal; // 暴露本地文件树加载函数
 

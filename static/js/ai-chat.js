@@ -512,7 +512,11 @@ window.createNewAISession = async function() {
 
 // 删除会话
 window.deleteAISession = async function(sessionId) {
-    if (!confirm('确定要删除这个对话吗？')) return;
+    const confirmed = await window.showConfirm(
+        '确定要删除这个对话吗？',
+        '删除对话'
+    );
+    if (!confirmed) return;
     
     try {
         await apiRequest(`/api/ai/session/delete?id=${sessionId}`, 'POST');
@@ -546,7 +550,11 @@ window.clearCurrentAIChat = async function() {
         return;
     }
     
-    if (!confirm('确定要清空当前对话的所有消息吗？')) return;
+    const confirmed = await window.showConfirm(
+        '确定要清空当前对话的所有消息吗？',
+        '清空对话'
+    );
+    if (!confirmed) return;
     
     try {
         await apiRequest(`/api/ai/session/clear?id=${currentSession.id}`, 'POST');
@@ -649,8 +657,12 @@ window.cancelEditMessage = function(messageId) {
 /**
  * 确认撤回消息
  */
-window.confirmRevokeMessage = function(messageId) {
-    if (confirm('确定要撤回此消息及之后的所有消息吗？此操作不可恢复！')) {
+window.confirmRevokeMessage = async function(messageId) {
+    const confirmed = await window.showConfirm(
+        '确定要撤回此消息及之后的所有消息吗？此操作不可恢复！',
+        '撤回消息'
+    );
+    if (confirmed) {
         revokeMessageHandler(messageId);
     }
 };
@@ -1728,9 +1740,14 @@ window.deleteMessage = async function(element) {
     if (!messageDiv) return;
     
     const role = messageDiv.classList.contains('user') ? '用户' : 'AI';
-    if (!confirm(`确定要删除这条${role}消息吗？`)) {
-        return;
-    }
+    
+    // 使用确认对话框
+    const confirmed = await window.showConfirm(
+        `确定要删除这条${role}消息吗？`,
+        '删除消息'
+    );
+    
+    if (!confirmed) return;
     
     try {
         // 直接从DOM删除（前端操作）

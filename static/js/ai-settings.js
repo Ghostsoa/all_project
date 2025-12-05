@@ -220,7 +220,11 @@ window.editProvider = function(providerId) {
 
 // 删除供应商
 window.deleteProvider = async function(providerId) {
-    if (!confirm('确定要删除这个供应商吗？')) return;
+    const confirmed = await window.showConfirm(
+        '确定要删除这个供应商吗？',
+        '删除供应商'
+    );
+    if (!confirmed) return;
     
     try {
         await apiRequest(`/api/ai/provider/delete?id=${providerId}`, 'POST');

@@ -667,12 +667,16 @@ window.switchContentTab = function(id) {
     }
 };
 
-window.closeContentTab = function(id) {
+window.closeContentTab = async function(id) {
     // 如果是编辑器标签
     if (id.startsWith('editor-')) {
         const tab = document.querySelector(`.content-tab-item[data-tab-id="${id}"]`);
         if (tab && tab.classList.contains('modified')) {
-            if (!confirm('文件未保存，确定关闭吗？')) return;
+            const confirmed = await window.showConfirm(
+                '文件未保存，确定关闭吗？',
+                '关闭文件'
+            );
+            if (!confirmed) return;
         }
         
         const pane = document.querySelector(`.editor-pane[data-tab-id="${id}"]`);

@@ -215,9 +215,14 @@ window.deleteCommand = async function(index) {
     }
 
     const command = cached[index];
-    if (!confirm(`确定要删除命令 "${command.command}" 吗？`)) {
-        return;
-    }
+    
+    // 使用确认对话框
+    const confirmed = await window.showConfirm(
+        `确定要删除命令 "${command.command}" 吗？`,
+        '删除命令'
+    );
+    
+    if (!confirmed) return;
 
     // 从缓存中删除
     cached.splice(index, 1);
@@ -243,9 +248,13 @@ window.clearAllCommands = async function() {
     const serverId = isLocal ? '0' : (session.server ? session.server.id : '0');
     const serverName = isLocal ? '本地终端' : (session.server ? session.server.name : '未知服务器');
 
-    if (!confirm(`确定要清空 "${serverName}" 的所有命令记录吗？此操作不可恢复！`)) {
-        return;
-    }
+    // 使用确认对话框
+    const confirmed = await window.showConfirm(
+        `确定要清空 "${serverName}" 的所有命令记录吗？此操作不可恢复！`,
+        '清空命令记录'
+    );
+    
+    if (!confirmed) return;
 
     try {
         // 清空缓存
