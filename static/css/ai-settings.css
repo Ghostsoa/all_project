@@ -1,5 +1,67 @@
 /* AI设置页面样式 */
 
+/* AI设置面板 - 覆盖中间区域 */
+.ai-settings-panel {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(20, 20, 20, 0.98);
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.settings-panel-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 20px 30px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.settings-panel-header h2 {
+    margin: 0;
+    font-size: 24px;
+    color: #ffffff;
+}
+
+.settings-panel-header .close-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.settings-panel-header .close-btn:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+    border-color: #ef4444;
+}
+
+.settings-panel-content {
+    flex: 1;
+    overflow-y: auto;
+    padding: 20px 30px;
+}
+
+.settings-panel-footer {
+    padding: 15px 30px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+}
+
 /* 大尺寸模态框 */
 .modal-large .modal-content {
     max-width: 900px;
@@ -292,6 +354,160 @@
     color: #ffffff;
 }
 
+/* 供应商列表 */
+.providers-header {
+    margin-bottom: 20px;
+}
+
+.providers-list {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+.provider-card {
+    background: rgba(30, 30, 30, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 20px;
+    transition: all 0.2s ease;
+}
+
+.provider-card:hover {
+    border-color: #4a90e2;
+    box-shadow: 0 2px 8px rgba(74, 144, 226, 0.1);
+}
+
+.provider-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 15px;
+}
+
+.provider-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #ffffff;
+}
+
+.provider-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.provider-actions button {
+    padding: 6px 10px;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.provider-actions button:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: #ffffff;
+}
+
+.provider-info {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 10px;
+    margin-bottom: 15px;
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.provider-models {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.model-tag {
+    display: inline-block;
+    margin: 4px 4px 0 0;
+    padding: 4px 8px;
+    background: rgba(74, 144, 226, 0.2);
+    border: 1px solid rgba(74, 144, 226, 0.3);
+    border-radius: 4px;
+    font-size: 12px;
+    color: #4a90e2;
+}
+
+/* 模型输入行 */
+.model-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 8px;
+    align-items: center;
+}
+
+.model-row input {
+    flex: 1;
+    padding: 8px 12px;
+    background: rgba(30, 30, 30, 0.8);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    color: #ffffff;
+}
+
+.model-row .remove-model-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    background: none;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.model-row .remove-model-btn:hover {
+    background: rgba(239, 68, 68, 0.1);
+    border-color: #ef4444;
+    color: #ef4444;
+}
+
+/* Tab内容 */
+.settings-tab-content {
+    animation: fadeIn 0.3s ease;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* 配置表单 */
+.config-form {
+    max-width: 800px;
+}
+
+.form-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+    gap: 20px;
+}
+
+.form-group label span {
+    float: right;
+    color: #4a90e2;
+    font-weight: normal;
+}
+
+.form-group input[type="range"] {
+    width: 100%;
+}
+
 /* 响应式 */
 @media (max-width: 768px) {
     .modal-large .modal-content {
@@ -309,6 +525,16 @@
     }
 
     .item-body {
+        grid-template-columns: 1fr;
+    }
+    
+    .settings-panel-header,
+    .settings-panel-content,
+    .settings-panel-footer {
+        padding: 15px 20px;
+    }
+    
+    .form-row {
         grid-template-columns: 1fr;
     }
 }

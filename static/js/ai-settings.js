@@ -6,27 +6,41 @@ import { apiRequest } from './api.js';
 let currentProviders = [];
 let currentTab = 'providers'; // 'providers' 或 'config'
 
-// ========== 分页切换 ==========
+// ========== 打开/关闭设置面板 ==========
 
-window.switchTab = function(tab) {
+window.openAISettings = function() {
+    const panel = document.getElementById('aiSettingsPanel');
+    if (panel) {
+        panel.style.display = 'flex';
+        // 加载供应商列表
+        loadProviders();
+    }
+};
+
+window.closeAISettings = function() {
+    const panel = document.getElementById('aiSettingsPanel');
+    if (panel) {
+        panel.style.display = 'none';
+    }
+};
+
+window.switchSettingsTab = function(tab) {
     currentTab = tab;
     
     // 更新Tab按钮状态
-    document.querySelectorAll('.settings-tab').forEach(btn => {
+    document.querySelectorAll('.settings-panel-tabs .settings-tab').forEach(btn => {
         btn.classList.remove('active');
     });
-    document.querySelector(`[onclick="switchTab('${tab}')"]`).classList.add('active');
+    document.querySelector(`.settings-panel-tabs [onclick="switchSettingsTab('${tab}')"]`).classList.add('active');
     
     // 显示对应内容
-    document.querySelectorAll('.tab-content').forEach(content => {
-        content.style.display = 'none';
-    });
-    document.getElementById(`${tab}-content`).style.display = 'block';
-    
-    // 加载数据
     if (tab === 'providers') {
+        document.getElementById('providersTab').style.display = 'block';
+        document.getElementById('configTab').style.display = 'none';
         loadProviders();
     } else if (tab === 'config') {
+        document.getElementById('providersTab').style.display = 'none';
+        document.getElementById('configTab').style.display = 'block';
         loadGlobalConfig();
     }
 };
@@ -80,7 +94,7 @@ async function loadProviders() {
 
 // 打开供应商表单
 window.openProviderForm = function(providerId = null) {
-    const formContainer = document.getElementById('providerFormContainer');
+    const formContainer = document.getElementById('providerFormModal');
     const form = document.getElementById('providerForm');
     
     form.dataset.providerId = providerId || '';
@@ -90,7 +104,7 @@ window.openProviderForm = function(providerId = null) {
         const provider = currentProviders.find(p => p.id === providerId);
         if (!provider) return;
         
-        document.getElementById('formTitle').textContent = '编辑供应商';
+        document.getElementById('providerFormTitle').textContent = '编辑供应商';
         document.getElementById('providerId').value = provider.id;
         document.getElementById('providerName').value = provider.name;
         document.getElementById('providerBaseUrl').value = provider.base_url;
@@ -104,7 +118,7 @@ window.openProviderForm = function(providerId = null) {
         });
     } else {
         // 新建模式
-        document.getElementById('formTitle').textContent = '添加供应商';
+        document.getElementById('providerFormTitle').textContent = '添加供应商';
         form.reset();
         document.getElementById('providerModels').innerHTML = '';
         addModelRow(); // 添加一个空行
@@ -115,7 +129,7 @@ window.openProviderForm = function(providerId = null) {
 
 // 关闭供应商表单
 window.closeProviderForm = function() {
-    document.getElementById('providerFormContainer').style.display = 'none';
+    document.getElementById('providerFormModal').style.display = 'none';
 };
 
 // 添加模型输入行
