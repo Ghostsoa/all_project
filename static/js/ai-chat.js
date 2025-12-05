@@ -281,6 +281,11 @@ window.selectAISession = async function(sessionId) {
         const data = await apiRequest(`/api/ai/session?id=${sessionId}`);
         currentSession = data.data;
         
+        // 确保模型列表已加载
+        if (!modelsLoaded) {
+            await loadModelList();
+        }
+        
         // 更新UI
         renderSessionList();
         updateModelDisplay(); // 更新模型显示
