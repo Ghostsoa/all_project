@@ -1027,115 +1027,99 @@
     transform: scale(0.95);
 }
 
-/* AI面板专用确认对话框 */
-.ai-confirm-overlay {
+/* 气泡式确认框（类似对话气泡，无遮罩） */
+.ai-bubble-confirm {
     position: absolute;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0, 0, 0, 0.7);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-    opacity: 0;
-    transition: opacity 0.2s ease;
-}
-
-.ai-confirm-overlay.show {
-    opacity: 1;
-}
-
-.ai-confirm-dialog {
-    background: #1a1a1a;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    min-width: 280px;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: linear-gradient(135deg, rgba(26, 26, 26, 0.98) 0%, rgba(35, 35, 35, 0.98) 100%);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 12px;
+    min-width: 320px;
     max-width: 400px;
-    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
-    animation: aiConfirmSlideIn 0.2s ease;
+    padding: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
+    z-index: 2000;
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
+    transition: all 0.2s ease;
 }
 
-@keyframes aiConfirmSlideIn {
-    from {
-        transform: translateY(-20px) scale(0.95);
-        opacity: 0;
-    }
-    to {
-        transform: translateY(0) scale(1);
-        opacity: 1;
-    }
+.ai-bubble-confirm.show {
+    opacity: 1;
+    transform: translate(-50%, -50%) scale(1);
 }
 
-.ai-confirm-header {
-    padding: 14px 16px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.ai-confirm-header h4 {
-    margin: 0;
-    font-size: 14px;
+.ai-bubble-title {
+    font-size: 15px;
     font-weight: 600;
     color: #ffffff;
+    margin-bottom: 12px;
 }
 
-.ai-confirm-body {
-    padding: 16px;
-}
-
-.ai-confirm-body p {
-    margin: 0;
+.ai-bubble-message {
     font-size: 13px;
     line-height: 1.6;
-    color: rgba(255, 255, 255, 0.8);
+    color: rgba(255, 255, 255, 0.75);
+    margin-bottom: 16px;
 }
 
-.ai-confirm-footer {
-    padding: 10px 16px;
+.ai-bubble-input {
+    width: 100%;
+    padding: 8px 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    border-radius: 6px;
+    color: #ffffff;
+    font-size: 13px;
+    font-family: inherit;
+    margin-bottom: 16px;
+    transition: all 0.2s ease;
+}
+
+.ai-bubble-input:focus {
+    outline: none;
+    border-color: rgba(96, 165, 250, 0.5);
+    background: rgba(255, 255, 255, 0.08);
+}
+
+.ai-bubble-buttons {
     display: flex;
     justify-content: flex-end;
     gap: 10px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
 }
 
-.ai-confirm-btn {
-    padding: 6px 14px;
+.ai-bubble-btn {
+    padding: 7px 16px;
     border: none;
-    border-radius: 4px;
+    border-radius: 6px;
     font-size: 12px;
-    cursor: pointer;
-    display: inline-flex;
-    align-items: center;
-    gap: 5px;
-    transition: all 0.2s ease;
     font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
 }
 
-.ai-confirm-btn-cancel {
-    background: rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.8);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+.ai-bubble-btn-cancel {
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(255, 255, 255, 0.7);
+    border: 1px solid rgba(255, 255, 255, 0.15);
 }
 
-.ai-confirm-btn-cancel:hover {
-    background: rgba(255, 255, 255, 0.15);
+.ai-bubble-btn-cancel:hover {
+    background: rgba(255, 255, 255, 0.12);
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.ai-bubble-btn-ok {
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+    border: none;
+}
+
+.ai-bubble-btn-ok:hover {
     transform: translateY(-1px);
-}
-
-.ai-confirm-btn-ok {
-    background: rgba(239, 68, 68, 0.2);
-    color: #ef4444;
-    border: 1px solid rgba(239, 68, 68, 0.5);
-}
-
-.ai-confirm-btn-ok:hover {
-    background: rgba(239, 68, 68, 0.3);
-    transform: translateY(-1px);
-}
-
-.ai-confirm-btn i {
-    font-size: 11px;
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
 }
 
 /* 消息操作按钮（类似命令记录样式） */

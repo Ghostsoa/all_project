@@ -471,7 +471,8 @@ function hideLoadingIndicator() {
 
 // 创建新会话
 window.createNewAISession = async function() {
-    const title = prompt('请输入对话标题:', '新对话 - ' + new Date().toLocaleString());
+    const defaultTitle = '新对话 - ' + new Date().toLocaleString();
+    const title = await showAIPrompt('请输入对话标题:', '创建新对话', defaultTitle);
     if (!title) return;
     
     try {
@@ -1713,7 +1714,7 @@ function scrollToBottom(force = false) {
 
 // ========== 消息操作功能 ==========
 
-// AI面板专用确认对话框（限制在右侧面板内）
+// 气泡式确认框（类似对话气泡，无遮罩）
 function showAIConfirm(message, title = '确认操作') {
     return new Promise((resolve) => {
         const aiPanel = document.getElementById('aiPanel');
@@ -1722,52 +1723,132 @@ function showAIConfirm(message, title = '确认操作') {
             return;
         }
         
-        // 创建确认对话框
-        const overlay = document.createElement('div');
-        overlay.className = 'ai-confirm-overlay';
-        overlay.innerHTML = `
-            <div class="ai-confirm-dialog">
-                <div class="ai-confirm-header">
-                    <h4>${escapeHtml(title)}</h4>
-                </div>
-                <div class="ai-confirm-body">
-                    <p>${escapeHtml(message)}</p>
-                </div>
-                <div class="ai-confirm-footer">
-                    <button class="ai-confirm-btn ai-confirm-btn-cancel">
-                        <i class="fa-solid fa-times"></i> 取消
-                    </button>
-                    <button class="ai-confirm-btn ai-confirm-btn-ok">
-                        <i class="fa-solid fa-check"></i> 确定
-                    </button>
-                </div>
+        // 移除旧的气泡
+        const oldBubble = document.querySelector('.ai-bubble-confirm');
+        if (oldBubble) oldBubble.remove();
+        
+        // 创建气泡确认框
+        const bubble = document.createElement('div');
+        bubble.className = 'ai-bubble-confirm';
+        bubble.innerHTML = `
+            <div class="ai-bubble-title">${escapeHtml(title)}</div>
+            <div class="ai-bubble-message">${escapeHtml(message)}</div>
+            <div class="ai-bubble-buttons">
+                <button class="ai-bubble-btn ai-bubble-btn-cancel">取消</button>
+                <button class="ai-bubble-btn ai-bubble-btn-ok">确定</button>
             </div>
         `;
         
-        aiPanel.appendChild(overlay);
+        aiPanel.appendChild(bubble);
         
         // 淡入动画
-        setTimeout(() => overlay.classList.add('show'), 10);
+        setTimeout(() => bubble.classList.add('show'), 10);
         
         // 绑定事件
-        const cancelBtn = overlay.querySelector('.ai-confirm-btn-cancel');
-        const okBtn = overlay.querySelector('.ai-confirm-btn-ok');
+        const cancelBtn = bubble.querySelector('.ai-bubble-btn-cancel');
+        const okBtn = bubble.querySelector('.ai-bubble-btn-ok');
         
-        const closeDialog = (result) => {
-            overlay.classList.remove('show');
+        const closeBubble = (result) => {
+            bubble.classList.remove('show');
             setTimeout(() => {
-                overlay.remove();
+                bubble.remove();
                 resolve(result);
             }, 200);
         };
         
-        cancelBtn.onclick = () => closeDialog(false);
-        okBtn.onclick = () => closeDialog(true);
+        cancelBtn.onclick = () => closeBubble(false);
+        okBtn.onclick = () => closeBubble(true);
+        
+        // 点击外部关闭
+        const handleClickOutside = (e) => {
+            if (!bubble.contains(e.target)) {
+                closeBubble(false);
+                document.removeEventListener('click', handleClickOutside);
+            }
+        };
+        setTimeout(() => document.addEventListener('click', handleClickOutside), 100);
         
         // ESC键关闭
         const handleEsc = (e) => {
             if (e.key === 'Escape') {
-                closeDialog(false);
+                closeBubble(false);
+                document.removeEventListener('keydown', handleEsc);
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
+    });
+}
+
+// 气泡式输入框（类似对话气泡，无遮罩）
+function showAIPrompt(message, title = '输入', defaultValue = '') {
+    return new Promise((resolve) => {
+        const aiPanel = document.getElementById('aiPanel');
+        if (!aiPanel) {
+            resolve(null);
+            return;
+        }
+        
+        // 移除旧的气泡
+        const oldBubble = document.querySelector('.ai-bubble-confirm');
+        if (oldBubble) oldBubble.remove();
+        
+        // 创建气泡输入框
+        const bubble = document.createElement('div');
+        bubble.className = 'ai-bubble-confirm';
+        bubble.innerHTML = `
+            <div class="ai-bubble-title">${escapeHtml(title)}</div>
+            <div class="ai-bubble-message">${escapeHtml(message)}</div>
+            <input type="text" class="ai-bubble-input" value="${escapeHtml(defaultValue)}" placeholder="请输入...">
+            <div class="ai-bubble-buttons">
+                <button class="ai-bubble-btn ai-bubble-btn-cancel">取消</button>
+                <button class="ai-bubble-btn ai-bubble-btn-ok">确定</button>
+            </div>
+        `;
+        
+        aiPanel.appendChild(bubble);
+        
+        const input = bubble.querySelector('.ai-bubble-input');
+        
+        // 淡入动画并聚焦
+        setTimeout(() => {
+            bubble.classList.add('show');
+            input.focus();
+            input.select();
+        }, 10);
+        
+        // 绑定事件
+        const cancelBtn = bubble.querySelector('.ai-bubble-btn-cancel');
+        const okBtn = bubble.querySelector('.ai-bubble-btn-ok');
+        
+        const closeBubble = (result) => {
+            bubble.classList.remove('show');
+            setTimeout(() => {
+                bubble.remove();
+                resolve(result);
+            }, 200);
+        };
+        
+        cancelBtn.onclick = () => closeBubble(null);
+        okBtn.onclick = () => {
+            const value = input.value.trim();
+            closeBubble(value || null);
+        };
+        
+        // 回车确认
+        input.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                e.preventDefault();
+                const value = input.value.trim();
+                closeBubble(value || null);
+            } else if (e.key === 'Escape') {
+                closeBubble(null);
+            }
+        };
+        
+        // ESC键关闭
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') {
+                closeBubble(null);
                 document.removeEventListener('keydown', handleEsc);
             }
         };
