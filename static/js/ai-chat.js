@@ -379,11 +379,13 @@ async function loadMoreMessages() {
         const messagesContainer = document.getElementById('aiMessages');
         if (!messagesContainer) return;
         
-        // 在顶部插入消息（倒序插入，因为后端返回的是时间顺序）
-        // 不保持滚动位置，让消息自然往上扩展，用户自己滚动上去查看
-        messages.reverse().forEach(msg => {
+        // 在顶部插入消息（从后往前插入，保持时间顺序）
+        // 后端返回的是按时间顺序[msg3, msg4]，我们从后往前插：先插msg4，再插msg3
+        // 结果：[msg3, msg4, msg5, msg6] - 正确的时间顺序
+        for (let i = messages.length - 1; i >= 0; i--) {
+            const msg = messages[i];
             prependMessage(msg.role, msg.content, msg.reasoning_content, msg.ID);
-        });
+        }
         
         console.log(`📊 加载了 ${messages.length} 条消息, offset: ${currentOffset}, 还有更多: ${hasMoreMessages}`);
     } catch (error) {
@@ -402,11 +404,12 @@ function prependMessage(role, content, reasoningContent, messageId) {
     
     const messageDiv = createMessageElement(role, content, reasoningContent, messageId);
     
-    // 插入到最前面（如果有欢迎信息，插在欢迎信息之后）
-    const firstMessage = messagesContainer.querySelector('.message-user, .message-assistant');
+    // 插入到最前面（跳过欢迎信息，插在第一条消息之前）
+    const firstMessage = messagesContainer.querySelector('.ai-message');
     if (firstMessage) {
         messagesContainer.insertBefore(messageDiv, firstMessage);
     } else {
+        // 如果没有消息，直接添加
         messagesContainer.appendChild(messageDiv);
     }
 }
