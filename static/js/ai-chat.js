@@ -147,7 +147,7 @@ window.selectTempModel = async function(modelId) {
 
 // 加载会话列表
 export async function loadSessions() {
-    showAILoading('正在加载中');
+    showAILoading('正在加载会话...');
     try {
         const data = await apiRequest('/api/ai/sessions');
         sessions = data.data || [];
@@ -162,11 +162,28 @@ export async function loadSessions() {
         if (sessions.length > 0 && !currentSession) {
             await selectAISession(sessions[0].id);
         } else {
+            // 没有会话，隐藏加载，显示欢迎界面
             hideAILoading();
+            showWelcomeScreen();
         }
     } catch (error) {
         console.error('加载会话列表失败:', error);
         hideAILoading();
+        showWelcomeScreen();
+    }
+}
+
+// 显示欢迎界面
+function showWelcomeScreen() {
+    const messagesContainer = document.getElementById('aiMessages');
+    if (messagesContainer) {
+        messagesContainer.innerHTML = `
+            <div class="ai-welcome">
+                <div class="welcome-icon">🤖</div>
+                <h3>AI 助手</h3>
+                <p>开始对话，获取智能帮助</p>
+            </div>
+        `;
     }
 }
 
@@ -259,7 +276,7 @@ function renderSessionList() {
 
 // 选择会话
 window.selectAISession = async function(sessionId) {
-    showAILoading('正在加载中');
+    showAILoading('正在加载对话...');
     try {
         const data = await apiRequest(`/api/ai/session?id=${sessionId}`);
         currentSession = data.data;
@@ -1091,15 +1108,16 @@ async function streamChat(sessionId, message, thinkingId) {
                     
                 } else if (data.type === 'error') {
                     // 错误
-                    console.error('❌ 对话错误:', data.content);
+                    const errorMsg = data.error || data.content || '未知错误';
+                    console.error('❌ 对话错误:', errorMsg);
                     
                     // 清理thinking元素
                     removeThinking(thinkingId);
                     
                     if (!messageElement) {
-                        appendMessage('assistant', '抱歉，发生了错误: ' + data.content);
+                        appendMessage('assistant', '抱歉，发生了错误: ' + errorMsg);
                     }
-                    reject(new Error(data.content));
+                    reject(new Error(errorMsg));
                 }
             } catch (error) {
                 console.error('解析消息失败:', error, '原始数据:', event.data);

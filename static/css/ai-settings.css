@@ -1,13 +1,13 @@
 /* AI设置页面样式 */
 
-/* AI设置面板 - 现代化设计 */
+/* AI设置面板 - 纯黑主题 */
 .ai-settings-panel {
     position: absolute;
     top: 0;
     left: 0;
     right: 0;
     bottom: 0;
-    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    background: #000000;
     z-index: 1000;
     display: flex;
     flex-direction: column;
@@ -18,20 +18,16 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 24px 40px;
-    background: rgba(0, 0, 0, 0.2);
-    backdrop-filter: blur(10px);
-    border-bottom: 1px solid rgba(74, 144, 226, 0.2);
+    padding: 20px 30px;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .settings-panel-header h2 {
     margin: 0;
-    font-size: 28px;
-    font-weight: 600;
-    background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
+    font-size: 24px;
+    font-weight: 500;
+    color: #ffffff;
 }
 
 .settings-panel-header .close-btn {
@@ -76,55 +72,42 @@
     max-height: 85vh;
 }
 
-/* 标签页导航 - 现代化 */
+/* 标签页导航 - 简洁风格 */
 .settings-tabs, .settings-panel-tabs {
     display: flex;
-    gap: 12px;
-    padding: 0 40px;
-    background: rgba(0, 0, 0, 0.1);
-    margin-bottom: 0;
+    gap: 8px;
+    padding: 0 30px;
+    background: rgba(255, 255, 255, 0.02);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .settings-tab {
-    padding: 16px 24px;
+    padding: 12px 20px;
     background: none;
     border: none;
-    border-bottom: 3px solid transparent;
-    color: rgba(255, 255, 255, 0.5);
+    border-bottom: 2px solid transparent;
+    color: rgba(255, 255, 255, 0.6);
     cursor: pointer;
-    font-size: 15px;
-    font-weight: 600;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    font-size: 14px;
+    font-weight: 500;
+    transition: all 0.2s ease;
     display: flex;
     align-items: center;
-    gap: 10px;
-    position: relative;
+    gap: 8px;
 }
 
 .settings-tab:hover {
     color: rgba(255, 255, 255, 0.9);
-    background: rgba(74, 144, 226, 0.1);
+    background: rgba(255, 255, 255, 0.05);
 }
 
 .settings-tab.active {
     color: #4a90e2;
     border-bottom-color: #4a90e2;
-    background: rgba(74, 144, 226, 0.08);
-}
-
-.settings-tab.active::after {
-    content: '';
-    position: absolute;
-    bottom: -3px;
-    left: 0;
-    right: 0;
-    height: 3px;
-    background: linear-gradient(90deg, #4a90e2, #357abd);
-    border-radius: 3px 3px 0 0;
 }
 
 .settings-tab i {
-    font-size: 18px;
+    font-size: 16px;
 }
 
 /* 旧样式已移除，统一使用新的设置面板样式 */
@@ -214,32 +197,30 @@
     color: #ffffff;
 }
 
-/* 供应商列表 - 现代化 */
+/* 供应商列表 */
 .providers-header {
-    margin-bottom: 24px;
-    padding: 30px 40px 0;
+    margin-bottom: 20px;
+    padding: 20px 30px 0;
 }
 
 .providers-list {
     display: flex;
     flex-direction: column;
-    gap: 16px;
-    padding: 0 40px 40px;
+    gap: 12px;
+    padding: 0 30px 30px;
 }
 
 .provider-card {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(74, 144, 226, 0.2);
-    border-radius: 12px;
-    padding: 24px;
-    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+    padding: 20px;
+    transition: all 0.2s ease;
 }
 
 .provider-card:hover {
-    border-color: #4a90e2;
-    box-shadow: 0 8px 24px rgba(74, 144, 226, 0.2);
-    transform: translateY(-2px);
+    border-color: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.03);
 }
 
 .provider-header {
