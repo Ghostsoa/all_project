@@ -7,7 +7,5 @@ export function getShowHiddenFiles() {
 }
 
 export function setShowHiddenFiles(value) {
-    console.log('⚙️ setShowHiddenFiles:', value, '(旧值:', _showHiddenFiles, ')');
     _showHiddenFiles = value;
-    console.log('✅ showHiddenFiles已更新为:', _showHiddenFiles);
 }

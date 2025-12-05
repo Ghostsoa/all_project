@@ -268,13 +268,11 @@ class FileTreeCache {
     // 工具方法
     makeKey(sessionID, path) {
         const showHidden = getShowHiddenFiles();
-        console.log('🔑 makeKey:', sessionID, path, 'showHidden=', showHidden);
         return `${sessionID}:${path}:${showHidden}`;
     }
     
     async fetchFiles(sessionID, path) {
         const showHidden = getShowHiddenFiles();
-        console.log('📂 fetchFiles:', path, '显示隐藏文件:', showHidden);
         
         // 获取正确的API端点
         const apiEndpoint = this.apiEndpointGetter ? this.apiEndpointGetter('list') : '/api/files/list';
@@ -288,7 +286,6 @@ class FileTreeCache {
             throw new Error(data.error || '加载失败');
         }
         
-        console.log('✅ 返回', data.files.length, '个文件');
         return data.files || [];
     }
     

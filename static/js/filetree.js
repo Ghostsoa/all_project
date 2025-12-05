@@ -117,29 +117,27 @@ async function refreshCurrentDirectory() {
 }
 
 // 切换显示隐藏文件
-function toggleHiddenFiles() {
+async function toggleHiddenFiles() {
     const checkbox = document.getElementById('showHiddenFiles');
     const checked = checkbox.checked;
-    console.log('👁️ 切换显示隐藏文件:', checked, { currentSessionID, currentPath });
     
     setShowHiddenFiles(checked);
     
     if (currentSessionID && currentPath) {
-        // 立即后台静默刷新（不清除缓存，使用stale-while-revalidate）
-        console.log('🔄 静默刷新文件树...');
         const key = fileCache.makeKey(currentSessionID, currentPath);
         
-        // 如果有缓存，先用缓存数据过滤显示
+        // 如果有缓存，先用缓存立即更新UI，然后后台刷新
         if (fileCache.cache.has(key)) {
             const cached = fileCache.cache.get(key);
             const filteredFiles = filterHiddenFiles(cached.data, checked);
             renderFileTree(filteredFiles, currentPath);
+            
+            // 后台静默刷新
+            fileCache.revalidateInBackground(currentSessionID, currentPath, key);
+        } else {
+            // 没有缓存，重新加载目录（这会立即更新UI）
+            await loadDirectory(currentPath);
         }
-        
-        // 后台静默刷新新数据
-        fileCache.revalidateInBackground(currentSessionID, currentPath, key);
-    } else {
-        console.warn('⚠️ 未连接服务器或无当前路径，无法重新加载');
     }
 }
 
