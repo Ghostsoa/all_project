@@ -5,7 +5,7 @@ import './toast.js'; // Toast组件（自动初始化到全局）
 import { showToast } from './toast.js';
 import { loadServers, searchServers, deleteServer, renderServerList } from './server.js';
 import { createTerminal, connectSSH, openLocalTerminal } from './terminal.js';
-import { loadCommandHistory, clearCurrentCommands, saveCommandToHistory } from './commands.js';
+import { loadCommandHistory, saveCommandToHistory } from './commands.js';
 import { initFileTree, setCurrentServer, setLocalTerminal, loadDirectory, initDragUpload } from './filetree.js';
 import { openFileEditor } from './editor.js';
 import { updateTerminalSnapshot, updateWorkspaceInfo } from './ai-assistant.js';
@@ -81,7 +81,6 @@ window.loadServers = loadServers;
 window.searchServers = searchServers;
 window.deleteServer = deleteServer;
 window.openLocalTerminal = openLocalTerminal;
-window.clearCurrentCommands = clearCurrentCommands;
 window.showToast = showToast;
 window.setCurrentServer = setCurrentServer; // 暴露文件树加载函数
 window.setLocalTerminal = setLocalTerminal; // 暴露本地文件树加载函数
