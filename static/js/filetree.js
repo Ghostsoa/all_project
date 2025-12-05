@@ -24,12 +24,17 @@ export function getCurrentSessionID() {
     return currentSessionID;
 }
 
-// 是否显示隐藏文件
-export let showHiddenFiles = false;
+// 是否显示隐藏文件（使用内部变量）
+let _showHiddenFiles = false;
+
+export function getShowHiddenFiles() {
+    return _showHiddenFiles;
+}
+
 export function setShowHiddenFiles(value) {
-    console.log('⚙️ setShowHiddenFiles:', value, '(旧值:', showHiddenFiles, ')');
-    showHiddenFiles = value;
-    console.log('✅ showHiddenFiles已更新为:', showHiddenFiles);
+    console.log('⚙️ setShowHiddenFiles:', value, '(旧值:', _showHiddenFiles, ')');
+    _showHiddenFiles = value;
+    console.log('✅ showHiddenFiles已更新为:', _showHiddenFiles);
 }
 
 // 防止重复初始化标志
@@ -176,7 +181,7 @@ export async function setCurrentServer(serverID, sessionID) {
     }
     
     // 设置获取showHidden状态的函数和API端点函数
-    fileCache.setShowHiddenGetter(() => showHiddenFiles);
+    fileCache.setShowHiddenGetter(getShowHiddenFiles);
     fileCache.setApiEndpointGetter(getApiEndpoint);
     
     currentPath = '/root'; // 默认根目录
