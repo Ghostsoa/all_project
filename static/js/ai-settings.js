@@ -1,6 +1,5 @@
 // AI设置管理
-import { showToast } from './toast.js'; - 重构版
-
+import { showToast } from './toast.js';
 import { apiRequest } from './api.js';
 
 // 全局变量
