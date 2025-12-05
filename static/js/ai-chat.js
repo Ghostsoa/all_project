@@ -512,33 +512,42 @@ window.createNewAISession = async function() {
     }
 };
 
-// 删除会话
+// 删除会话（智能切换）
 window.deleteAISession = async function(sessionId) {
-    const confirmed = await window.showConfirm(
+    const confirmed = await showAIConfirm(
         '确定要删除这个对话吗？',
         '删除对话'
     );
     if (!confirmed) return;
     
     try {
-        await apiRequest(`/api/ai/session/delete?id=${sessionId}`, 'POST');
+        // 记录是否删除的是当前会话
+        const isDeletingCurrentSession = currentSession?.id === sessionId;
         
-        // 如果删除的是当前会话，清空当前会话
-        if (currentSession?.id === sessionId) {
-            currentSession = null;
-            const messagesContainer = document.getElementById('aiMessages');
-            if (messagesContainer) {
-                messagesContainer.innerHTML = `
-                    <div class="ai-welcome">
-                        <h3>Agent</h3>
-                        <p>选择一个对话或创建新对话</p>
-                    </div>
-                `;
-            }
-        }
+        // 删除会话
+        await apiRequest(`/api/ai/session/delete?id=${sessionId}`, 'POST');
+        showToast('已删除', 'success');
         
         // 重新加载会话列表
-        await loadSessions();
+        const data = await apiRequest('/api/ai/sessions');
+        sessions = data.data || [];
+        renderSessionList();
+        
+        // 智能切换逻辑
+        if (isDeletingCurrentSession) {
+            // 删除的是当前会话
+            if (sessions.length > 0) {
+                // 还有其他会话，自动切换到最新的（第一个）
+                console.log('🔄 切换到最新会话:', sessions[0].title);
+                await selectAISession(sessions[0].id);
+            } else {
+                // 没有其他会话了，显示欢迎界面
+                currentSession = null;
+                showWelcomeScreen();
+            }
+        }
+        // 如果删除的不是当前会话，不需要做任何切换，列表已更新
+        
     } catch (error) {
         console.error('删除会话失败:', error);
         showToast('删除会话失败: ' + error.message, 'error');
@@ -552,7 +561,7 @@ window.clearCurrentAIChat = async function() {
         return;
     }
     
-    const confirmed = await window.showConfirm(
+    const confirmed = await showAIConfirm(
         '确定要清空当前对话的所有消息吗？',
         '清空对话'
     );
@@ -660,7 +669,7 @@ window.cancelEditMessage = function(messageId) {
  * 确认撤回消息
  */
 window.confirmRevokeMessage = async function(messageId) {
-    const confirmed = await window.showConfirm(
+    const confirmed = await showAIConfirm(
         '确定要撤回此消息及之后的所有消息吗？此操作不可恢复！',
         '撤回消息'
     );
