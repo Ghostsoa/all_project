@@ -1383,7 +1383,7 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
     avatar.textContent = role === 'user' ? 'User' : 'Agent';
     
     const contentWrapper = document.createElement('div');
-    contentWrapper.className = 'message-content-wrapper';
+    contentWrapper.className = 'message-content-wrapper';  // 注意：这个类名在工具调用中也会使用
     
     // 如果有思维链内容，先添加思维链（默认折叠）
     if (reasoning) {
@@ -2195,9 +2195,9 @@ export async function initAIChat() {
  * @param {Object} toolData - {tool_call_id, name, arguments}
  */
 function appendToolCall(messageElement, toolData) {
-    const contentWrapper = messageElement.querySelector('.message-wrapper');
+    const contentWrapper = messageElement.querySelector('.message-content-wrapper');
     if (!contentWrapper) {
-        console.error('未找到 .message-wrapper');
+        console.error('未找到 .message-content-wrapper');
         return;
     }
     
@@ -2216,7 +2216,7 @@ function appendToolCall(messageElement, toolData) {
     }
     
     toolElement.setAttribute('data-tool-call-id', toolData.tool_call_id);
-    contentWrapper.appendChild(toolElement);  // 添加到 wrapper，不会被文本更新清空
+    contentWrapper.appendChild(toolElement);  // 添加到 content-wrapper，不会被文本更新清空
 }
 
 /**
@@ -2225,7 +2225,7 @@ function appendToolCall(messageElement, toolData) {
  * @param {Object} data - {tool_call_id, name, result}
  */
 function updateToolResult(messageElement, data) {
-    const contentWrapper = messageElement.querySelector('.message-wrapper');
+    const contentWrapper = messageElement.querySelector('.message-content-wrapper');
     if (!contentWrapper) return;
     
     const { tool_call_id, name: toolName, result } = data;
