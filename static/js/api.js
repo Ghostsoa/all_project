@@ -81,10 +81,8 @@ export const api = {
     },
     
     async clearCommands(serverId) {
-        const res = await fetch(`${config.API_BASE}/commands/clear`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ server_id: serverId })
+        const res = await fetch(`${config.API_BASE}/commands/clear?server_id=${serverId}`, {
+            method: 'POST'
         });
         return res.json();
     },

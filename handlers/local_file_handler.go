@@ -41,6 +41,8 @@ func (h *LocalFileHandler) ListLocalFiles(c *gin.Context) {
 		path = getHomeDir()
 	}
 
+	showHidden := c.Query("show_hidden") == "true"
+
 	// 读取目录
 	entries, err := os.ReadDir(path)
 	if err != nil {
@@ -50,6 +52,11 @@ func (h *LocalFileHandler) ListLocalFiles(c *gin.Context) {
 
 	var files []gin.H
 	for _, entry := range entries {
+		// 根据设置过滤隐藏文件
+		if !showHidden && strings.HasPrefix(entry.Name(), ".") {
+			continue
+		}
+
 		info, err := entry.Info()
 		if err != nil {
 			continue

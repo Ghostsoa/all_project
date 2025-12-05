@@ -68,7 +68,7 @@ document.addEventListener('DOMContentLoaded', async function() {
     await initAIChat(); // 初始化AI对话功能
     
     // 默认加载本地命令记录
-    loadCommandHistory(0, '本地终端');
+    loadCommandHistory('0', '本地终端');
     
     // 自动打开本地终端作为默认
     setTimeout(() => {
@@ -397,12 +397,12 @@ window.switchTab = function(sessionId) {
         }, 100);
         
         // 检查是否为本地终端
-        const isLocal = sessionId.startsWith('local');
+        const isLocal = sessionId === 'local';
         
         // 加载对应的命令记录
         if (isLocal) {
-            loadCommandHistory(0, '本地终端');
-        } else {
+            loadCommandHistory('0', '本地终端');
+        } else if (session.server) {
             loadCommandHistory(session.server.id, session.server.name);
         }
         

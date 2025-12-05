@@ -49,9 +49,9 @@ func GetSession(id string) (*ChatSession, error) {
 	sessionCacheLock.RLock()
 	if cached, ok := sessionCache[id]; ok {
 		sessionCacheLock.RUnlock()
-		// 返回副本，避免外部修改影响缓存
-		sessionCopy := *cached
-		return &sessionCopy, nil
+		// 直接返回缓存的指针，不需要拷贝
+		// 因为我们在所有修改操作中都已经加锁了
+		return cached, nil
 	}
 	sessionCacheLock.RUnlock()
 
@@ -60,6 +60,11 @@ func GetSession(id string) (*ChatSession, error) {
 	var session ChatSession
 	if err := readJSON(sessionFile, &session); err != nil {
 		return nil, err
+	}
+
+	// 确保Messages不为nil
+	if session.Messages == nil {
+		session.Messages = []ChatMessage{}
 	}
 
 	// 3. 加入缓存
@@ -149,11 +154,25 @@ func AddMessage(sessionID string, message ChatMessage) error {
 	return writeJSON(sessionFile, session)
 }
 
-// GetMessages 获取会话的所有消息
+// GetMessages 获取会话的所有消息（返回副本）
 func GetMessages(sessionID string, limit int) ([]ChatMessage, error) {
-	session, err := GetSession(sessionID)
-	if err != nil {
-		return nil, err
+	sessionCacheLock.RLock()
+	defer sessionCacheLock.RUnlock()
+
+	session, ok := sessionCache[sessionID]
+	if !ok {
+		// 缓存未命中，尝试加载
+		sessionCacheLock.RUnlock()
+		loadedSession, err := GetSession(sessionID)
+		sessionCacheLock.RLock()
+		if err != nil {
+			return nil, err
+		}
+		session = loadedSession
+	}
+
+	if session.Messages == nil {
+		return []ChatMessage{}, nil
 	}
 
 	messages := session.Messages
@@ -163,7 +182,11 @@ func GetMessages(sessionID string, limit int) ([]ChatMessage, error) {
 		messages = messages[len(messages)-limit:]
 	}
 
-	return messages, nil
+	// 返回副本
+	result := make([]ChatMessage, len(messages))
+	copy(result, messages)
+
+	return result, nil
 }
 
 // ClearMessages 清空会话消息（直接操作缓存）

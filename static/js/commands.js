@@ -60,6 +60,9 @@ let commandSaveTimer = null;
 let loadHistoryTimer = null;
 
 export function saveCommandToHistory(serverId, command) {
+    // 统一转为字符串
+    serverId = String(serverId);
+    
     // 1. 立即更新内存缓存（去重：相同命令更新时间并移到最前）
     let cached = commandCache.get(serverId) || [];
     
@@ -94,7 +97,8 @@ export function saveCommandToHistory(serverId, command) {
     // 2. 立即更新UI（无延迟）
     const session = state.terminals.get(state.activeSessionId);
     if (session) {
-        const sessionServerId = state.activeSessionId.startsWith('local') ? 0 : session.server.id;
+        const isLocal = state.activeSessionId === 'local';
+        const sessionServerId = isLocal ? '0' : (session.server ? session.server.id : null);
         // 类型转换比较：都转为字符串
         if (String(sessionServerId) === String(serverId)) {
             console.log('🔄 立即更新命令UI:', command);
@@ -121,7 +125,10 @@ export function saveCommandToHistory(serverId, command) {
 }
 
 export async function loadCommandHistory(serverId, serverName) {
-    const displayName = serverId === 0 ? '💻 本地终端' : serverName || '未知服务器';
+    // 统一转为字符串
+    serverId = String(serverId);
+    
+    const displayName = serverId === '0' ? '💻 本地终端' : serverName || '未知服务器';
     document.getElementById('commandsServerName').textContent = displayName;
     
     console.log('🔍 加载命令历史:', serverId, serverName);
@@ -156,9 +163,6 @@ export async function loadCommandHistory(serverId, serverName) {
     }, delay);
 }
 
-let isSelectMode = false;
-let selectedCommands = new Set();
-
 function renderCommandHistory(commands) {
     const list = document.getElementById('commandsList');
     
@@ -167,127 +171,96 @@ function renderCommandHistory(commands) {
         return;
     }
     
-    if (isSelectMode) {
-        list.innerHTML = `
-            <div class="command-select-header">
-                <button class="btn-select-all" onclick="window.selectAllCommands()">✓ 全选</button>
-                <button class="btn-delete-selected" onclick="window.deleteSelectedCommands()">🗑️ 删除选中</button>
-                <button class="btn-cancel-select" onclick="window.cancelSelectMode()">✕ 取消</button>
+    list.innerHTML = commands.map((cmd, index) => {
+        const timeStr = formatCommandTime(cmd.timestamp || cmd.created_at);
+        const escapedCmd = escapeHtml(cmd.command).replace(/'/g, "\\'");
+        
+        return `
+            <div class="command-item">
+                <div class="command-text">${escapeHtml(cmd.command)}</div>
+                <div class="command-meta">
+                    <span class="command-time">${timeStr}</span>
+                    <div class="command-actions">
+                        <span class="command-link" onclick="window.copyCommand('${escapedCmd}')" title="复制到剪贴板">
+                            <i class="fa-solid fa-copy"></i> 复制
+                        </span>
+                        <span class="command-link" onclick="window.writeCommandToTerminal('${escapedCmd}')" title="填充到终端">
+                            <i class="fa-solid fa-terminal"></i> 填充
+                        </span>
+                        <span class="command-link delete" onclick="window.deleteCommand(${index})" title="删除">
+                            <i class="fa-solid fa-trash"></i> 删除
+                        </span>
+                    </div>
+                </div>
             </div>
-        ` + commands.map(cmd => {
-            const timeStr = formatCommandTime(cmd.timestamp || cmd.created_at);
-            const isSelected = selectedCommands.has(cmd.id);
-            
-            return `
-                <div class="command-item ${isSelected ? 'selected' : ''}" onclick="window.toggleCommandSelect(${cmd.id})">
-                    <div class="command-checkbox">${isSelected ? '☑' : '☐'}</div>
-                    <div class="command-content">
-                        <div class="command-text">${escapeHtml(cmd.command)}</div>
-                        <div class="command-meta">
-                            <span class="command-time">⏰ ${timeStr}</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    } else {
-        list.innerHTML = commands.map(cmd => {
-            const timeStr = formatCommandTime(cmd.timestamp || cmd.created_at);
-            const escapedCmd = escapeHtml(cmd.command).replace(/'/g, "\\'");
-            
-            return `
-                <div class="command-item">
-                    <div class="command-text">${escapeHtml(cmd.command)}</div>
-                    <div class="command-meta">
-                        <span class="command-time">${timeStr}</span>
-                        <div class="command-actions">
-                            <span class="command-link" onclick="window.copyCommand('${escapedCmd}')" title="复制到剪贴板">复制</span>
-                            <span class="command-link" onclick="window.writeCommandToTerminal('${escapedCmd}')" title="填充到终端">填充</span>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }).join('');
-    }
+        `;
+    }).join('');
 }
 
-export function enterSelectMode() {
-    isSelectMode = true;
-    selectedCommands.clear();
-    const session = state.terminals.get(state.activeSessionId);
-    if (session) {
-        loadCommandHistory(session.server.id, session.server.name);
-    }
-}
-
-window.toggleCommandSelect = function(id) {
-    if (selectedCommands.has(id)) {
-        selectedCommands.delete(id);
-    } else {
-        selectedCommands.add(id);
-    }
-    const session = state.terminals.get(state.activeSessionId);
-    if (session) {
-        loadCommandHistory(session.server.id, session.server.name);
-    }
-};
-
-window.selectAllCommands = function() {
-    const items = document.querySelectorAll('.command-item');
-    items.forEach(item => {
-        const checkbox = item.querySelector('.command-checkbox');
-        if (checkbox) {
-            const match = item.onclick.toString().match(/toggleCommandSelect\((\d+)\)/);
-            if (match) {
-                selectedCommands.add(parseInt(match[1]));
-            }
-        }
-    });
-    const session = state.terminals.get(state.activeSessionId);
-    if (session) {
-        loadCommandHistory(session.server.id, session.server.name);
-    }
-};
-
-window.cancelSelectMode = function() {
-    isSelectMode = false;
-    selectedCommands.clear();
-    const session = state.terminals.get(state.activeSessionId);
-    if (session) {
-        loadCommandHistory(session.server.id, session.server.name);
-    }
-};
-
-window.deleteSelectedCommands = async function() {
-    if (selectedCommands.size === 0) {
-        showToast('请先选择要删除的命令', 'warning');
-        return;
-    }
-    
-    if (!confirm(`确定要删除选中的 ${selectedCommands.size} 条命令吗？`)) return;
-    
-    try {
-        // TODO: 实现批量删除API
-        showToast('批量删除功能待后端支持', 'info');
-        isSelectMode = false;
-        selectedCommands.clear();
-        const session = state.terminals.get(state.activeSessionId);
-        if (session) {
-            loadCommandHistory(session.server.id, session.server.name);
-        }
-    } catch (error) {
-        console.error('删除失败:', error);
-        showToast('删除失败', 'error');
-    }
-};
-
-export async function clearCurrentCommands() {
+// 删除单条命令
+window.deleteCommand = async function(index) {
     const session = state.terminals.get(state.activeSessionId);
     if (!session) {
         showToast('请先选择一个终端', 'warning');
         return;
     }
+
+    const isLocal = state.activeSessionId === 'local';
+    const serverId = isLocal ? '0' : (session.server ? session.server.id : '0');
+    const cached = commandCache.get(serverId) || [];
     
-    // 进入选择模式
-    enterSelectMode();
+    if (index < 0 || index >= cached.length) {
+        showToast('命令不存在', 'error');
+        return;
+    }
+
+    const command = cached[index];
+    if (!confirm(`确定要删除命令 "${command.command}" 吗？`)) {
+        return;
+    }
+
+    // 从缓存中删除
+    cached.splice(index, 1);
+    commandCache.set(serverId, cached);
+    
+    // 立即更新UI
+    renderCommandHistory(cached);
+    showToast('已删除', 'success');
+
+    // 异步保存到服务器（TODO: 需要后端支持单条删除API）
+    // 目前通过清空后重新保存所有命令来实现
+};
+
+// 全部删除
+window.clearAllCommands = async function() {
+    const session = state.terminals.get(state.activeSessionId);
+    if (!session) {
+        showToast('请先选择一个终端', 'warning');
+        return;
+    }
+
+    const isLocal = state.activeSessionId === 'local';
+    const serverId = isLocal ? '0' : (session.server ? session.server.id : '0');
+    const serverName = isLocal ? '本地终端' : (session.server ? session.server.name : '未知服务器');
+
+    if (!confirm(`确定要清空 "${serverName}" 的所有命令记录吗？此操作不可恢复！`)) {
+        return;
+    }
+
+    try {
+        // 清空缓存
+        commandCache.set(serverId, []);
+        renderCommandHistory([]);
+        
+        // 调用后端清空API
+        const data = await api.clearCommands(serverId);
+        if (data.success) {
+            showToast('已清空所有命令', 'success');
+        } else {
+            showToast('清空失败: ' + (data.error || '未知错误'), 'error');
+        }
+    } catch (error) {
+        console.error('清空命令失败:', error);
+        showToast('清空失败', 'error');
+    }
 }

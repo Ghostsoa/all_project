@@ -92,11 +92,23 @@
 }
 
 .btn-clear-commands {
-    background: transparent;
-    border: none;
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 11px;
+    padding: 6px 12px;
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+    font-size: 12px;
+    border-radius: 4px;
     cursor: pointer;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    transition: all 0.2s ease;
+}
+
+.btn-clear-commands:hover {
+    background: rgba(239, 68, 68, 0.2);
+    border-color: #ef4444;
+    transform: translateY(-1px);
     padding: 4px 8px;
     transition: color 0.2s;
 }
@@ -218,11 +230,21 @@
     color: rgba(255, 255, 255, 0.5);
     cursor: pointer;
     font-size: 10px;
-    transition: color 0.2s;
+    transition: all 0.2s;
     user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
 }
 
 .command-link:hover {
     color: rgba(255, 255, 255, 0.9);
-    text-decoration: underline;
+}
+
+.command-link.delete {
+    color: rgba(239, 68, 68, 0.6);
+}
+
+.command-link.delete:hover {
+    color: #ef4444;
 }
