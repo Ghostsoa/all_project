@@ -2195,13 +2195,16 @@ export async function initAIChat() {
  * @param {Object} toolData - {tool_call_id, name, arguments}
  */
 function appendToolCall(messageElement, toolData) {
-    const contentDiv = messageElement.querySelector('.message-content');
-    if (!contentDiv) return;
+    const contentWrapper = messageElement.querySelector('.message-wrapper');
+    if (!contentWrapper) {
+        console.error('未找到 .message-wrapper');
+        return;
+    }
     
     // 渲染执行中的工具
     const toolHTML = aiToolsManager.renderExecutingTool(toolData);
     
-    // 添加到消息内容后面，并添加标记供后续更新
+    // 添加到 message-wrapper 中，在 message-content 后面
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = toolHTML;
     
@@ -2213,7 +2216,7 @@ function appendToolCall(messageElement, toolData) {
     }
     
     toolElement.setAttribute('data-tool-call-id', toolData.tool_call_id);
-    contentDiv.appendChild(toolElement);  // 改为 appendChild，添加到最后
+    contentWrapper.appendChild(toolElement);  // 添加到 wrapper，不会被文本更新清空
 }
 
 /**
@@ -2222,8 +2225,8 @@ function appendToolCall(messageElement, toolData) {
  * @param {Object} data - {tool_call_id, name, result}
  */
 function updateToolResult(messageElement, data) {
-    const contentDiv = messageElement.querySelector('.message-content');
-    if (!contentDiv) return;
+    const contentWrapper = messageElement.querySelector('.message-wrapper');
+    if (!contentWrapper) return;
     
     const { tool_call_id, name: toolName, result } = data;
     
@@ -2236,7 +2239,7 @@ function updateToolResult(messageElement, data) {
     }
     
     // 通过 tool_call_id 精确查找对应的工具元素
-    const toolElement = contentDiv.querySelector(`[data-tool-call-id="${tool_call_id}"]`);
+    const toolElement = contentWrapper.querySelector(`[data-tool-call-id="${tool_call_id}"]`);
     
     console.log('🔄 更新工具结果:', { tool_call_id, toolName, resultObj, found: !!toolElement });
     
@@ -2261,7 +2264,7 @@ function updateToolResult(messageElement, data) {
         tempDiv.innerHTML = toolResultHTML;
         const newElement = tempDiv.querySelector('.tool-call');
         if (newElement) {
-            contentDiv.insertBefore(newElement, contentDiv.firstChild);
+            contentWrapper.appendChild(newElement);
         }
     }
 }
