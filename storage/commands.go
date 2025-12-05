@@ -53,6 +53,24 @@ func SaveCommand(serverID, serverName, command string) error {
 		commandsLoaded = true
 	}
 
+	// 去重：查找相同服务器的相同命令
+	existingIndex := -1
+	for i := len(commandStore.Commands) - 1; i >= 0; i-- {
+		cmd := commandStore.Commands[i]
+		if cmd.ServerID == serverID && cmd.Command == command {
+			existingIndex = i
+			break
+		}
+	}
+
+	// 如果找到重复命令，删除旧的
+	if existingIndex >= 0 {
+		commandStore.Commands = append(
+			commandStore.Commands[:existingIndex],
+			commandStore.Commands[existingIndex+1:]...,
+		)
+	}
+
 	// 创建新命令记录
 	history := CommandHistory{
 		ID:         commandStore.NextID,
@@ -62,7 +80,7 @@ func SaveCommand(serverID, serverName, command string) error {
 		Timestamp:  time.Now(),
 	}
 
-	// 添加到列表
+	// 添加到列表末尾（最新的）
 	commandStore.Commands = append(commandStore.Commands, history)
 	commandStore.NextID++
 

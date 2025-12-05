@@ -65,7 +65,17 @@ export function saveCommandToHistory(serverId, serverName, command) {
     // 统一转为字符串
     serverId = String(serverId);
     
-    // 1. 立即添加到内存缓存
+    // 去重：查找相同服务器的相同命令
+    const existingIndex = allCommands.findIndex(cmd => 
+        cmd.server_id === serverId && cmd.command === command
+    );
+    
+    // 如果找到重复，先删除旧的
+    if (existingIndex >= 0) {
+        allCommands.splice(existingIndex, 1);
+    }
+    
+    // 1. 添加到内存缓存（最新的在前）
     const newCommand = {
         id: Date.now(), // 临时ID
         server_id: serverId,
@@ -74,7 +84,7 @@ export function saveCommandToHistory(serverId, serverName, command) {
         timestamp: new Date().toISOString()
     };
     
-    // 添加到列表开头（最新的在前）
+    // 添加到列表开头
     allCommands.unshift(newCommand);
     
     // 限制缓存大小
