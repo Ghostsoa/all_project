@@ -55,12 +55,18 @@ class AIToolsManager {
 
         const { type, status } = toolResult;
         
+        // 如果status是accepted或rejected，显示完成状态（不可交互）
+        if (status === 'accepted' || status === 'rejected') {
+            return this.renderCompletedToolResult(toolResult, toolCallId, status);
+        }
+        
         // 如果status是pending，需要从toolCallArgs获取完整参数
         if (status === 'pending' && toolCallArgs) {
             // 合并tool结果和tool_calls参数
             toolResult = { ...toolResult, ...toolCallArgs };
         }
         
+        // 渲染pending状态（可交互）
         switch (type) {
             case 'read':
                 return this.renderReadTool(toolResult);
@@ -73,6 +79,39 @@ class AIToolsManager {
             default:
                 return this.renderGenericTool(toolResult, toolName);
         }
+    }
+    
+    /**
+     * 渲染已完成的工具结果（accepted/rejected）
+     */
+    renderCompletedToolResult(result, toolCallId, status) {
+        const { type, file_path } = result;
+        const fileName = file_path ? file_path.split('/').pop() : 'Unknown';
+        const fileIcon = this.getFileIconHTML(fileName);
+        
+        const statusText = status === 'accepted' ? '✓ Accepted' : '✗ Rejected';
+        const statusClass = status === 'accepted' ? 'tool-status-accepted' : 'tool-status-rejected';
+        const typeText = type === 'write' ? 'Create' : 'Edit';
+        
+        return `
+            <div class="tool-call">
+                <div class="tool-container" data-tool-call-id="${toolCallId}">
+                    <div class="tool-header">
+                        <div class="tool-file-icon">
+                            ${fileIcon}
+                        </div>
+                        <div class="tool-file-info">
+                            <div class="tool-file-name">${fileName}</div>
+                            <div class="tool-file-path">${file_path || ''}</div>
+                        </div>
+                        <div class="tool-status">
+                            <span class="tool-type-badge tool-type-${type}">${typeText}</span>
+                            <span class="tool-status-badge ${statusClass}">${statusText}</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     // ==================== 简单工具（read/list）====================
