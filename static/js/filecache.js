@@ -15,7 +15,9 @@ class FileTreeCache {
     
     // 设置获取showHidden状态的函数
     setShowHiddenGetter(getter) {
+        console.log('⚙️ setShowHiddenGetter被调用, getter类型:', typeof getter);
         this.showHiddenGetter = getter;
+        console.log('✅ showHiddenGetter已设置:', this.showHiddenGetter ? '成功' : '失败');
     }
     
     // 设置获取API端点的函数
@@ -272,6 +274,7 @@ class FileTreeCache {
     
     // 工具方法
     makeKey(sessionID, path) {
+        console.log('🔑 makeKey - 检查getter:', this.showHiddenGetter ? '存在' : '不存在');
         const showHidden = this.showHiddenGetter ? this.showHiddenGetter() : false;
         console.log('🔑 makeKey:', sessionID, path, 'showHidden=', showHidden);
         return `${sessionID}:${path}:${showHidden}`;
