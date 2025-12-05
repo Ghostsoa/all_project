@@ -191,6 +191,47 @@ func (h *AISessionsHandler) UpdateSessionModel(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "更新成功"})
 }
 
+// UpdateMessage 更新会话中的消息
+func (h *AISessionsHandler) UpdateMessage(c *gin.Context) {
+	var req struct {
+		SessionID    string `json:"session_id"`
+		MessageIndex int    `json:"message_index"`
+		NewContent   string `json:"new_content"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "参数错误"})
+		return
+	}
+
+	if err := storage.UpdateMessageInSession(req.SessionID, req.MessageIndex, req.NewContent); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "更新成功"})
+}
+
+// DeleteMessage 删除会话中的消息
+func (h *AISessionsHandler) DeleteMessage(c *gin.Context) {
+	var req struct {
+		SessionID    string `json:"session_id"`
+		MessageIndex int    `json:"message_index"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "参数错误"})
+		return
+	}
+
+	if err := storage.DeleteMessageFromSession(req.SessionID, req.MessageIndex); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "删除成功"})
+}
+
 func generateSessionID() string {
 	b := make([]byte, 16)
 	rand.Read(b)

@@ -330,9 +330,9 @@ async function loadMessages(sessionId) {
         // 清空欢迎信息
         messagesContainer.innerHTML = '';
         
-        // 渲染消息
-        messages.forEach(msg => {
-            appendMessage(msg.role, msg.content, msg.reasoning_content, msg.ID);
+        // 渲染消息（传递索引作为messageId）
+        messages.forEach((msg, index) => {
+            appendMessage(msg.role, msg.content, msg.reasoning_content, currentOffset + index);
         });
         
         // 滚动到底部（强制）
@@ -382,9 +382,11 @@ async function loadMoreMessages() {
         // 在顶部插入消息（从后往前插入，保持时间顺序）
         // 后端返回的是按时间顺序[msg3, msg4]，我们从后往前插：先插msg4，再插msg3
         // 结果：[msg3, msg4, msg5, msg6] - 正确的时间顺序
+        // 计算基础索引：totalMessages - currentOffset - messages.length
+        const baseIndex = totalMessages - currentOffset - messages.length;
         for (let i = messages.length - 1; i >= 0; i--) {
             const msg = messages[i];
-            prependMessage(msg.role, msg.content, msg.reasoning_content, msg.ID);
+            prependMessage(msg.role, msg.content, msg.reasoning_content, baseIndex + i);
         }
         
         console.log(`📊 加载了 ${messages.length} 条消息, offset: ${currentOffset}, 还有更多: ${hasMoreMessages}`);
@@ -1370,6 +1372,11 @@ function createMessageElement(role, content, reasoning = null, messageId = null)
     messageDiv.appendChild(avatar);
     messageDiv.appendChild(contentWrapper);
     
+    // 添加消息索引（用于编辑/删除）
+    if (messageId !== null && messageId !== undefined) {
+        messageDiv.dataset.messageIndex = messageId;
+    }
+    
     // 添加消息操作按钮（类似命令记录样式）
     const actionsDiv = document.createElement('div');
     actionsDiv.className = 'message-actions';
@@ -1527,7 +1534,7 @@ function formatMessageContent(content) {
         const placeholder = `__CODEBLOCK_${codeBlocks.length}__`;
         const isBash = lang === 'bash' || lang === 'sh' || lang === 'shell';
         const executeBtn = isBash ? `<button class="code-execute-btn" onclick="executeCode('${codeId}')" title="在终端执行">
-                    <i class="fa-solid fa-play"></i>
+                    <i class="fa-solid fa-play"></i> Run
                 </button>` : '';
         
         codeBlocks.push(`<div class="code-block">
@@ -1536,7 +1543,7 @@ function formatMessageContent(content) {
                 <div class="code-actions">
                     ${executeBtn}
                     <button class="code-copy-btn" onclick="copyCode('${codeId}', event)" title="复制代码">
-                        <i class="fa-solid fa-copy"></i>
+                        <i class="fa-solid fa-copy"></i> Copy
                     </button>
                 </div>
             </div>
@@ -1624,12 +1631,12 @@ window.copyCode = function(codeId, event) {
             const btn = event.target.closest('.code-copy-btn');
             if (btn) {
                 const originalHTML = btn.innerHTML;
-                btn.innerHTML = '<i class="fa-solid fa-check"></i>';
-                btn.style.color = '#10b981';
+                btn.innerHTML = '<i class="fa-solid fa-check"></i> Copied';
+                btn.classList.add('copied');
                 setTimeout(() => {
                     btn.innerHTML = originalHTML;
-                    btn.style.color = '';
-                }, 2000);
+                    btn.classList.remove('copied');
+                }, 1500);
             }
         }
     }).catch(err => {
@@ -1697,6 +1704,68 @@ function scrollToBottom(force = false) {
 
 // ========== 消息操作功能 ==========
 
+// AI面板专用确认对话框（限制在右侧面板内）
+function showAIConfirm(message, title = '确认操作') {
+    return new Promise((resolve) => {
+        const aiPanel = document.getElementById('aiPanel');
+        if (!aiPanel) {
+            resolve(false);
+            return;
+        }
+        
+        // 创建确认对话框
+        const overlay = document.createElement('div');
+        overlay.className = 'ai-confirm-overlay';
+        overlay.innerHTML = `
+            <div class="ai-confirm-dialog">
+                <div class="ai-confirm-header">
+                    <h4>${escapeHtml(title)}</h4>
+                </div>
+                <div class="ai-confirm-body">
+                    <p>${escapeHtml(message)}</p>
+                </div>
+                <div class="ai-confirm-footer">
+                    <button class="ai-confirm-btn ai-confirm-btn-cancel">
+                        <i class="fa-solid fa-times"></i> 取消
+                    </button>
+                    <button class="ai-confirm-btn ai-confirm-btn-ok">
+                        <i class="fa-solid fa-check"></i> 确定
+                    </button>
+                </div>
+            </div>
+        `;
+        
+        aiPanel.appendChild(overlay);
+        
+        // 淡入动画
+        setTimeout(() => overlay.classList.add('show'), 10);
+        
+        // 绑定事件
+        const cancelBtn = overlay.querySelector('.ai-confirm-btn-cancel');
+        const okBtn = overlay.querySelector('.ai-confirm-btn-ok');
+        
+        const closeDialog = (result) => {
+            overlay.classList.remove('show');
+            setTimeout(() => {
+                overlay.remove();
+                resolve(result);
+            }, 200);
+        };
+        
+        cancelBtn.onclick = () => closeDialog(false);
+        okBtn.onclick = () => closeDialog(true);
+        
+        // ESC键关闭
+        const handleEsc = (e) => {
+            if (e.key === 'Escape') {
+                closeDialog(false);
+                document.removeEventListener('keydown', handleEsc);
+            }
+        };
+        document.addEventListener('keydown', handleEsc);
+    });
+}
+
 // 复制消息内容（不含思维链）
 window.copyMessageContent = function(element) {
     const messageDiv = element.closest('.ai-message');
@@ -1717,7 +1786,7 @@ window.copyMessageContent = function(element) {
     });
 };
 
-// 编辑用户消息
+// 编辑用户消息（就地编辑）
 window.editMessage = function(element) {
     const messageDiv = element.closest('.ai-message');
     if (!messageDiv) return;
@@ -1725,24 +1794,93 @@ window.editMessage = function(element) {
     const contentDiv = messageDiv.querySelector('.message-content');
     if (!contentDiv) return;
     
-    const currentContent = contentDiv.textContent || contentDiv.innerText;
-    const newContent = prompt('编辑消息:', currentContent);
+    // 保存原始内容
+    const originalContent = contentDiv.textContent || contentDiv.innerText;
     
-    if (newContent && newContent !== currentContent) {
-        // TODO: 调用后端API更新消息
-        showToast('编辑功能开发中...', 'info');
+    // 隐藏操作按钮
+    const actionsDiv = messageDiv.querySelector('.message-actions');
+    if (actionsDiv) actionsDiv.style.display = 'none';
+    
+    // 创建编辑UI
+    contentDiv.innerHTML = '';
+    const textarea = document.createElement('textarea');
+    textarea.className = 'message-edit-textarea';
+    textarea.value = originalContent;
+    contentDiv.appendChild(textarea);
+    
+    // 创建编辑按钮
+    const editButtons = document.createElement('div');
+    editButtons.className = 'message-edit-buttons';
+    editButtons.innerHTML = `
+        <button class="btn-edit-save" title="保存"><i class="fa-solid fa-check"></i></button>
+        <button class="btn-edit-cancel" title="取消"><i class="fa-solid fa-times"></i></button>
+    `;
+    contentDiv.appendChild(editButtons);
+    
+    textarea.focus();
+    textarea.select();
+    
+    // 保存按钮
+    editButtons.querySelector('.btn-edit-save').onclick = async () => {
+        const newContent = textarea.value.trim();
+        if (!newContent) {
+            showToast('内容不能为空', 'warning');
+            return;
+        }
+        
+        if (newContent === originalContent) {
+            cancelEdit();
+            return;
+        }
+        
+        try {
+            // 获取消息索引
+            const messageIndex = parseInt(messageDiv.dataset.messageIndex);
+            if (isNaN(messageIndex)) {
+                showToast('消息索引无效', 'error');
+                return;
+            }
+            
+            // 调用后端API
+            const data = await apiRequest('/api/ai/message/update', 'POST', {
+                session_id: currentSession.id,
+                message_index: messageIndex,
+                new_content: newContent
+            });
+            
+            if (data.success) {
+                // 更新UI
+                contentDiv.innerHTML = escapeHtml(newContent).replace(/\n/g, '<br>');
+                if (actionsDiv) actionsDiv.style.display = 'flex';
+                showToast('已保存', 'success');
+            } else {
+                throw new Error(data.error || '更新失败');
+            }
+        } catch (error) {
+            console.error('编辑消息失败:', error);
+            showToast('编辑失败: ' + error.message, 'error');
+            cancelEdit();
+        }
+    };
+    
+    // 取消按钮
+    editButtons.querySelector('.btn-edit-cancel').onclick = cancelEdit;
+    
+    function cancelEdit() {
+        contentDiv.innerHTML = escapeHtml(originalContent).replace(/\n/g, '<br>');
+        if (actionsDiv) actionsDiv.style.display = 'flex';
     }
 };
 
-// 删除消息
+// 删除消息（真正的删除）
 window.deleteMessage = async function(element) {
     const messageDiv = element.closest('.ai-message');
     if (!messageDiv) return;
     
     const role = messageDiv.classList.contains('user') ? '用户' : 'AI';
     
-    // 使用确认对话框
-    const confirmed = await window.showConfirm(
+    // 使用AI面板专用确认对话框
+    const confirmed = await showAIConfirm(
         `确定要删除这条${role}消息吗？`,
         '删除消息'
     );
@@ -1750,15 +1888,29 @@ window.deleteMessage = async function(element) {
     if (!confirmed) return;
     
     try {
-        // 直接从DOM删除（前端操作）
-        messageDiv.remove();
-        showToast('已删除', 'success');
+        // 获取消息索引
+        const messageIndex = parseInt(messageDiv.dataset.messageIndex);
+        if (isNaN(messageIndex)) {
+            showToast('消息索引无效', 'error');
+            return;
+        }
         
-        // TODO: 调用后端API删除消息（如果需要持久化）
-        // 当前会话在内存中，刷新会重新加载
+        // 调用后端API
+        const data = await apiRequest('/api/ai/message/delete', 'POST', {
+            session_id: currentSession.id,
+            message_index: messageIndex
+        });
+        
+        if (data.success) {
+            // 从DOM删除
+            messageDiv.remove();
+            showToast('已删除', 'success');
+        } else {
+            throw new Error(data.error || '删除失败');
+        }
     } catch (error) {
         console.error('删除消息失败:', error);
-        showToast('删除失败', 'error');
+        showToast('删除失败: ' + error.message, 'error');
     }
 };
 

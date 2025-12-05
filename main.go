@@ -177,8 +177,8 @@ func main() {
 		api.POST("/ai/session/clear", aiSessionsHandler.ClearSession)
 		api.POST("/ai/session/update-model", aiSessionsHandler.UpdateSessionModel)
 		api.GET("/ai/messages", aiSessionsHandler.GetMessages)
-		// TODO: 消息编辑/删除/撤回功能后续实现
-		// api.POST("/ai/message/edit", aiHandler.EditMessage)
+		api.POST("/ai/message/update", aiSessionsHandler.UpdateMessage)
+		api.POST("/ai/message/delete", aiSessionsHandler.DeleteMessage)
 		// api.POST("/ai/message/delete", aiHandler.DeleteMessage)
 		// api.POST("/ai/message/revoke", aiHandler.RevokeMessage)
 	}

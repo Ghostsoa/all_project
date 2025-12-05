@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path/filepath"
@@ -262,6 +263,69 @@ func UpdateSessionModel(sessionID, modelID string) error {
 
 	// 更新模型
 	session.ModelID = modelID
+	session.UpdatedAt = time.Now()
+
+	// 写入文件
+	sessionFile := filepath.Join(sessionsDir, sessionID+".json")
+	return writeJSON(sessionFile, session)
+}
+
+// UpdateMessageInSession 更新会话中的指定消息
+func UpdateMessageInSession(sessionID string, messageIndex int, newContent string) error {
+	sessionCacheLock.Lock()
+	defer sessionCacheLock.Unlock()
+
+	// 从缓存获取或加载
+	session, ok := sessionCache[sessionID]
+	if !ok {
+		sessionFile := filepath.Join(sessionsDir, sessionID+".json")
+		var loadedSession ChatSession
+		if err := readJSON(sessionFile, &loadedSession); err != nil {
+			return err
+		}
+		session = &loadedSession
+		sessionCache[sessionID] = session
+	}
+
+	// 检查索引
+	if messageIndex < 0 || messageIndex >= len(session.Messages) {
+		return fmt.Errorf("消息索引超出范围")
+	}
+
+	// 更新消息内容
+	session.Messages[messageIndex].Content = newContent
+	session.Messages[messageIndex].Timestamp = time.Now()
+	session.UpdatedAt = time.Now()
+
+	// 写入文件
+	sessionFile := filepath.Join(sessionsDir, sessionID+".json")
+	return writeJSON(sessionFile, session)
+}
+
+// DeleteMessageFromSession 删除会话中的指定消息
+func DeleteMessageFromSession(sessionID string, messageIndex int) error {
+	sessionCacheLock.Lock()
+	defer sessionCacheLock.Unlock()
+
+	// 从缓存获取或加载
+	session, ok := sessionCache[sessionID]
+	if !ok {
+		sessionFile := filepath.Join(sessionsDir, sessionID+".json")
+		var loadedSession ChatSession
+		if err := readJSON(sessionFile, &loadedSession); err != nil {
+			return err
+		}
+		session = &loadedSession
+		sessionCache[sessionID] = session
+	}
+
+	// 检查索引
+	if messageIndex < 0 || messageIndex >= len(session.Messages) {
+		return fmt.Errorf("消息索引超出范围")
+	}
+
+	// 删除消息
+	session.Messages = append(session.Messages[:messageIndex], session.Messages[messageIndex+1:]...)
 	session.UpdatedAt = time.Now()
 
 	// 写入文件
