@@ -330,7 +330,7 @@
                     Agent
                 </div>
                 <div class="right-tab" data-tab="commands" onclick="switchRightTab('commands')">
-                    📜 命令记录
+                    <i class="fa-solid fa-clock-rotate-left"></i> 命令历史
                 </div>
             </div>
 
@@ -417,15 +417,29 @@
                 </div>
             </div>
 
-            <!-- 命令记录面板 -->
+            <!-- 命令历史面板 -->
             <div class="right-panel-content" id="commandsPanel" style="display: none;">
                 <div class="commands-header">
-                    <div class="commands-title">
-                        <span id="commandsServerName">选择服务器查看命令</span>
+                    <div class="commands-search">
+                        <i class="fa-solid fa-magnifying-glass"></i>
+                        <input type="text" 
+                               id="commandSearchInput" 
+                               placeholder="搜索命令或服务器..." 
+                               oninput="searchCommands(this.value)">
+                        <button class="btn-search-clear" 
+                                onclick="document.getElementById('commandSearchInput').value=''; searchCommands('');" 
+                                title="清空搜索">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
                     </div>
-                    <button class="btn-clear-commands" onclick="clearAllCommands()" title="清空所有命令">
-                        <i class="fa-solid fa-trash-can"></i> 全部删除
-                    </button>
+                    <div class="commands-actions">
+                        <button class="btn-command-action" onclick="loadCommandHistory()" title="刷新">
+                            <i class="fa-solid fa-rotate-right"></i>
+                        </button>
+                        <button class="btn-command-action" onclick="clearAllCommands()" title="清空所有">
+                            <i class="fa-solid fa-trash-can"></i>
+                        </button>
+                    </div>
                 </div>
                 <div class="commands-list" id="commandsList">
                     <div class="commands-empty">

@@ -83,7 +83,7 @@ func initDefaultFiles() error {
 
 	// commands.json
 	if _, err := os.Stat(commandsFile); os.IsNotExist(err) {
-		if err := writeJSON(commandsFile, &CommandHistoryStore{Commands: make(map[string][]CommandHistory)}); err != nil {
+		if err := writeJSON(commandsFile, &CommandHistoryStore{Commands: []CommandHistory{}, NextID: 1}); err != nil {
 			return err
 		}
 	}

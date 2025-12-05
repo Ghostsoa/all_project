@@ -75,46 +75,93 @@
     color: #858585;
 }
 
-/* 命令记录 */
+/* 命令历史 */
 .commands-header {
-    padding: 16px;
+    padding: 12px;
     background: rgba(255, 255, 255, 0.02);
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
     display: flex;
-    justify-content: space-between;
+    gap: 8px;
     align-items: center;
 }
 
-.commands-title {
-    font-size: 13px;
-    color: #ffffff;
-    font-weight: 600;
-}
-
-.btn-clear-commands {
-    padding: 6px 12px;
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.3);
-    color: #ef4444;
-    font-size: 12px;
-    border-radius: 4px;
-    cursor: pointer;
-    display: inline-flex;
+/* 搜索框 */
+.commands-search {
+    flex: 1;
+    display: flex;
     align-items: center;
-    gap: 4px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 6px 10px;
+    gap: 8px;
     transition: all 0.2s ease;
 }
 
-.btn-clear-commands:hover {
-    background: rgba(239, 68, 68, 0.2);
-    border-color: #ef4444;
-    transform: translateY(-1px);
-    padding: 4px 8px;
-    transition: color 0.2s;
+.commands-search:focus-within {
+    border-color: rgba(96, 165, 250, 0.5);
+    background: rgba(255, 255, 255, 0.08);
 }
 
-.btn-clear-commands:hover {
-    color: #ff3b30;
+.commands-search i.fa-magnifying-glass {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 11px;
+}
+
+.commands-search input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #ffffff;
+    font-size: 12px;
+    padding: 0;
+}
+
+.commands-search input::placeholder {
+    color: rgba(255, 255, 255, 0.3);
+}
+
+.btn-search-clear {
+    background: transparent;
+    border: none;
+    color: rgba(255, 255, 255, 0.3);
+    cursor: pointer;
+    padding: 0;
+    font-size: 12px;
+    transition: color 0.2s ease;
+}
+
+.btn-search-clear:hover {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* 功能按钮 */
+.commands-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.btn-command-action {
+    width: 28px;
+    height: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: all 0.2s ease;
+    font-size: 12px;
+}
+
+.btn-command-action:hover {
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
 }
 
 .commands-list {
@@ -199,12 +246,42 @@
     display: inline-block;
 }
 
+/* 命令header（服务器标签+时间） */
+.command-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 6px;
+}
+
+/* 服务器标签 */
+.server-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: 600;
+    transition: all 0.2s ease;
+}
+
+.server-tag.local {
+    background: rgba(52, 211, 153, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(52, 211, 153, 0.3);
+}
+
+.server-tag.remote {
+    background: rgba(96, 165, 250, 0.15);
+    color: #60a5fa;
+    border: 1px solid rgba(96, 165, 250, 0.3);
+}
+
 .command-text {
     font-family: 'Consolas', 'Courier New', monospace;
     font-size: 12px;
     color: #4ec9b0;
     word-break: break-all;
-    margin-bottom: 6px;
+    margin-bottom: 8px;
     line-height: 1.5;
 }
 

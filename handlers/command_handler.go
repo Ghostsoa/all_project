@@ -17,8 +17,9 @@ func NewCommandHandler() *CommandHandler {
 // GinSaveCommand 保存命令历史
 func (h *CommandHandler) GinSaveCommand(c *gin.Context) {
 	var req struct {
-		ServerID string `json:"server_id"`
-		Command  string `json:"command"`
+		ServerID   string `json:"server_id"`
+		ServerName string `json:"server_name"`
+		Command    string `json:"command"`
 	}
 
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -26,7 +27,7 @@ func (h *CommandHandler) GinSaveCommand(c *gin.Context) {
 		return
 	}
 
-	if err := storage.SaveCommand(req.ServerID, req.Command); err != nil {
+	if err := storage.SaveCommand(req.ServerID, req.ServerName, req.Command); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
@@ -68,6 +69,28 @@ func (h *CommandHandler) GinGetRecentCommands(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "data": commands})
 }
 
+// GinDeleteCommand 删除单条命令
+func (h *CommandHandler) GinDeleteCommand(c *gin.Context) {
+	idStr := c.Query("id")
+	if idStr == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "缺少id参数"})
+		return
+	}
+
+	id, err := strconv.Atoi(idStr)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "id参数无效"})
+		return
+	}
+
+	if err := storage.DeleteCommand(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
 // GinClearServerCommands 清空指定服务器的命令历史
 func (h *CommandHandler) GinClearServerCommands(c *gin.Context) {
 	serverID := c.Query("server_id")
@@ -82,4 +105,34 @@ func (h *CommandHandler) GinClearServerCommands(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "清空成功"})
+}
+
+// GinClearAllCommands 清空所有命令历史
+func (h *CommandHandler) GinClearAllCommands(c *gin.Context) {
+	if err := storage.ClearAllCommands(); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true})
+}
+
+// GinSearchCommands 搜索命令
+func (h *CommandHandler) GinSearchCommands(c *gin.Context) {
+	keyword := c.Query("keyword")
+	if keyword == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "缺少keyword参数"})
+		return
+	}
+
+	limitStr := c.DefaultQuery("limit", "100")
+	limit, _ := strconv.Atoi(limitStr)
+
+	commands, err := storage.SearchCommands(keyword, limit)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": commands})
 }

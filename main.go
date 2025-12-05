@@ -132,7 +132,10 @@ func main() {
 		api.POST("/command/save", commandHandler.GinSaveCommand)
 		api.GET("/commands", commandHandler.GinGetServerCommands)
 		api.GET("/commands/recent", commandHandler.GinGetRecentCommands)
+		api.GET("/commands/search", commandHandler.GinSearchCommands)
+		api.POST("/command/delete", commandHandler.GinDeleteCommand)
 		api.POST("/commands/clear", commandHandler.GinClearServerCommands)
+		api.POST("/commands/clear-all", commandHandler.GinClearAllCommands)
 
 		// 文件管理
 		api.GET("/files/list", fileHandler.ListFiles)

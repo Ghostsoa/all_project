@@ -59,14 +59,17 @@ type ChatMessage struct {
 	Timestamp        time.Time `json:"timestamp"`
 }
 
-// CommandHistory 命令历史
+// CommandHistory 命令历史（统一时间线）
 type CommandHistory struct {
-	ServerID  string    `json:"server_id"`
-	Command   string    `json:"command"`
-	Timestamp time.Time `json:"timestamp"`
+	ID         int       `json:"id"`          // 唯一ID
+	ServerID   string    `json:"server_id"`   // 服务器ID（0表示本地）
+	ServerName string    `json:"server_name"` // 服务器名称（用于显示）
+	Command    string    `json:"command"`     // 命令内容
+	Timestamp  time.Time `json:"timestamp"`   // 执行时间
 }
 
-// CommandHistoryStore 命令历史存储（按服务器分组）
+// CommandHistoryStore 命令历史存储（统一列表）
 type CommandHistoryStore struct {
-	Commands map[string][]CommandHistory `json:"commands"` // key: server_id
+	Commands []CommandHistory `json:"commands"` // 所有命令的统一列表
+	NextID   int              `json:"next_id"`  // 下一个ID
 }

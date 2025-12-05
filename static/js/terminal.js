@@ -142,7 +142,7 @@ export function connectSSH(sessionId, server) {
             if (data === '\r' || data === '\n') {
                 const command = currentSession.commandBuffer.trim();
                 if (command && command.length > 0) {
-                    saveCommandToHistory(server.id, command);
+                    saveCommandToHistory(server.id, server.name, command);
                 }
                 currentSession.commandBuffer = '';
             } else if (data === '\u007F' || data === '\b') {
@@ -331,7 +331,7 @@ function connectLocalTerminal(sessionId) {
             if (data === '\r' || data === '\n') {
                 const command = session.commandBuffer.trim();
                 if (command && command.length > 0) {
-                    saveCommandToHistory(0, command);
+                    saveCommandToHistory('0', '本地', command);
                 }
                 session.commandBuffer = '';
             } else if (data === '\u007F' || data === '\b') {

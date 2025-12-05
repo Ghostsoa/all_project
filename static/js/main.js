@@ -69,8 +69,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     initDragUpload(); // 初始化拖拽上传
     await initAIChat(); // 初始化AI对话功能
     
-    // 默认加载本地命令记录
-    loadCommandHistory('0', '本地终端');
+    // 加载命令历史（统一时间线，不依赖终端）
+    loadCommandHistory();
     
     // 自动打开本地终端作为默认
     setTimeout(() => {
@@ -224,7 +224,6 @@ window.selectServer = async function(id) {
         state.activeSessionId = sessionId;
         
         connectSSH(sessionId, server);
-        loadCommandHistory(server.id, server.name);
         
         // 渲染顶部SSH服务器标签
         renderTabs();
@@ -400,13 +399,6 @@ window.switchTab = function(sessionId) {
         
         // 检查是否为本地终端
         const isLocal = sessionId === 'local';
-        
-        // 加载对应的命令记录
-        if (isLocal) {
-            loadCommandHistory('0', '本地终端');
-        } else if (session.server) {
-            loadCommandHistory(session.server.id, session.server.name);
-        }
         
         // 只在首次切换或上次sessionID不同时更新文件树（避免闪烁）
         if (!prevSessionId || prevSessionId !== sessionId) {
