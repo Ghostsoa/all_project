@@ -53,7 +53,12 @@ class AIToolsManager {
             return this.renderGenericTool(toolResult, toolName);
         }
 
-        const { type, status } = toolResult;
+        const { type, status, success } = toolResult;
+        
+        // 如果工具执行失败，显示失败状态
+        if (success === false) {
+            return this.renderFailedTool(toolResult, toolName);
+        }
         
         // 如果status是accepted或rejected，显示完成状态（不可交互）
         if (status === 'accepted' || status === 'rejected') {
@@ -79,6 +84,19 @@ class AIToolsManager {
             default:
                 return this.renderGenericTool(toolResult, toolName);
         }
+    }
+    
+    /**
+     * 渲染失败的工具
+     */
+    renderFailedTool(result, toolName) {
+        const error = result.error || '未知错误';
+        return `
+            <div class="tool-simple completed">
+                <span class="tool-simple-icon">❌</span>
+                <${toolName}: ✗ Failed> ${error}
+            </div>
+        `;
     }
     
     /**
