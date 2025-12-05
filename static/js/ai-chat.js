@@ -1389,6 +1389,7 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
     
     // 如果是 assistant 且有工具调用，先渲染工具调用
     if (role === 'assistant' && fullMessage && fullMessage.tool_calls && fullMessage.tool_calls.length > 0) {
+        console.log('🔧 渲染历史工具调用:', fullMessage.tool_calls);
         fullMessage.tool_calls.forEach(toolCall => {
             if (window.aiToolsManager) {
                 // 解析工具调用参数
