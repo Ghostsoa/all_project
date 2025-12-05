@@ -71,8 +71,8 @@ export const api = {
         return fetch(`${config.API_BASE}/command/save`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ server_id: serverId, command })
-        });
+            body: JSON.stringify({ server_id: String(serverId), command })
+        }).then(res => res.json());
     },
     
     async getCommands(serverId, limit = 50) {

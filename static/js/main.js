@@ -523,12 +523,13 @@ function renderTags() {
 
 // 服务器模态框
 window.showAddServerModal = function() {
-    document.getElementById('modalTitle').textContent = '添加服务器';
+    document.getElementById('serverPanelTitle').textContent = '添加服务器';
     document.getElementById('serverForm').reset();
     document.getElementById('serverId').value = '';
+    document.getElementById('serverPassword').required = true;
     state.currentTags = [];
     renderTags();
-    document.getElementById('serverModal').classList.add('show');
+    document.getElementById('serverSettingsPanel').style.display = 'flex';
 };
 
 window.editServer = async function(id) {
@@ -537,7 +538,7 @@ window.editServer = async function(id) {
         
         if (data.success) {
             const server = data.data;
-            document.getElementById('modalTitle').textContent = '编辑服务器';
+            document.getElementById('serverPanelTitle').textContent = '编辑服务器';
             document.getElementById('serverId').value = server.id;
             document.getElementById('serverName').value = server.name;
             document.getElementById('serverHost').value = server.host;
@@ -547,7 +548,7 @@ window.editServer = async function(id) {
             document.getElementById('serverDescription').value = server.description || '';
             state.currentTags = server.tags || [];
             renderTags();
-            document.getElementById('serverModal').classList.add('show');
+            document.getElementById('serverSettingsPanel').style.display = 'flex';
         }
     } catch (error) {
         console.error('加载服务器信息失败:', error);
@@ -587,7 +588,7 @@ window.saveServer = async function() {
         }
         
         if (data.success) {
-            closeModal();
+            closeServerPanel();
             loadServers();
             showToast(data.message || '保存成功', 'success');
         } else {
@@ -599,9 +600,12 @@ window.saveServer = async function() {
     }
 };
 
-window.closeModal = function() {
-    document.getElementById('serverModal').classList.remove('show');
+window.closeServerPanel = function() {
+    document.getElementById('serverSettingsPanel').style.display = 'none';
 };
+
+// 兼容旧代码
+window.closeModal = window.closeServerPanel;
 
 // 右侧面板切换
 window.switchRightTab = function(tabName) {

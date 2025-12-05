@@ -473,6 +473,83 @@
     transform: translateY(-1px);
 }
 
+/* 服务器表单特定样式 */
+.server-form {
+    max-width: 800px;
+    margin: 0 auto;
+}
+
+.server-form .form-row {
+    display: grid;
+    grid-template-columns: 2fr 1fr;
+    gap: 20px;
+}
+
+.server-form .tags-input-wrapper {
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.02);
+    min-height: 42px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    align-items: center;
+}
+
+.server-form .tags-display {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.server-form .tag-item {
+    background: rgba(74, 144, 226, 0.15);
+    border: 1px solid rgba(74, 144, 226, 0.3);
+    color: #4a90e2;
+    padding: 4px 8px;
+    border-radius: 4px;
+    font-size: 12px;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.server-form .tag-item:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+}
+
+.server-form .tag-remove {
+    font-size: 14px;
+    font-weight: bold;
+}
+
+.server-form .tag-input {
+    flex: 1;
+    min-width: 120px;
+    border: none;
+    background: transparent;
+    color: #ffffff;
+    outline: none;
+    padding: 4px;
+    font-size: 14px;
+}
+
+.server-form .tag-input::placeholder {
+    color: rgba(255, 255, 255, 0.4);
+}
+
+.server-form .form-hint {
+    display: block;
+    margin-top: 6px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.5);
+}
+
 /* 响应式 */
 @media (max-width: 768px) {
     .modal-large .modal-content {
