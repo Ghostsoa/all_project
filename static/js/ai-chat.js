@@ -2168,7 +2168,14 @@ function appendToolCall(messageElement, toolData) {
     // 添加到消息内容前面，并添加标记供后续更新
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = toolHTML;
-    const toolElement = tempDiv.firstChild;
+    
+    // 获取第一个元素节点（跳过可能的文本节点）
+    const toolElement = tempDiv.querySelector('.tool-call');
+    if (!toolElement) {
+        console.error('无法找到工具元素:', toolHTML);
+        return;
+    }
+    
     toolElement.setAttribute('data-tool-call-id', toolData.tool_call_id);
     contentDiv.insertBefore(toolElement, contentDiv.firstChild);
 }

@@ -75,9 +75,10 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 		// 获取会话
 		session, err := storage.GetSession(req.SessionID)
 		if err != nil {
+			log.Printf("❌ 获取会话失败: %v, SessionID: %s", err, req.SessionID)
 			ws.WriteJSON(map[string]interface{}{
 				"type":  "error",
-				"error": "会话不存在",
+				"error": fmt.Sprintf("会话不存在: %v", err),
 			})
 			continue
 		}
