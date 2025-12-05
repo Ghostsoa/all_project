@@ -432,44 +432,59 @@
     width: 100%;
 }
 
-/* 模态框按钮样式 */
+/* 表单操作区域 */
+.form-actions {
+    display: flex;
+    gap: 12px;
+    justify-content: flex-end;
+    margin-top: 30px;
+    padding-top: 20px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* 统一按钮样式 */
+.btn-action,
 .modal-footer .btn-primary,
-.form-actions .btn-primary {
+.modal-footer .btn-secondary,
+.form-actions .btn-primary,
+.form-actions .btn-secondary,
+.form-actions button {
     padding: 10px 20px;
-    background: rgba(74, 144, 226, 0.15);
-    border: 1px solid rgba(74, 144, 226, 0.3);
-    color: #4a90e2;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: rgba(255, 255, 255, 0.9);
     font-size: 14px;
     font-weight: 500;
     border-radius: 6px;
     cursor: pointer;
     transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
 }
 
+.btn-action:hover,
+.form-actions button:hover,
+.modal-footer .btn-secondary:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.25);
+    transform: translateY(-1px);
+}
+
+/* 主要操作按钮（保存） */
+.btn-action.primary,
+.modal-footer .btn-primary,
+.form-actions .btn-primary {
+    background: rgba(74, 144, 226, 0.15);
+    border: 1px solid rgba(74, 144, 226, 0.3);
+    color: #4a90e2;
+}
+
+.btn-action.primary:hover,
 .modal-footer .btn-primary:hover,
 .form-actions .btn-primary:hover {
     background: rgba(74, 144, 226, 0.25);
     border-color: #4a90e2;
-    transform: translateY(-1px);
-}
-
-.modal-footer .btn-secondary,
-.form-actions .btn-secondary {
-    padding: 10px 20px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: rgba(255, 255, 255, 0.8);
-    font-size: 14px;
-    font-weight: 500;
-    border-radius: 6px;
-    cursor: pointer;
-    transition: all 0.2s ease;
-}
-
-.modal-footer .btn-secondary:hover,
-.form-actions .btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(255, 255, 255, 0.2);
     transform: translateY(-1px);
 }
 
