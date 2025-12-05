@@ -14,6 +14,13 @@ let chatWSHeartbeatInterval = null; // 心跳定时器
 let isReconnecting = false; // 重连标志
 let isGenerating = false; // 是否正在生成
 
+// 分页相关
+let currentOffset = 0;
+const PAGE_SIZE = 2; // 测试用：每页2条，正式环境改为20
+let isLoadingMore = false;
+let hasMoreMessages = true;
+let totalMessages = 0;
+
 // ========== Loading 控制 ==========
 
 function showAILoading(text = '正在加载中') {
@@ -304,11 +311,18 @@ window.selectAISession = async function(sessionId) {
     }
 };
 
-// 加载消息
+// 加载消息（初始加载）
 async function loadMessages(sessionId) {
     try {
-        const data = await apiRequest(`/api/ai/messages?session_id=${sessionId}&limit=50`);
+        // 重置分页状态
+        currentOffset = 0;
+        hasMoreMessages = true;
+        totalMessages = 0;
+        
+        const data = await apiRequest(`/api/ai/messages?session_id=${sessionId}&limit=${PAGE_SIZE}&offset=0`);
         const messages = data.data || [];
+        totalMessages = data.total || 0;
+        hasMoreMessages = data.has_more || false;
         
         const messagesContainer = document.getElementById('aiMessages');
         if (!messagesContainer) return;
@@ -323,8 +337,137 @@ async function loadMessages(sessionId) {
         
         // 滚动到底部
         scrollToBottom();
+        
+        // 添加滚动监听（如果还没有）
+        setupScrollListener();
+        
+        console.log(`📊 初始加载: ${messages.length}/${totalMessages} 条消息, 还有更多: ${hasMoreMessages}`);
     } catch (error) {
         console.error('加载消息失败:', error);
+    }
+}
+
+// 加载更多消息（向上滚动时）
+async function loadMoreMessages() {
+    if (!currentSession || isLoadingMore || !hasMoreMessages) {
+        return;
+    }
+    
+    isLoadingMore = true;
+    console.log('📥 加载更多消息...');
+    
+    // 显示加载指示器
+    showLoadingIndicator();
+    
+    try {
+        // 计算下一页的offset
+        currentOffset += PAGE_SIZE;
+        
+        const data = await apiRequest(
+            `/api/ai/messages?session_id=${currentSession.id}&limit=${PAGE_SIZE}&offset=${currentOffset}`
+        );
+        
+        const messages = data.data || [];
+        hasMoreMessages = data.has_more || false;
+        
+        if (messages.length === 0) {
+            hasMoreMessages = false;
+            console.log('✅ 没有更多消息了');
+            return;
+        }
+        
+        const messagesContainer = document.getElementById('aiMessages');
+        if (!messagesContainer) return;
+        
+        // 保存当前滚动位置
+        const oldScrollHeight = messagesContainer.scrollHeight;
+        const oldScrollTop = messagesContainer.scrollTop;
+        
+        // 在顶部插入消息（倒序插入，因为后端返回的是时间顺序）
+        messages.reverse().forEach(msg => {
+            prependMessage(msg.role, msg.content, msg.reasoning_content, msg.ID);
+        });
+        
+        // 恢复滚动位置（保持在原来看的地方）
+        const newScrollHeight = messagesContainer.scrollHeight;
+        messagesContainer.scrollTop = oldScrollTop + (newScrollHeight - oldScrollHeight);
+        
+        console.log(`📊 加载了 ${messages.length} 条消息, offset: ${currentOffset}, 还有更多: ${hasMoreMessages}`);
+    } catch (error) {
+        console.error('加载更多消息失败:', error);
+        currentOffset -= PAGE_SIZE; // 回滚offset
+    } finally {
+        hideLoadingIndicator();
+        isLoadingMore = false;
+    }
+}
+
+// 在顶部插入消息
+function prependMessage(role, content, reasoningContent, messageId) {
+    const messagesContainer = document.getElementById('aiMessages');
+    if (!messagesContainer) return;
+    
+    const messageDiv = createMessageElement(role, content, reasoningContent, messageId);
+    
+    // 插入到最前面（如果有欢迎信息，插在欢迎信息之后）
+    const firstMessage = messagesContainer.querySelector('.message-user, .message-assistant');
+    if (firstMessage) {
+        messagesContainer.insertBefore(messageDiv, firstMessage);
+    } else {
+        messagesContainer.appendChild(messageDiv);
+    }
+}
+
+// 设置滚动监听
+function setupScrollListener() {
+    const messagesContainer = document.getElementById('aiMessages');
+    if (!messagesContainer) return;
+    
+    // 移除旧的监听器（如果有）
+    messagesContainer.removeEventListener('scroll', handleScroll);
+    
+    // 添加新的监听器
+    messagesContainer.addEventListener('scroll', handleScroll);
+}
+
+// 处理滚动事件
+function handleScroll(e) {
+    const container = e.target;
+    
+    // 当滚动到顶部100px以内时，加载更多
+    if (container.scrollTop < 100 && hasMoreMessages && !isLoadingMore) {
+        loadMoreMessages();
+    }
+}
+
+// 显示加载指示器
+function showLoadingIndicator() {
+    const messagesContainer = document.getElementById('aiMessages');
+    if (!messagesContainer) return;
+    
+    // 检查是否已存在
+    let indicator = messagesContainer.querySelector('.loading-more-indicator');
+    if (indicator) return;
+    
+    indicator = document.createElement('div');
+    indicator.className = 'loading-more-indicator';
+    indicator.innerHTML = `
+        <div class="loading-spinner-small"></div>
+        <span>加载更多消息...</span>
+    `;
+    
+    // 插入到最前面
+    messagesContainer.insertBefore(indicator, messagesContainer.firstChild);
+}
+
+// 隐藏加载指示器
+function hideLoadingIndicator() {
+    const messagesContainer = document.getElementById('aiMessages');
+    if (!messagesContainer) return;
+    
+    const indicator = messagesContainer.querySelector('.loading-more-indicator');
+    if (indicator) {
+        indicator.remove();
     }
 }
 
@@ -1175,7 +1318,7 @@ function appendMessage(role, content, reasoning = null, messageId = null) {
     messagesContainer.appendChild(messageDiv);
 }
 
-// 创建消息元素
+// 创建消息元素（只创建，不添加到容器）
 function createMessageElement(role, content, reasoning = null, messageId = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `ai-message ${role}`;
@@ -1228,11 +1371,6 @@ function createMessageElement(role, content, reasoning = null, messageId = null)
             <button class="message-action-btn" onclick="confirmRevokeMessage(${messageId})" title="撤回">⎌</button>
         `;
         messageDiv.appendChild(actionsDiv);
-    }
-    
-    const messagesContainer = document.getElementById('aiMessages');
-    if (messagesContainer) {
-        messagesContainer.appendChild(messageDiv);
     }
     
     return messageDiv;

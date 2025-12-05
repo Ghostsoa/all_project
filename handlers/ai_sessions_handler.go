@@ -141,7 +141,7 @@ func (h *AISessionsHandler) ClearSession(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "清空成功"})
 }
 
-// GetMessages 获取会话消息
+// GetMessages 获取会话消息（支持分页）
 func (h *AISessionsHandler) GetMessages(c *gin.Context) {
 	sessionID := c.Query("session_id")
 	if sessionID == "" {
@@ -149,16 +149,26 @@ func (h *AISessionsHandler) GetMessages(c *gin.Context) {
 		return
 	}
 
-	limitStr := c.DefaultQuery("limit", "50")
-	limit, _ := strconv.Atoi(limitStr)
+	limitStr := c.DefaultQuery("limit", "20")
+	offsetStr := c.DefaultQuery("offset", "0")
 
-	messages, err := storage.GetMessages(sessionID, limit)
+	limit, _ := strconv.Atoi(limitStr)
+	offset, _ := strconv.Atoi(offsetStr)
+
+	messages, total, err := storage.GetMessagesWithPagination(sessionID, limit, offset)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{"success": true, "data": messages})
+	c.JSON(http.StatusOK, gin.H{
+		"success":  true,
+		"data":     messages,
+		"total":    total,
+		"offset":   offset,
+		"limit":    limit,
+		"has_more": offset+len(messages) < total,
+	})
 }
 
 // UpdateSessionModel 更新会话使用的模型

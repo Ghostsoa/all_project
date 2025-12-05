@@ -161,12 +161,18 @@ func AddMessage(sessionID string, message ChatMessage) error {
 	return writeJSON(sessionFile, session)
 }
 
-// GetMessages 获取会话的所有消息（返回副本）
+// GetMessages 获取会话的所有消息（返回副本）- 保留兼容性
 func GetMessages(sessionID string, limit int) ([]ChatMessage, error) {
+	messages, _, err := GetMessagesWithPagination(sessionID, limit, 0)
+	return messages, err
+}
+
+// GetMessagesWithPagination 获取会话消息（支持分页）
+func GetMessagesWithPagination(sessionID string, limit, offset int) ([]ChatMessage, int, error) {
 	// 1. 确保session已加载到缓存
 	_, err := GetSession(sessionID)
 	if err != nil {
-		return nil, err
+		return nil, 0, err
 	}
 
 	// 2. 从缓存读取（加读锁保护）
@@ -175,21 +181,40 @@ func GetMessages(sessionID string, limit int) ([]ChatMessage, error) {
 
 	session := sessionCache[sessionID]
 	if session == nil || session.Messages == nil {
-		return []ChatMessage{}, nil
+		return []ChatMessage{}, 0, nil
 	}
 
-	messages := session.Messages
+	allMessages := session.Messages
+	total := len(allMessages)
 
-	// 3. 限制返回数量
-	if limit > 0 && len(messages) > limit {
-		messages = messages[len(messages)-limit:]
+	// 3. 计算分页范围（倒序：最新的消息在最后）
+	// offset=0 返回最新的消息
+	// offset>0 返回更早的消息
+	start := total - offset - limit
+	if start < 0 {
+		start = 0
+	}
+	end := total - offset
+	if end > total {
+		end = total
+	}
+	if end < 0 {
+		end = 0
 	}
 
-	// 4. 返回副本，避免外部修改
+	// 4. 切片获取指定范围的消息
+	var messages []ChatMessage
+	if start < end {
+		messages = allMessages[start:end]
+	} else {
+		messages = []ChatMessage{}
+	}
+
+	// 5. 返回副本，避免外部修改
 	result := make([]ChatMessage, len(messages))
 	copy(result, messages)
 
-	return result, nil
+	return result, total, nil
 }
 
 // ClearMessages 清空会话消息（直接操作缓存）
