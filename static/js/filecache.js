@@ -1,5 +1,6 @@
 // 文件树缓存管理器 - Stale-While-Revalidate + 智能预加载
 import { showToast } from './utils.js';
+import { getShowHiddenFiles } from './filetree.js';
 
 class FileTreeCache {
     constructor() {
