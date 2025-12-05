@@ -335,6 +335,9 @@ async function loadMessages(sessionId) {
         // 清空欢迎信息
         messagesContainer.innerHTML = '';
         
+        // 保存历史消息供工具调用渲染使用
+        window.currentHistoryMessages = messages;
+        
         // 渲染消息（传递完整消息对象）
         messages.forEach((msg, index) => {
             appendMessage(msg.role, msg.content, msg.reasoning_content, currentOffset + index, msg);
@@ -383,6 +386,12 @@ async function loadMoreMessages() {
         
         const messagesContainer = document.getElementById('aiMessages');
         if (!messagesContainer) return;
+        
+        // 更新全局历史消息变量（将新消息添加到前面）
+        if (!window.currentHistoryMessages) {
+            window.currentHistoryMessages = [];
+        }
+        window.currentHistoryMessages = [...messages, ...window.currentHistoryMessages];
         
         // 在顶部插入消息（从后往前插入，保持时间顺序）
         // 后端返回的是按时间顺序[msg3, msg4]，我们从后往前插：先插msg4，再插msg3
@@ -1405,31 +1414,47 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
     // 然后在正文后面渲染工具调用
     if (role === 'assistant' && fullMessage && fullMessage.tool_calls && fullMessage.tool_calls.length > 0) {
         console.log('🔧 渲染历史工具调用:', fullMessage.tool_calls);
+        
+        // 获取历史消息中的所有 tool 结果（从 messages 参数中查找）
+        const toolResults = new Map();
+        if (window.currentHistoryMessages) {
+            window.currentHistoryMessages.forEach(msg => {
+                if (msg.role === 'tool' && msg.tool_call_id) {
+                    try {
+                        const result = typeof msg.content === 'string' ? JSON.parse(msg.content) : msg.content;
+                        toolResults.set(msg.tool_call_id, { result, toolName: msg.tool_name });
+                    } catch (e) {
+                        console.error('解析tool结果失败:', e);
+                    }
+                }
+            });
+        }
+        
         fullMessage.tool_calls.forEach(toolCall => {
             if (window.aiToolsManager) {
-                // 解析工具调用参数
                 const functionData = toolCall.function || {};
                 const functionName = functionData.name || '';
-                const functionArgs = functionData.arguments || '{}';
+                const toolCallId = toolCall.id;
                 
-                // 解析参数获取文件信息
-                let argsObj = {};
-                try {
-                    argsObj = JSON.parse(functionArgs);
-                } catch (e) {
-                    console.error('解析工具参数失败:', e);
+                // 查找对应的 tool 结果
+                const toolResultData = toolResults.get(toolCallId);
+                
+                let toolHTML;
+                if (toolResultData) {
+                    // 有结果：使用 renderToolResult 渲染（显示 Pending 状态）
+                    toolHTML = window.aiToolsManager.renderToolResult(
+                        toolResultData.result, 
+                        toolResultData.toolName || functionName,
+                        toolCallId
+                    );
+                } else {
+                    // 无结果：显示执行中状态
+                    toolHTML = window.aiToolsManager.renderExecutingTool({
+                        tool_call_id: toolCallId,
+                        name: functionName,
+                        arguments: toolCall.function.arguments
+                    });
                 }
-                
-                // 渲染工具调用结果（已完成状态）
-                const toolData = {
-                    tool_call_id: toolCall.id,
-                    name: functionName,
-                    arguments: functionArgs
-                };
-                
-                // 获取工具执行结果（从下一条tool消息中）
-                // 这里先渲染为已完成状态的工具横条
-                const toolHTML = window.aiToolsManager.renderToolCallCompleted(toolData, argsObj);
                 
                 if (toolHTML) {
                     const toolDiv = document.createElement('div');
