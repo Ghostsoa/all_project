@@ -13,6 +13,7 @@ import { openFileEditor } from './editor.js';
 import { updateTerminalSnapshot, updateWorkspaceInfo } from './ai-assistant.js';
 import './ai-settings.js'; // AI设置管理
 import { initAIChat } from './ai-chat.js'; // AI对话功能
+import './ai-tools.js'; // AI工具调用管理
 
 // 导出AI助手函数到window
 window.updateTerminalSnapshot = updateTerminalSnapshot;

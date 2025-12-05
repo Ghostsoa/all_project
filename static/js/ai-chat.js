@@ -1271,7 +1271,10 @@ async function streamChat(sessionId, message, thinkingId) {
                     if (!messageElement) {
                         messageElement = convertThinkingToMessage(thinkingId);
                         if (!messageElement) {
+                            // 创建新消息元素并添加到DOM
+                            const messagesContainer = document.getElementById('aiMessages');
                             messageElement = createMessageElement('assistant', '');
+                            messagesContainer.appendChild(messageElement);
                         }
                     }
                     

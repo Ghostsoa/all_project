@@ -76,3 +76,21 @@ type CommandHistoryStore struct {
 	Commands []CommandHistory `json:"commands"` // 所有命令的统一列表
 	NextID   int              `json:"next_id"`  // 下一个ID
 }
+
+// EditOperation 编辑操作
+type EditOperation struct {
+	Type       string `json:"type"`        // create/replace
+	StartLine  int    `json:"start_line"`  // replace 操作的起始行
+	EndLine    int    `json:"end_line"`    // replace 操作的结束行
+	OldContent string `json:"old_content"` // replace 操作的旧内容
+	NewContent string `json:"new_content"` // 新内容
+}
+
+// EditPreview 编辑预览
+type EditPreview struct {
+	ID         string          `json:"id"`
+	ServerID   string          `json:"server_id"`
+	FilePath   string          `json:"file_path"`
+	Operations []EditOperation `json:"operations"`
+	CreatedAt  time.Time       `json:"created_at"`
+}

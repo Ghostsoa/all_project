@@ -58,7 +58,7 @@ func main() {
 	aiConfigHandler := handlers.NewAIConfigHandler()
 	aiSessionsHandler := handlers.NewAISessionsHandler()
 	aiChatHandler := handlers.NewAIChatHandler()
-	aiEditHandler := handlers.NewAIEditHandler(aiChatHandler.GetToolExecutor())
+	aiEditHandler := handlers.NewAIEditHandler()
 
 	// 初始化全局本地终端
 	if err := handlers.InitGlobalLocalTerminal(); err != nil {
@@ -184,9 +184,9 @@ func main() {
 		api.POST("/ai/message/update", aiSessionsHandler.UpdateMessage)
 		api.POST("/ai/message/revoke", aiSessionsHandler.RevokeMessage)
 
-		// AI编辑管理（确认/拒绝）
-		api.POST("/ai/edit/apply", aiEditHandler.ApplyEdit)
-		api.POST("/ai/edit/reject", aiEditHandler.RejectEdit)
+		// AI工具确认/拒绝（更新状态，实际文件操作由前端调用文件API）
+		api.POST("/api/ai/edit/apply", aiEditHandler.ApplyEdit)
+		api.POST("/api/ai/edit/reject", aiEditHandler.RejectEdit)
 	}
 
 	// WebSocket 路由（需要认证，未登录则重定向）

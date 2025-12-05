@@ -6,30 +6,16 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"time"
 )
 
 // ToolExecutor 统一的工具执行器
 type ToolExecutor struct {
-	editPreviews map[string]*EditPreview // 编辑预览池
+	// 不需要保存任何状态，所有确认逻辑由前端处理
 }
 
 // NewToolExecutor 创建工具执行器
 func NewToolExecutor() *ToolExecutor {
-	return &ToolExecutor{
-		editPreviews: make(map[string]*EditPreview),
-	}
-}
-
-// EditPreview 编辑预览
-type EditPreview struct {
-	PreviewID  string      `json:"preview_id"`
-	ServerID   string      `json:"server_id"`
-	FilePath   string      `json:"file_path"`
-	OldContent string      `json:"old_content"`
-	NewContent string      `json:"new_content"`
-	Operations []Operation `json:"operations"`
-	Timestamp  time.Time   `json:"timestamp"`
+	return &ToolExecutor{}
 }
 
 // Operation 编辑操作
@@ -108,27 +94,23 @@ func (te *ToolExecutor) readFile(args FileOperationArgs) (string, error) {
 	return string(resultJSON), nil
 }
 
-// writeFile 写入文件（创建或覆盖）
+// writeFile 写入文件（创建或覆盖） - 只返回预览信息，不执行写入
 func (te *ToolExecutor) writeFile(args FileOperationArgs) (string, error) {
-
-	// 确保目录存在
-	dir := filepath.Dir(args.FilePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return "", fmt.Errorf("创建目录失败: %v", err)
-	}
-
-	// 写入文件
-	if err := os.WriteFile(args.FilePath, []byte(args.Content), 0644); err != nil {
-		return "", fmt.Errorf("写入文件失败: %v", err)
+	// 检查文件是否已存在
+	fileExists := false
+	if _, err := os.Stat(args.FilePath); err == nil {
+		fileExists = true
 	}
 
 	result := map[string]interface{}{
-		"success":   true,
-		"type":      "write",
-		"server_id": args.ServerID,
-		"file_path": args.FilePath,
-		"size":      len(args.Content),
-		"message":   fmt.Sprintf("已创建/更新文件: %s", args.FilePath),
+		"success":     true,
+		"type":        "write",
+		"server_id":   args.ServerID,
+		"file_path":   args.FilePath,
+		"content":     args.Content,
+		"size":        len(args.Content),
+		"file_exists": fileExists,
+		"message":     fmt.Sprintf("准备创建文件: %s", args.FilePath),
 	}
 
 	resultJSON, _ := json.Marshal(result)
@@ -170,26 +152,16 @@ func (te *ToolExecutor) editFile(args FileOperationArgs) (string, error) {
 	// 5. 计算差异操作
 	operations := te.computeOperations(content, newContent, args.OldString, args.NewString)
 
-	// 6. 保存到预览池
-	previewID := generateID()
-	te.editPreviews[previewID] = &EditPreview{
-		PreviewID:  previewID,
-		ServerID:   args.ServerID,
-		FilePath:   args.FilePath,
-		OldContent: content,
-		NewContent: newContent,
-		Operations: operations,
-		Timestamp:  time.Now(),
-	}
-
-	// 7. 返回预览结果（不直接写文件）
+	// 6. 返回预览结果（前端负责显示和确认）
 	result := map[string]interface{}{
-		"success":    true,
-		"type":       "edit",
-		"preview_id": previewID,
-		"server_id":  args.ServerID,
-		"file_path":  args.FilePath,
-		"operations": operations,
+		"success":     true,
+		"type":        "edit",
+		"server_id":   args.ServerID,
+		"file_path":   args.FilePath,
+		"old_string":  args.OldString,
+		"new_string":  args.NewString,
+		"new_content": newContent, // 完整的新文件内容，供前端确认后写入
+		"operations":  operations,
 		"summary": fmt.Sprintf(
 			"准备编辑 %s: %d 行修改",
 			filepath.Base(args.FilePath),
@@ -271,27 +243,7 @@ func (te *ToolExecutor) computeOperations(oldContent, newContent, oldStr, newStr
 	return operations
 }
 
-// ApplyEdit 应用编辑（用户确认后调用）
-func (te *ToolExecutor) ApplyEdit(previewID string) error {
-	preview, exists := te.editPreviews[previewID]
-	if !exists {
-		return fmt.Errorf("预览不存在: %s", previewID)
-	}
-
-	// 写入新内容
-	if err := os.WriteFile(preview.FilePath, []byte(preview.NewContent), 0644); err != nil {
-		return fmt.Errorf("写入文件失败: %v", err)
-	}
-
-	// 清理预览
-	delete(te.editPreviews, previewID)
-	return nil
-}
-
-// RejectEdit 拒绝编辑
-func (te *ToolExecutor) RejectEdit(previewID string) {
-	delete(te.editPreviews, previewID)
-}
+// 前端确认后，直接调用文件API执行写入，不需要后端保存预览
 
 // GetToolsDefinition 获取工具定义（发送给AI）
 func GetToolsDefinition() []map[string]interface{} {

@@ -389,12 +389,19 @@ class AIToolsManager {
         const { server_id, file_path, operations, preview_id } = edit;
         
         try {
-            // 1. 打开文件（调用 editor.js 的函数）
-            if (window.openFile) {
-                await window.openFile(file_path, server_id);
+            // 1. 获取当前 sessionID
+            const sessionID = this.getCurrentSessionId();
+            if (!sessionID) {
+                this.showToast('无法获取当前会话ID', 'error');
+                return;
             }
             
-            // 2. 应用 diff decorations
+            // 2. 打开文件（调用 editor.js 的函数）
+            if (window.openFile) {
+                await window.openFile(file_path, server_id, sessionID);
+            }
+            
+            // 3. 应用 diff decorations
             this.applyDiffDecorations(file_path, operations, preview_id);
             
         } catch (error) {
@@ -577,20 +584,28 @@ class AIToolsManager {
         const edit = this.pendingEdits.get(previewId);
         if (edit && edit.editorInstance && edit.decorationIds) {
             edit.editorInstance.deltaDecorations(edit.decorationIds, []);
+            delete edit.decorationIds;
+            delete edit.editorInstance;
         }
     }
 
     /**
-     * 获取当前服务器ID
+     * 获取当前服务器 ID
      */
     getCurrentServerId() {
-        // 从全局状态获取当前服务器ID
-        // local 或远程服务器ID
-        if (window.currentSessionId === 'local') {
-            return 'local';
+        // 从全局状态或 filetree 模块获取
+        return window.state?.currentServer || '';
+    }
+
+    /**
+     * 获取当前会话 ID
+     */
+    getCurrentSessionId() {
+        // 从 filetree 模块获取当前会话ID
+        if (window.getCurrentSessionID) {
+            return window.getCurrentSessionID();
         }
-        const session = window.state?.terminals?.get(window.currentSessionId);
-        return session?.server?.id || null;
+        return null;
     }
 
     /**
