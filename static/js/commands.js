@@ -116,6 +116,13 @@ export function saveCommandToHistory(serverId, serverName, command) {
 export async function loadCommandHistory() {
     console.log('🔍 加载命令历史（统一时间线）');
     
+    // 清空搜索状态
+    searchKeyword = '';
+    const searchInput = document.getElementById('commandSearchInput');
+    if (searchInput) {
+        searchInput.value = '';
+    }
+    
     try {
         // 加载最近的命令（统一时间线）
         const data = await api.getRecentCommands(200); // 加载最近200条
@@ -244,25 +251,38 @@ window.clearAllCommands = async function() {
     }
 }
 
-// 搜索命令
-window.searchCommands = async function(keyword) {
-    searchKeyword = keyword.trim();
-    
-    if (searchKeyword) {
-        try {
-            // 调用搜索API
-            const data = await api.searchCommands(searchKeyword, 200);
-            if (data.success) {
-                allCommands = data.data || [];
-                renderCommandHistory();
-            }
-        } catch (error) {
-            console.error('搜索命令失败:', error);
-        }
-    } else {
-        // 清空搜索，重新加载全部
-        await loadCommandHistory();
+// 搜索防抖timer
+let searchDebounceTimer = null;
+
+// 搜索命令（带防抖）
+window.searchCommands = function(keyword) {
+    // 清除之前的定时器
+    if (searchDebounceTimer) {
+        clearTimeout(searchDebounceTimer);
     }
+    
+    // 300ms后执行搜索
+    searchDebounceTimer = setTimeout(async () => {
+        searchKeyword = keyword.trim();
+        
+        if (searchKeyword) {
+            try {
+                console.log('🔍 搜索命令:', searchKeyword);
+                // 调用搜索API
+                const data = await api.searchCommands(searchKeyword, 200);
+                if (data.success) {
+                    allCommands = data.data || [];
+                    renderCommandHistory();
+                }
+            } catch (error) {
+                console.error('搜索命令失败:', error);
+            }
+        } else {
+            // 清空搜索，重新加载全部
+            console.log('🔄 清空搜索，重新加载');
+            await loadCommandHistory();
+        }
+    }, 300);
 }
 
 // 筛选服务器
@@ -270,3 +290,29 @@ window.filterByServer = function(serverId) {
     currentFilter = serverId;
     renderCommandHistory();
 }
+
+// 刷新命令历史（带动画）
+window.refreshCommandHistory = async function() {
+    const btn = document.getElementById('refreshCommandsBtn');
+    const icon = btn?.querySelector('i');
+    
+    if (icon) {
+        icon.classList.add('fa-spin');
+    }
+    
+    try {
+        await loadCommandHistory();
+        showToast('刷新成功', 'success');
+    } catch (error) {
+        showToast('刷新失败', 'error');
+    } finally {
+        if (icon) {
+            setTimeout(() => {
+                icon.classList.remove('fa-spin');
+            }, 500);
+        }
+    }
+}
+
+// 暴露loadCommandHistory供main.js使用
+window.loadCommandHistory = loadCommandHistory;

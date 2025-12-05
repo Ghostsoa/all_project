@@ -273,12 +273,13 @@ class FileTreeCache {
     // 工具方法
     makeKey(sessionID, path) {
         const showHidden = this.showHiddenGetter ? this.showHiddenGetter() : false;
+        console.log('🔑 makeKey:', sessionID, path, 'showHidden=', showHidden);
         return `${sessionID}:${path}:${showHidden}`;
     }
     
     async fetchFiles(sessionID, path) {
         const showHidden = this.showHiddenGetter ? this.showHiddenGetter() : false;
-        console.log('📂 加载目录:', path, '显示隐藏文件:', showHidden);
+        console.log('📂 fetchFiles:', path, '显示隐藏文件:', showHidden);
         
         // 获取正确的API端点
         const apiEndpoint = this.apiEndpointGetter ? this.apiEndpointGetter('list') : '/api/files/list';

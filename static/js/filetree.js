@@ -27,7 +27,9 @@ export function getCurrentSessionID() {
 // 是否显示隐藏文件
 export let showHiddenFiles = false;
 export function setShowHiddenFiles(value) {
+    console.log('⚙️ setShowHiddenFiles:', value, '(旧值:', showHiddenFiles, ')');
     showHiddenFiles = value;
+    console.log('✅ showHiddenFiles已更新为:', showHiddenFiles);
 }
 
 // 防止重复初始化标志
