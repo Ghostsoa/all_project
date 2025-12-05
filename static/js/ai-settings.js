@@ -196,6 +196,11 @@ window.saveProvider = async function(event) {
         
         closeProviderForm();
         await loadProviders();
+        
+        // 刷新AI聊天页面的模型缓存
+        if (window.refreshModelCache) {
+            window.refreshModelCache();
+        }
     } catch (error) {
         alert('保存失败: ' + error.message);
     }
@@ -213,6 +218,11 @@ window.deleteProvider = async function(providerId) {
     try {
         await apiRequest(`/api/ai/provider/delete?id=${providerId}`, 'POST');
         await loadProviders();
+        
+        // 刷新AI聊天页面的模型缓存
+        if (window.refreshModelCache) {
+            window.refreshModelCache();
+        }
     } catch (error) {
         alert('删除失败: ' + error.message);
     }
@@ -284,9 +294,4 @@ function maskApiKey(key) {
     return key.substring(0, 8) + '...' + key.substring(key.length - 4);
 }
 
-// ========== 初始化 ==========
-
-document.addEventListener('DOMContentLoaded', () => {
-    // 默认加载供应商页面
-    switchTab('providers');
-});
+// 无需初始化，面板打开时自动加载

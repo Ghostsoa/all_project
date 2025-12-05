@@ -33,9 +33,8 @@ function hideAILoading() {
 
 // ========== 模型配置管理 ==========
 
-let tempSelectedModel = null;
-let originalModel = null;
 let allModels = []; // 缓存所有模型
+let modelsLoaded = false; // 模型是否已加载
 
 // 更新模型显示
 function updateModelDisplay() {
@@ -60,19 +59,14 @@ window.toggleModelSelector = async function() {
     
     if (isOpen) {
         popup.style.display = 'none';
-        resetTempSelection();
     } else {
-        // 记录原始选择
-        originalModel = currentSession?.model_id || null;
-        tempSelectedModel = originalModel;
-        
-        // 加载模型列表
-        await loadModelList();
-        
-        // 隐藏保存/取消按钮
-        const actionsEl = document.getElementById('popupActions');
-        if (actionsEl) actionsEl.style.display = 'none';
-        
+        // 如果还没加载过，先加载
+        if (!modelsLoaded) {
+            await loadModelList();
+        } else {
+            // 使用缓存，直接渲染
+            renderModelList(allModels);
+        }
         popup.style.display = 'block';
     }
 };
@@ -82,6 +76,7 @@ async function loadModelList() {
     try {
         const modelData = await apiRequest('/api/ai/models');
         allModels = modelData.data || [];
+        modelsLoaded = true;
         renderModelList(allModels);
     } catch (error) {
         console.error('加载模型列表失败:', error);
@@ -89,6 +84,13 @@ async function loadModelList() {
         if (container) container.innerHTML = '<div class="loading-small">加载失败</div>';
     }
 }
+
+// 刷新模型列表缓存（供应商编辑后调用）
+window.refreshModelCache = async function() {
+    console.log('🔄 刷新模型列表缓存...');
+    modelsLoaded = false;
+    await loadModelList();
+};
 
 // 渲染模型列表
 function renderModelList(models) {
@@ -100,93 +102,44 @@ function renderModelList(models) {
         return;
     }
     
+    const currentModelId = currentSession?.model_id;
+    
     container.innerHTML = models.map(model => `
-        <div class="model-option ${tempSelectedModel === model.id ? 'active' : ''}"
+        <div class="model-option ${currentModelId === model.id ? 'active' : ''}"
              onclick="selectTempModel('${model.id}')"
              data-model-id="${model.id}">
             <div class="model-info">
                 <div class="model-name">${escapeHtml(model.name || model.id)}</div>
             </div>
-            ${tempSelectedModel === model.id ? '<i class="fa-solid fa-check"></i>' : ''}
+            ${currentModelId === model.id ? '<i class="fa-solid fa-check"></i>' : ''}
         </div>
     `).join('');
 }
 
 // endpoint已移除，供应商信息自动关联到模型
 
-// 临时选择模型
-window.selectTempModel = function(modelId) {
-    tempSelectedModel = modelId;
-    
-    // 只更新UI高亮状态
-    const modelOptions = document.querySelectorAll('#modelList .model-option');
-    modelOptions.forEach(opt => {
-        const optModelId = opt.dataset.modelId;
-        const oldCheck = opt.querySelector('i.fa-check');
-        
-        if (optModelId === modelId) {
-            opt.classList.add('active');
-            if (!oldCheck) {
-                const icon = document.createElement('i');
-                icon.className = 'fa-solid fa-check';
-                opt.appendChild(icon);
-            }
-        } else {
-            opt.classList.remove('active');
-            if (oldCheck) oldCheck.remove();
-        }
-    });
-    
-    checkIfChanged();
-};
-
-
-// 检查是否有改动
-function checkIfChanged() {
-    const hasChanged = tempSelectedModel !== originalModel;
-    const actionsEl = document.getElementById('popupActions');
-    if (actionsEl) {
-        actionsEl.style.display = hasChanged ? 'flex' : 'none';
-    }
-}
-
-// 重置临时选择
-function resetTempSelection() {
-    tempSelectedModel = null;
-    originalModel = null;
-}
-
-// 取消配置修改
-window.cancelModelConfig = function() {
-    toggleModelSelector(); // 关闭弹窗
-};
-
-// 保存模型配置
-window.saveModelConfig = async function() {
+// 选择模型并立即切换
+window.selectTempModel = async function(modelId) {
     if (!currentSession) return;
-    if (!tempSelectedModel) {
-        alert('请选择模型');
-        return;
-    }
     
     try {
-        await apiRequest('/api/ai/session/update-model', {
-            method: 'POST',
-            body: JSON.stringify({
-                session_id: currentSession.id,
-                model_id: tempSelectedModel
-            })
+        // 立即更新会话模型
+        await apiRequest('/api/ai/session/update-model', 'POST', {
+            session_id: currentSession.id,
+            model_id: modelId
         });
         
-        // 重新加载会话信息
-        const data = await apiRequest(`/api/ai/session?id=${currentSession.id}`);
-        currentSession = data.data;
+        // 更新本地会话信息
+        currentSession.model_id = modelId;
+        
+        // 更新显示
         updateModelDisplay();
         
-        toggleModelSelector(); // 关闭弹窗
+        // 关闭弹窗
+        toggleModelSelector();
     } catch (error) {
-        console.error('保存配置失败:', error);
-        alert('保存配置失败: ' + error.message);
+        console.error('切换模型失败:', error);
+        alert('切换模型失败: ' + error.message);
     }
 };
 
@@ -199,6 +152,11 @@ export async function loadSessions() {
         const data = await apiRequest('/api/ai/sessions');
         sessions = data.data || [];
         renderSessionList();
+        
+        // 后台预加载模型列表（不阻塞）
+        if (!modelsLoaded) {
+            loadModelList().catch(err => console.error('预加载模型列表失败:', err));
+        }
         
         // 如果有会话，自动选择第一个
         if (sessions.length > 0 && !currentSession) {
