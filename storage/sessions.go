@@ -302,8 +302,8 @@ func UpdateMessageInSession(sessionID string, messageIndex int, newContent strin
 	return writeJSON(sessionFile, session)
 }
 
-// DeleteMessageFromSession 删除会话中的指定消息
-func DeleteMessageFromSession(sessionID string, messageIndex int) error {
+// RevokeMessagesFromIndex 撤销指定索引及之后的所有消息
+func RevokeMessagesFromIndex(sessionID string, messageIndex int) error {
 	sessionCacheLock.Lock()
 	defer sessionCacheLock.Unlock()
 
@@ -324,8 +324,8 @@ func DeleteMessageFromSession(sessionID string, messageIndex int) error {
 		return fmt.Errorf("消息索引超出范围")
 	}
 
-	// 删除消息
-	session.Messages = append(session.Messages[:messageIndex], session.Messages[messageIndex+1:]...)
+	// 撤销该消息及之后的所有消息
+	session.Messages = session.Messages[:messageIndex]
 	session.UpdatedAt = time.Now()
 
 	// 写入文件

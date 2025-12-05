@@ -472,8 +472,7 @@ function hideLoadingIndicator() {
 // 创建新会话
 window.createNewAISession = async function() {
     const defaultTitle = '新对话 - ' + new Date().toLocaleString();
-    const triggerBtn = document.querySelector('.history-trigger');
-    const title = await showAIPrompt('请输入对话标题:', '创建新对话', defaultTitle, triggerBtn, 'down');
+    const title = await showAIPrompt('请输入对话标题:', '创建新对话', defaultTitle);
     if (!title) return;
     
     try {
@@ -563,12 +562,9 @@ window.clearCurrentAIChat = async function() {
         return;
     }
     
-    const clearBtn = document.querySelector('.clear-chat-btn');
     const confirmed = await showAIConfirm(
         '确定要清空当前对话的所有消息吗？',
-        '清空对话',
-        clearBtn,
-        'up'
+        '清空对话'
     );
     if (!confirmed) return;
     
@@ -670,31 +666,6 @@ window.cancelEditMessage = function(messageId) {
     contentDiv.innerHTML = escapeHtml(originalContent).replace(/\n/g, '<br>');
 };
 
-/**
- * 确认撤回消息
- */
-window.confirmRevokeMessage = async function(messageId) {
-    const confirmed = await showAIConfirm(
-        '确定要撤回此消息及之后的所有消息吗？此操作不可恢复！',
-        '撤回消息'
-    );
-    if (confirmed) {
-        revokeMessageHandler(messageId);
-    }
-};
-
-/**
- * 撤回消息处理
- */
-async function revokeMessageHandler(messageId) {
-    try {
-        await revokeMessage(messageId);
-        // 重新加载消息
-        await loadMessages(currentSession.id);
-    } catch (error) {
-        showToast('撤回失败: ' + error.message, 'error');
-    }
-}
 
 // ========== 消息操作API ==========
 
@@ -1396,7 +1367,7 @@ function createMessageElement(role, content, reasoning = null, messageId = null)
     actionsDiv.className = 'message-actions';
     
     if (role === 'user') {
-        // 用户消息：复制、编辑、删除
+        // 用户消息：复制、编辑、撤销
         actionsDiv.innerHTML = `
             <span class="message-action-link" onclick="copyMessageContent(this)" title="复制">
                 <i class="fa-solid fa-copy"></i> 复制
@@ -1404,18 +1375,15 @@ function createMessageElement(role, content, reasoning = null, messageId = null)
             <span class="message-action-link" onclick="editMessage(this)" title="编辑">
                 <i class="fa-solid fa-edit"></i> 编辑
             </span>
-            <span class="message-action-link delete" onclick="deleteMessage(this)" title="删除">
-                <i class="fa-solid fa-trash"></i> 删除
+            <span class="message-action-link revoke" onclick="revokeMessage(this)" title="撤销此消息及之后的消息">
+                <i class="fa-solid fa-rotate-left"></i> 撤销
             </span>
         `;
     } else {
-        // AI消息：复制（不含思维链）、删除
+        // AI消息：只有复制（不含思维链）
         actionsDiv.innerHTML = `
             <span class="message-action-link" onclick="copyMessageContent(this)" title="复制回复">
                 <i class="fa-solid fa-copy"></i> 复制
-            </span>
-            <span class="message-action-link delete" onclick="deleteMessage(this)" title="删除">
-                <i class="fa-solid fa-trash"></i> 删除
             </span>
         `;
     }
@@ -1718,8 +1686,8 @@ function scrollToBottom(force = false) {
 
 // ========== 消息操作功能 ==========
 
-// 气泡式确认框（在触发元素附近弹出，类似右键菜单）
-function showAIConfirm(message, title = '确认操作', triggerElement = null, direction = 'up') {
+// 气泡式确认框（类似对话气泡，无遮罩）
+function showAIConfirm(message, title = '确认操作') {
     return new Promise((resolve) => {
         const aiPanel = document.getElementById('aiPanel');
         if (!aiPanel) {
@@ -1728,35 +1696,22 @@ function showAIConfirm(message, title = '确认操作', triggerElement = null, d
         }
         
         // 移除旧的气泡
-        const oldBubble = document.querySelector('.ai-bubble-popup');
+        const oldBubble = document.querySelector('.ai-bubble-confirm');
         if (oldBubble) oldBubble.remove();
         
         // 创建气泡确认框
         const bubble = document.createElement('div');
-        bubble.className = `ai-bubble-popup ai-bubble-${direction}`;
+        bubble.className = 'ai-bubble-confirm';
         bubble.innerHTML = `
-            <div class="ai-bubble-arrow"></div>
-            <div class="ai-bubble-content">
-                <div class="ai-bubble-title">${escapeHtml(title)}</div>
-                <div class="ai-bubble-message">${escapeHtml(message)}</div>
-                <div class="ai-bubble-buttons">
-                    <button class="ai-bubble-btn ai-bubble-btn-cancel">取消</button>
-                    <button class="ai-bubble-btn ai-bubble-btn-ok">确定</button>
-                </div>
+            <div class="ai-bubble-title">${escapeHtml(title)}</div>
+            <div class="ai-bubble-message">${escapeHtml(message)}</div>
+            <div class="ai-bubble-buttons">
+                <button class="ai-bubble-btn ai-bubble-btn-cancel">取消</button>
+                <button class="ai-bubble-btn ai-bubble-btn-ok">确定</button>
             </div>
         `;
         
         aiPanel.appendChild(bubble);
-        
-        // 定位气泡
-        if (triggerElement) {
-            positionBubble(bubble, triggerElement, direction);
-        } else {
-            // 默认居中
-            bubble.style.left = '50%';
-            bubble.style.top = '50%';
-            bubble.style.transform = 'translate(-50%, -50%)';
-        }
         
         // 淡入动画
         setTimeout(() => bubble.classList.add('show'), 10);
@@ -1778,7 +1733,7 @@ function showAIConfirm(message, title = '确认操作', triggerElement = null, d
         
         // 点击外部关闭
         const handleClickOutside = (e) => {
-            if (!bubble.contains(e.target) && e.target !== triggerElement) {
+            if (!bubble.contains(e.target)) {
                 closeBubble(false);
                 document.removeEventListener('click', handleClickOutside);
             }
@@ -1796,8 +1751,8 @@ function showAIConfirm(message, title = '确认操作', triggerElement = null, d
     });
 }
 
-// 气泡式输入框（在触发元素附近弹出）
-function showAIPrompt(message, title = '输入', defaultValue = '', triggerElement = null, direction = 'down') {
+// 气泡式输入框（类似对话气泡，无遮罩）
+function showAIPrompt(message, title = '输入', defaultValue = '') {
     return new Promise((resolve) => {
         const aiPanel = document.getElementById('aiPanel');
         if (!aiPanel) {
@@ -1806,37 +1761,25 @@ function showAIPrompt(message, title = '输入', defaultValue = '', triggerEleme
         }
         
         // 移除旧的气泡
-        const oldBubble = document.querySelector('.ai-bubble-popup');
+        const oldBubble = document.querySelector('.ai-bubble-confirm');
         if (oldBubble) oldBubble.remove();
         
         // 创建气泡输入框
         const bubble = document.createElement('div');
-        bubble.className = `ai-bubble-popup ai-bubble-${direction}`;
+        bubble.className = 'ai-bubble-confirm';
         bubble.innerHTML = `
-            <div class="ai-bubble-arrow"></div>
-            <div class="ai-bubble-content">
-                <div class="ai-bubble-title">${escapeHtml(title)}</div>
-                <div class="ai-bubble-message">${escapeHtml(message)}</div>
-                <input type="text" class="ai-bubble-input" value="${escapeHtml(defaultValue)}" placeholder="请输入...">
-                <div class="ai-bubble-buttons">
-                    <button class="ai-bubble-btn ai-bubble-btn-cancel">取消</button>
-                    <button class="ai-bubble-btn ai-bubble-btn-ok">确定</button>
-                </div>
+            <div class="ai-bubble-title">${escapeHtml(title)}</div>
+            <div class="ai-bubble-message">${escapeHtml(message)}</div>
+            <input type="text" class="ai-bubble-input" value="${escapeHtml(defaultValue)}" placeholder="请输入...">
+            <div class="ai-bubble-buttons">
+                <button class="ai-bubble-btn ai-bubble-btn-cancel">取消</button>
+                <button class="ai-bubble-btn ai-bubble-btn-ok">确定</button>
             </div>
         `;
         
         aiPanel.appendChild(bubble);
         
         const input = bubble.querySelector('.ai-bubble-input');
-        
-        // 定位气泡
-        if (triggerElement) {
-            positionBubble(bubble, triggerElement, direction);
-        } else {
-            bubble.style.left = '50%';
-            bubble.style.top = '50%';
-            bubble.style.transform = 'translate(-50%, -50%)';
-        }
         
         // 淡入动画并聚焦
         setTimeout(() => {
@@ -1883,32 +1826,6 @@ function showAIPrompt(message, title = '输入', defaultValue = '', triggerEleme
         };
         document.addEventListener('keydown', handleEsc);
     });
-}
-
-// 定位气泡（相对于触发元素）
-function positionBubble(bubble, triggerElement, direction) {
-    const aiPanel = document.getElementById('aiPanel');
-    const triggerRect = triggerElement.getBoundingClientRect();
-    const panelRect = aiPanel.getBoundingClientRect();
-    
-    // 计算相对于aiPanel的位置
-    const left = triggerRect.left - panelRect.left + triggerRect.width / 2;
-    
-    if (direction === 'up') {
-        // 向上弹出（在元素上方）
-        const top = triggerRect.top - panelRect.top;
-        bubble.style.left = left + 'px';
-        bubble.style.top = top + 'px';
-        bubble.style.transform = 'translate(-50%, -100%)';
-        bubble.style.marginTop = '-8px'; // 箭头间距
-    } else {
-        // 向下弹出（在元素下方）
-        const top = triggerRect.bottom - panelRect.top;
-        bubble.style.left = left + 'px';
-        bubble.style.top = top + 'px';
-        bubble.style.transform = 'translate(-50%, 0)';
-        bubble.style.marginTop = '8px'; // 箭头间距
-    }
 }
 
 // 复制消息内容（不含思维链）
@@ -2017,19 +1934,15 @@ window.editMessage = function(element) {
     }
 };
 
-// 删除消息（真正的删除）
-window.deleteMessage = async function(element) {
+// 撤销消息（撤销该消息及之后的所有消息）
+window.revokeMessage = async function(element) {
     const messageDiv = element.closest('.ai-message');
     if (!messageDiv) return;
     
-    const role = messageDiv.classList.contains('user') ? '用户' : 'AI';
-    
-    // 使用气泡确认框，在消息上方弹出
+    // 使用气泡式确认对话框
     const confirmed = await showAIConfirm(
-        `确定要删除这条${role}消息吗？`,
-        '删除消息',
-        messageDiv,
-        'up'
+        '确定要撤销此消息及之后的所有消息吗？此操作不可恢复！',
+        '撤销消息'
     );
     
     if (!confirmed) return;
@@ -2042,22 +1955,30 @@ window.deleteMessage = async function(element) {
             return;
         }
         
-        // 调用后端API
-        const data = await apiRequest('/api/ai/message/delete', 'POST', {
+        // 调用后端API撤销消息
+        const data = await apiRequest('/api/ai/message/revoke', 'POST', {
             session_id: currentSession.id,
             message_index: messageIndex
         });
         
         if (data.success) {
-            // 从DOM删除
-            messageDiv.remove();
-            showToast('已删除', 'success');
+            // 从DOM删除该消息及之后的所有消息
+            let nextSibling = messageDiv;
+            while (nextSibling) {
+                const toRemove = nextSibling;
+                nextSibling = nextSibling.nextElementSibling;
+                // 跳过欢迎信息
+                if (toRemove.classList.contains('ai-message')) {
+                    toRemove.remove();
+                }
+            }
+            showToast('已撤销', 'success');
         } else {
-            throw new Error(data.error || '删除失败');
+            throw new Error(data.error || '撤销失败');
         }
     } catch (error) {
-        console.error('删除消息失败:', error);
-        showToast('删除失败: ' + error.message, 'error');
+        console.error('撤销消息失败:', error);
+        showToast('撤销失败: ' + error.message, 'error');
     }
 };
 

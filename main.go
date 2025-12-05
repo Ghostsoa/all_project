@@ -178,9 +178,7 @@ func main() {
 		api.POST("/ai/session/update-model", aiSessionsHandler.UpdateSessionModel)
 		api.GET("/ai/messages", aiSessionsHandler.GetMessages)
 		api.POST("/ai/message/update", aiSessionsHandler.UpdateMessage)
-		api.POST("/ai/message/delete", aiSessionsHandler.DeleteMessage)
-		// api.POST("/ai/message/delete", aiHandler.DeleteMessage)
-		// api.POST("/ai/message/revoke", aiHandler.RevokeMessage)
+		api.POST("/ai/message/revoke", aiSessionsHandler.RevokeMessage)
 	}
 
 	// WebSocket 路由（需要认证，未登录则重定向）

@@ -248,7 +248,7 @@
     flex: 1;
     overflow-y: auto;
     overflow-x: hidden;
-    padding: 12px;
+    padding: 12px 12px 0 12px;
     background: rgba(0, 0, 0, 0.2);
 }
 
@@ -280,7 +280,7 @@
 /* 输入区域 */
 .ai-input-container {
     background: rgba(0, 0, 0, 0.2);
-    padding: 8px 8px;
+    padding: 0 8px 8px 8px;
 }
 
 .input-box {
@@ -1027,53 +1027,28 @@
     transform: scale(0.95);
 }
 
-/* 气泡弹窗（在触发元素附近弹出，类似右键菜单） */
-.ai-bubble-popup {
+/* 气泡式确认框（类似对话气泡，无遮罩） */
+.ai-bubble-confirm {
     position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
     background: linear-gradient(135deg, rgba(26, 26, 26, 0.98) 0%, rgba(35, 35, 35, 0.98) 100%);
     border: 1px solid rgba(255, 255, 255, 0.15);
-    border-radius: 10px;
-    min-width: 280px;
-    max-width: 360px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.7);
+    border-radius: 12px;
+    min-width: 320px;
+    max-width: 400px;
+    padding: 20px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.6);
     z-index: 2000;
     opacity: 0;
+    transform: translate(-50%, -50%) scale(0.9);
     transition: all 0.2s ease;
 }
 
-.ai-bubble-popup.show {
+.ai-bubble-confirm.show {
     opacity: 1;
-}
-
-/* 气泡箭头 */
-.ai-bubble-arrow {
-    position: absolute;
-    width: 0;
-    height: 0;
-    border-style: solid;
-}
-
-/* 向上弹出的箭头（在气泡底部） */
-.ai-bubble-up .ai-bubble-arrow {
-    bottom: -8px;
-    left: 50%;
-    transform: translateX(-50%);
-    border-width: 8px 8px 0 8px;
-    border-color: rgba(26, 26, 26, 0.98) transparent transparent transparent;
-}
-
-/* 向下弹出的箭头（在气泡顶部） */
-.ai-bubble-down .ai-bubble-arrow {
-    top: -8px;
-    left: 50%;
-    transform: translateX(-50%);
-    border-width: 0 8px 8px 8px;
-    border-color: transparent transparent rgba(26, 26, 26, 0.98) transparent;
-}
-
-/* 气泡内容区 */
-.ai-bubble-content {
-    padding: 16px;
+    transform: translate(-50%, -50%) scale(1);
 }
 
 .ai-bubble-title {
@@ -1176,6 +1151,14 @@
 
 .message-action-link.delete:hover {
     color: #ef4444;
+}
+
+.message-action-link.revoke {
+    color: rgba(251, 146, 60, 0.6);
+}
+
+.message-action-link.revoke:hover {
+    color: #fb923c;
 }
 
 .message-action-link i {
