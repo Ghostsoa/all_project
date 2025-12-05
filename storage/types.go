@@ -53,10 +53,13 @@ type ChatSession struct {
 
 // ChatMessage 对话消息
 type ChatMessage struct {
-	Role             string    `json:"role"` // user/assistant/system
-	Content          string    `json:"content"`
-	ReasoningContent string    `json:"reasoning_content,omitempty"` // o1模型的推理内容
-	Timestamp        time.Time `json:"timestamp"`
+	Role             string                   `json:"role"` // user/assistant/system/tool
+	Content          string                   `json:"content"`
+	ReasoningContent string                   `json:"reasoning_content,omitempty"` // o1模型的推理内容
+	ToolCalls        []map[string]interface{} `json:"tool_calls,omitempty"`        // 工具调用（assistant role）
+	ToolCallID       string                   `json:"tool_call_id,omitempty"`      // 工具调用ID（tool role）
+	ToolName         string                   `json:"tool_name,omitempty"`         // 工具名称（tool role）
+	Timestamp        time.Time                `json:"timestamp"`
 }
 
 // CommandHistory 命令历史（统一时间线）

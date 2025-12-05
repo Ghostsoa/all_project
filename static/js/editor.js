@@ -12,6 +12,17 @@ export function getEditorInstance(tabId) {
     return editorInstances.get(tabId);
 }
 
+// 通过文件路径获取编辑器实例
+export function getEditorByPath(filePath) {
+    const fileInfo = openFiles.get(filePath);
+    if (!fileInfo || !fileInfo.tabId) return null;
+    return editorInstances.get(fileInfo.tabId);
+}
+
+// 暴露到全局（供AI工具管理器使用）
+window.getEditorByPath = getEditorByPath;
+window.openFile = openFileEditor;
+
 // 获取文件图标HTML（用于标签页）
 function getFileIconHTML(fileName) {
     const ext = fileName.split('.').pop()?.toLowerCase();
@@ -220,6 +231,11 @@ export async function openFileEditor(filePath, serverID, sessionID, fileSize = 0
             await initializeMarkdownEditor(tabId, filePath, data.content);
         } else {
             initializeEditor(tabId, filePath, data.content);
+        }
+        
+        // 通知AI工具管理器（检查是否有pending edit）
+        if (window.aiToolsManager) {
+            window.aiToolsManager.onFileOpened(filePath, serverID);
         }
         
         // 显示成功状态

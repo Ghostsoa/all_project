@@ -176,11 +176,11 @@ class AIToolsManager {
     
     /**
      * 渲染执行中的工具调用
-     * @param {Object} toolCall - 工具调用信息
+     * @param {Object} toolData - {tool_call_id, name, arguments}
      * @returns {string} HTML
      */
-    renderExecutingTool(toolCall) {
-        const { name, arguments: args } = toolCall.function;
+    renderExecutingTool(toolData) {
+        const { name, arguments: args } = toolData;
         
         if (name !== 'file_operation') {
             return `

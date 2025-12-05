@@ -163,11 +163,19 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 				break
 			}
 
-			// 保存助手回复
+			// 保存助手回复（包含工具调用）
+			var toolCallsForSave []map[string]interface{}
+			for _, tc := range toolCalls {
+				if tcMap, ok := tc.(map[string]interface{}); ok {
+					toolCallsForSave = append(toolCallsForSave, tcMap)
+				}
+			}
+
 			assistantMsg := storage.ChatMessage{
 				Role:             "assistant",
 				Content:          assistantContent,
 				ReasoningContent: reasoningContent,
+				ToolCalls:        toolCallsForSave, // 保存工具调用
 				Timestamp:        time.Now(),
 			}
 			if err := storage.AddMessage(req.SessionID, assistantMsg); err != nil {
@@ -206,9 +214,18 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 				toolCallID := getString(tcMap, "id")
 				functionData := getMap(tcMap, "function")
 				functionName := getString(functionData, "name")
+				functionArgs := getString(functionData, "arguments")
+
+				// 发送工具调用通知（执行前）
+				ws.WriteJSON(map[string]interface{}{
+					"type":         "tool_call",
+					"tool_call_id": toolCallID,
+					"name":         functionName,
+					"arguments":    functionArgs,
+				})
 
 				// 执行工具
-				result := h.executeToolCall(functionName, getString(functionData, "arguments"))
+				result := h.executeToolCall(functionName, functionArgs)
 
 				// 如果是file_operation且类型为edit，解析结果并发送edit_preview
 				if functionName == "file_operation" {
@@ -229,7 +246,7 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 					}
 				}
 
-				// 添加工具结果到消息历史
+				// 添加工具结果到消息历史（API）
 				messages = append(messages, map[string]interface{}{
 					"role":         "tool",
 					"tool_call_id": toolCallID,
@@ -243,6 +260,18 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 					"name":         functionName,
 					"result":       result,
 				})
+
+				// 保存工具结果到数据库
+				toolMsg := storage.ChatMessage{
+					Role:       "tool",
+					Content:    result,
+					ToolCallID: toolCallID,
+					ToolName:   functionName,
+					Timestamp:  time.Now(),
+				}
+				if err := storage.AddMessage(req.SessionID, toolMsg); err != nil {
+					log.Println("保存工具消息失败:", err)
+				}
 			}
 
 			// 继续下一轮对话（带着工具结果）

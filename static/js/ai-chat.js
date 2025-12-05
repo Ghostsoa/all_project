@@ -335,9 +335,9 @@ async function loadMessages(sessionId) {
         // 清空欢迎信息
         messagesContainer.innerHTML = '';
         
-        // 渲染消息（传递索引作为messageId）
+        // 渲染消息（传递完整消息对象）
         messages.forEach((msg, index) => {
-            appendMessage(msg.role, msg.content, msg.reasoning_content, currentOffset + index);
+            appendMessage(msg.role, msg.content, msg.reasoning_content, currentOffset + index, msg);
         });
         
         // 滚动到底部（强制）
@@ -391,7 +391,7 @@ async function loadMoreMessages() {
         const baseIndex = totalMessages - currentOffset - messages.length;
         for (let i = messages.length - 1; i >= 0; i--) {
             const msg = messages[i];
-            prependMessage(msg.role, msg.content, msg.reasoning_content, baseIndex + i);
+            prependMessage(msg.role, msg.content, msg.reasoning_content, baseIndex + i, msg);
         }
         
         console.log(`📊 加载了 ${messages.length} 条消息, offset: ${currentOffset}, 还有更多: ${hasMoreMessages}`);
@@ -405,11 +405,11 @@ async function loadMoreMessages() {
 }
 
 // 在顶部插入消息
-function prependMessage(role, content, reasoningContent, messageId) {
+function prependMessage(role, content, reasoningContent, messageId, fullMessage = null) {
     const messagesContainer = document.getElementById('aiMessages');
     if (!messagesContainer) return;
     
-    const messageDiv = createMessageElement(role, content, reasoningContent, messageId);
+    const messageDiv = createMessageElement(role, content, reasoningContent, messageId, fullMessage);
     
     // 插入到最前面（跳过欢迎信息，插在第一条消息之前）
     const firstMessage = messagesContainer.querySelector('.ai-message');
@@ -1265,7 +1265,7 @@ async function streamChat(sessionId, message, thinkingId) {
                     
                 } else if (data.type === 'tool_call') {
                     // AI 调用工具
-                    console.log('🔧 工具调用:', data.tool_call);
+                    console.log('🔧 工具调用:', data);
                     
                     // 渲染执行中的工具
                     if (!messageElement) {
@@ -1275,7 +1275,7 @@ async function streamChat(sessionId, message, thinkingId) {
                         }
                     }
                     
-                    appendToolCall(messageElement, data.tool_call);
+                    appendToolCall(messageElement, data);
                     scrollToBottom();
                     
                 } else if (data.type === 'tool_result') {
@@ -1335,7 +1335,7 @@ function showChatArea() {
 }
 
 // 添加消息
-function appendMessage(role, content, reasoning = null, messageId = null) {
+function appendMessage(role, content, reasoning = null, messageId = null, fullMessage = null) {
     const messagesContainer = document.getElementById('aiMessages');
     if (!messagesContainer) return;
     
@@ -1345,16 +1345,31 @@ function appendMessage(role, content, reasoning = null, messageId = null) {
         welcome.remove();
     }
     
-    const messageDiv = createMessageElement(role, content, reasoning, messageId);
+    const messageDiv = createMessageElement(role, content, reasoning, messageId, fullMessage);
     messagesContainer.appendChild(messageDiv);
 }
 
 // 创建消息元素（只创建，不添加到容器）
-function createMessageElement(role, content, reasoning = null, messageId = null) {
+function createMessageElement(role, content, reasoning = null, messageId = null, fullMessage = null) {
     const messageDiv = document.createElement('div');
     messageDiv.className = `ai-message ${role}`;
     if (messageId) {
         messageDiv.dataset.messageId = messageId;
+    }
+    
+    // 处理 tool role（工具执行结果）
+    if (role === 'tool' && fullMessage) {
+        // 工具执行结果，渲染为工具横条
+        const resultObj = JSON.parse(content);
+        const toolHTML = window.aiToolsManager ? 
+            window.aiToolsManager.renderToolResult(resultObj, fullMessage.tool_name) :
+            `<div>Tool: ${fullMessage.tool_name}</div>`;
+        
+        messageDiv.innerHTML = `
+            <div class="message-avatar">🔧</div>
+            <div class="message-content">${toolHTML}</div>
+        `;
+        return messageDiv;
     }
     
     const avatar = document.createElement('div');
@@ -2112,25 +2127,27 @@ export async function initAIChat() {
 /**
  * 添加工具调用（执行中状态）
  * @param {HTMLElement} messageElement 
- * @param {Object} toolCall 
+ * @param {Object} toolData - {tool_call_id, name, arguments}
  */
-function appendToolCall(messageElement, toolCall) {
+function appendToolCall(messageElement, toolData) {
     const contentDiv = messageElement.querySelector('.message-content');
     if (!contentDiv) return;
     
     // 渲染执行中的工具
-    const toolHTML = aiToolsManager.renderExecutingTool(toolCall);
+    const toolHTML = aiToolsManager.renderExecutingTool(toolData);
     
-    // 添加到消息内容前面
+    // 添加到消息内容前面，并添加标记供后续更新
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = toolHTML;
-    contentDiv.insertBefore(tempDiv.firstChild, contentDiv.firstChild);
+    const toolElement = tempDiv.firstChild;
+    toolElement.setAttribute('data-tool-call-id', toolData.tool_call_id);
+    contentDiv.insertBefore(toolElement, contentDiv.firstChild);
 }
 
 /**
  * 更新工具结果
  * @param {HTMLElement} messageElement 
- * @param {Object} data 
+ * @param {Object} data - {tool_call_id, name, result}
  */
 function updateToolResult(messageElement, data) {
     const contentDiv = messageElement.querySelector('.message-content');
@@ -2146,23 +2163,18 @@ function updateToolResult(messageElement, data) {
         resultObj = { success: false, error: '解析结果失败' };
     }
     
-    // 查找对应的执行中工具元素，替换为结果
-    const toolCalls = contentDiv.querySelectorAll('.tool-call');
-    let replaced = false;
+    // 通过 tool_call_id 精确查找对应的工具元素
+    const toolElement = contentDiv.querySelector(`[data-tool-call-id="${tool_call_id}"]`);
     
-    toolCalls.forEach(toolCall => {
-        // 如果是执行中的工具（有spinner），替换为结果
-        if (toolCall.querySelector('.tool-spinner')) {
-            const toolResultHTML = aiToolsManager.renderToolResult(resultObj, toolName);
-            const tempDiv = document.createElement('div');
-            tempDiv.innerHTML = toolResultHTML;
-            toolCall.replaceWith(tempDiv.firstChild);
-            replaced = true;
-        }
-    });
-    
-    // 如果没有找到执行中的工具，直接添加结果
-    if (!replaced) {
+    if (toolElement) {
+        // 找到了对应的工具元素，替换为结果
+        const toolResultHTML = aiToolsManager.renderToolResult(resultObj, toolName);
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = toolResultHTML;
+        toolElement.replaceWith(tempDiv.firstChild);
+    } else {
+        // 没找到（理论上不应该发生），直接添加
+        console.warn('未找到对应的工具元素:', tool_call_id);
         const toolResultHTML = aiToolsManager.renderToolResult(resultObj, toolName);
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = toolResultHTML;
