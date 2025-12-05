@@ -1012,26 +1012,39 @@
     transform: scale(0.95);
 }
 
-/* 消息操作按钮 */
+/* 消息操作按钮（类似命令记录样式） */
 .message-actions {
-    display: flex;  /* 常驻显示 */
-    gap: 8px;
-    margin-top: 4px;
-    font-size: 13px;
+    display: flex;
+    gap: 12px;
+    margin-top: 6px;
+    margin-left: 4px;
+    font-size: 10px;
 }
 
-.message-action-btn {
-    background: none;
-    border: none;
-    color: rgba(255, 255, 255, 0.4);
-    padding: 0;
+.message-action-link {
+    color: rgba(255, 255, 255, 0.5);
     cursor: pointer;
-    transition: color 0.2s ease;
-    line-height: 1;
+    transition: all 0.2s;
+    user-select: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
 }
 
-.message-action-btn:hover {
-    color: rgba(255, 255, 255, 0.8);
+.message-action-link:hover {
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.message-action-link.delete {
+    color: rgba(239, 68, 68, 0.6);
+}
+
+.message-action-link.delete:hover {
+    color: #ef4444;
+}
+
+.message-action-link i {
+    font-size: 10px;
 }
 
 /* 消息编辑界面 */

@@ -16,7 +16,7 @@ let isGenerating = false; // 是否正在生成
 
 // 分页相关
 let currentOffset = 0;
-const PAGE_SIZE = 2; // 测试用：每页2条，正式环境改为20
+const PAGE_SIZE = 20; // 每页20条消息
 let isLoadingMore = false;
 let hasMoreMessages = true;
 let totalMessages = 0;
@@ -1358,16 +1358,36 @@ function createMessageElement(role, content, reasoning = null, messageId = null)
     messageDiv.appendChild(avatar);
     messageDiv.appendChild(contentWrapper);
     
-    // 为用户消息添加操作按钮（在气泡外下方）
-    if (role === 'user' && messageId) {
-        const actionsDiv = document.createElement('div');
-        actionsDiv.className = 'message-actions';
+    // 添加消息操作按钮（类似命令记录样式）
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'message-actions';
+    
+    if (role === 'user') {
+        // 用户消息：复制、编辑、删除
         actionsDiv.innerHTML = `
-            <button class="message-action-btn" onclick="startEditMessage(${messageId})" title="编辑">🖊</button>
-            <button class="message-action-btn" onclick="confirmRevokeMessage(${messageId})" title="撤回">⎌</button>
+            <span class="message-action-link" onclick="copyMessageContent(this)" title="复制">
+                <i class="fa-solid fa-copy"></i> 复制
+            </span>
+            <span class="message-action-link" onclick="editMessage(this)" title="编辑">
+                <i class="fa-solid fa-edit"></i> 编辑
+            </span>
+            <span class="message-action-link delete" onclick="deleteMessage(this)" title="删除">
+                <i class="fa-solid fa-trash"></i> 删除
+            </span>
         `;
-        messageDiv.appendChild(actionsDiv);
+    } else {
+        // AI消息：复制（不含思维链）、删除
+        actionsDiv.innerHTML = `
+            <span class="message-action-link" onclick="copyMessageContent(this)" title="复制回复">
+                <i class="fa-solid fa-copy"></i> 复制
+            </span>
+            <span class="message-action-link delete" onclick="deleteMessage(this)" title="删除">
+                <i class="fa-solid fa-trash"></i> 删除
+            </span>
+        `;
     }
+    
+    messageDiv.appendChild(actionsDiv);
     
     return messageDiv;
 }
@@ -1662,6 +1682,68 @@ function scrollToBottom(force = false) {
     }
     // 否则，用户正在查看历史消息，不打扰
 }
+
+// ========== 消息操作功能 ==========
+
+// 复制消息内容（不含思维链）
+window.copyMessageContent = function(element) {
+    const messageDiv = element.closest('.ai-message');
+    if (!messageDiv) return;
+    
+    // 只复制正文内容，不包含思维链
+    const contentDiv = messageDiv.querySelector('.message-content');
+    if (!contentDiv) return;
+    
+    const content = contentDiv.textContent || contentDiv.innerText;
+    
+    // 复制到剪贴板
+    navigator.clipboard.writeText(content).then(() => {
+        showToast('已复制到剪贴板', 'success');
+    }).catch(err => {
+        console.error('复制失败:', err);
+        showToast('复制失败', 'error');
+    });
+};
+
+// 编辑用户消息
+window.editMessage = function(element) {
+    const messageDiv = element.closest('.ai-message');
+    if (!messageDiv) return;
+    
+    const contentDiv = messageDiv.querySelector('.message-content');
+    if (!contentDiv) return;
+    
+    const currentContent = contentDiv.textContent || contentDiv.innerText;
+    const newContent = prompt('编辑消息:', currentContent);
+    
+    if (newContent && newContent !== currentContent) {
+        // TODO: 调用后端API更新消息
+        showToast('编辑功能开发中...', 'info');
+    }
+};
+
+// 删除消息
+window.deleteMessage = async function(element) {
+    const messageDiv = element.closest('.ai-message');
+    if (!messageDiv) return;
+    
+    const role = messageDiv.classList.contains('user') ? '用户' : 'AI';
+    if (!confirm(`确定要删除这条${role}消息吗？`)) {
+        return;
+    }
+    
+    try {
+        // 直接从DOM删除（前端操作）
+        messageDiv.remove();
+        showToast('已删除', 'success');
+        
+        // TODO: 调用后端API删除消息（如果需要持久化）
+        // 当前会话在内存中，刷新会重新加载
+    } catch (error) {
+        console.error('删除消息失败:', error);
+        showToast('删除失败', 'error');
+    }
+};
 
 // 格式化时间
 function formatTime(timeStr) {
