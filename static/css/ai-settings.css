@@ -494,6 +494,34 @@
     padding: 20px 30px;
 }
 
+.models-list {
+    margin-bottom: 12px;
+}
+
+.btn-add-model {
+    width: 100%;
+    padding: 10px 16px;
+    background: rgba(74, 144, 226, 0.1);
+    border: 1px dashed rgba(74, 144, 226, 0.3);
+    color: #4a90e2;
+    font-size: 14px;
+    font-weight: 500;
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+}
+
+.btn-add-model:hover {
+    background: rgba(74, 144, 226, 0.15);
+    border-style: solid;
+    border-color: rgba(74, 144, 226, 0.5);
+    transform: translateY(-1px);
+}
+
 .form-header {
     display: flex;
     align-items: center;
