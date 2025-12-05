@@ -1,6 +1,6 @@
 // 文件树缓存管理器 - Stale-While-Revalidate + 智能预加载
 import { showToast } from './utils.js';
-import { getShowHiddenFiles } from './filetree.js';
+import { getShowHiddenFiles } from './filetree-state.js';
 
 class FileTreeCache {
     constructor() {
@@ -10,15 +10,7 @@ class FileTreeCache {
         this.preloading = false; // 是否正在预加载
         this.currentPath = null; // 当前显示的路径
         this.renderCallback = null; // 渲染回调
-        this.showHiddenGetter = null; // 获取showHidden状态的函数
         this.apiEndpointGetter = null; // 获取API端点的函数
-    }
-    
-    // 设置获取showHidden状态的函数
-    setShowHiddenGetter(getter) {
-        console.log('⚙️ setShowHiddenGetter被调用, getter类型:', typeof getter);
-        this.showHiddenGetter = getter;
-        console.log('✅ showHiddenGetter已设置:', this.showHiddenGetter ? '成功' : '失败');
     }
     
     // 设置获取API端点的函数
@@ -275,14 +267,13 @@ class FileTreeCache {
     
     // 工具方法
     makeKey(sessionID, path) {
-        console.log('🔑 makeKey - 检查getter:', this.showHiddenGetter ? '存在' : '不存在');
-        const showHidden = this.showHiddenGetter ? this.showHiddenGetter() : false;
+        const showHidden = getShowHiddenFiles();
         console.log('🔑 makeKey:', sessionID, path, 'showHidden=', showHidden);
         return `${sessionID}:${path}:${showHidden}`;
     }
     
     async fetchFiles(sessionID, path) {
-        const showHidden = this.showHiddenGetter ? this.showHiddenGetter() : false;
+        const showHidden = getShowHiddenFiles();
         console.log('📂 fetchFiles:', path, '显示隐藏文件:', showHidden);
         
         // 获取正确的API端点

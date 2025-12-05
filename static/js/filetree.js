@@ -4,6 +4,7 @@ import { showToast } from './utils.js';
 import { openFileEditor } from './editor.js';
 import { fileCache } from './filecache.js';
 import { showConfirm } from './modal.js';
+import { getShowHiddenFiles, setShowHiddenFiles } from './filetree-state.js';
 
 let currentServerID = null;
 let currentSessionID = null; // 当前会话ID
@@ -22,19 +23,6 @@ export function getApiEndpoint(action) {
 // 获取当前sessionID（供其他模块使用）
 export function getCurrentSessionID() {
     return currentSessionID;
-}
-
-// 是否显示隐藏文件（使用内部变量）
-let _showHiddenFiles = false;
-
-export function getShowHiddenFiles() {
-    return _showHiddenFiles;
-}
-
-export function setShowHiddenFiles(value) {
-    console.log('⚙️ setShowHiddenFiles:', value, '(旧值:', _showHiddenFiles, ')');
-    _showHiddenFiles = value;
-    console.log('✅ showHiddenFiles已更新为:', _showHiddenFiles);
 }
 
 // 防止重复初始化标志
@@ -180,8 +168,7 @@ export async function setCurrentServer(serverID, sessionID) {
         headerContainer.appendChild(header);
     }
     
-    // 设置获取showHidden状态的函数和API端点函数
-    fileCache.setShowHiddenGetter(getShowHiddenFiles);
+    // 设置API端点函数
     fileCache.setApiEndpointGetter(getApiEndpoint);
     
     currentPath = '/root'; // 默认根目录
