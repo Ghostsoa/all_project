@@ -1,5 +1,5 @@
 // 服务器管理模块
-import { state } from './state.js';
+import { state } from './config.js';
 import { showToast } from './toast.js';
 import { api } from './api.js';
 import { escapeHtml } from './utils.js';

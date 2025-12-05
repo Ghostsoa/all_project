@@ -98,13 +98,55 @@
                 <div class="settings-panel-content">
                     <!-- 供应商管理 -->
                     <div id="providersTab" class="settings-tab-content">
-                        <div class="providers-header">
-                            <button class="btn-primary" onclick="openProviderForm()">
-                                <i class="fa-solid fa-plus"></i> 添加供应商
-                            </button>
+                        <!-- 供应商列表视图 -->
+                        <div id="providersListView">
+                            <div class="providers-header">
+                                <button class="btn-primary" onclick="openProviderForm()">
+                                    <i class="fa-solid fa-plus"></i> 添加供应商
+                                </button>
+                            </div>
+                            <div id="providersList" class="providers-list">
+                                <div class="loading">加载中...</div>
+                            </div>
                         </div>
-                        <div id="providersList" class="providers-list">
-                            <div class="loading">加载中...</div>
+
+                        <!-- 供应商表单视图 -->
+                        <div id="providerFormView" style="display: none;">
+                            <div class="form-header">
+                                <button class="btn-back" onclick="cancelProviderForm()">
+                                    <i class="fa-solid fa-arrow-left"></i> 返回
+                                </button>
+                                <h3 id="providerFormTitle">添加供应商</h3>
+                            </div>
+                            <form id="providerForm" class="provider-form" onsubmit="saveProvider(event); return false;">
+                                <div class="form-group">
+                                    <label>供应商ID *</label>
+                                    <input type="text" id="providerId" required placeholder="如: openai">
+                                </div>
+                                <div class="form-group">
+                                    <label>显示名称 *</label>
+                                    <input type="text" id="providerName" required placeholder="如: OpenAI">
+                                </div>
+                                <div class="form-group">
+                                    <label>Base URL *</label>
+                                    <input type="url" id="providerBaseUrl" required placeholder="https://api.openai.com/v1">
+                                </div>
+                                <div class="form-group">
+                                    <label>API Key *</label>
+                                    <input type="password" id="providerApiKey" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>模型列表 *</label>
+                                    <div id="providerModels"></div>
+                                    <button type="button" class="btn-secondary" onclick="addModelRow()">
+                                        <i class="fa-solid fa-plus"></i> 添加模型
+                                    </button>
+                                </div>
+                                <div class="form-actions">
+                                    <button type="button" class="btn-action" onclick="cancelProviderForm()">取消</button>
+                                    <button type="submit" class="btn-action primary">保存</button>
+                                </div>
+                            </form>
                         </div>
                     </div>
 
@@ -159,46 +201,6 @@
                 </div>
             </div>
 
-            <!-- 供应商表单弹窗 -->
-            <div id="providerFormModal" class="modal-overlay" style="display: none;">
-                <div class="modal-content">
-                    <div class="modal-header">
-                        <h3 id="providerFormTitle">添加供应商</h3>
-                        <button class="modal-close" onclick="closeProviderForm()">
-                            <i class="fa-solid fa-times"></i>
-                        </button>
-                    </div>
-                    <form id="providerForm" onsubmit="saveProvider(event); return false;">
-                        <div class="form-group">
-                            <label>供应商ID *</label>
-                            <input type="text" id="providerId" required placeholder="如: openai">
-                        </div>
-                        <div class="form-group">
-                            <label>显示名称 *</label>
-                            <input type="text" id="providerName" required placeholder="如: OpenAI">
-                        </div>
-                        <div class="form-group">
-                            <label>Base URL *</label>
-                            <input type="url" id="providerBaseUrl" required placeholder="https://api.openai.com/v1">
-                        </div>
-                        <div class="form-group">
-                            <label>API Key *</label>
-                            <input type="password" id="providerApiKey" required>
-                        </div>
-                        <div class="form-group">
-                            <label>模型列表 *</label>
-                            <div id="providerModels"></div>
-                            <button type="button" class="btn-secondary" onclick="addModelRow()">
-                                <i class="fa-solid fa-plus"></i> 添加模型
-                            </button>
-                        </div>
-                        <div class="form-actions">
-                            <button type="button" class="btn-secondary" onclick="closeProviderForm()">取消</button>
-                            <button type="submit" class="btn-primary">保存</button>
-                        </div>
-                    </form>
-                </div>
-            </div>
 
             <!-- 空状态提示 -->
             <div class="no-selection" id="noSelection">

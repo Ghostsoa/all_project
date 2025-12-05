@@ -95,7 +95,6 @@ async function loadProviders() {
 
 // 打开供应商表单
 window.openProviderForm = function(providerId = null) {
-    const formContainer = document.getElementById('providerFormModal');
     const form = document.getElementById('providerForm');
     
     form.dataset.providerId = providerId || '';
@@ -125,13 +124,19 @@ window.openProviderForm = function(providerId = null) {
         addModelRow(); // 添加一个空行
     }
     
-    formContainer.style.display = 'flex';
+    // 切换视图：隐藏列表，显示表单
+    document.getElementById('providersListView').style.display = 'none';
+    document.getElementById('providerFormView').style.display = 'block';
 };
 
-// 关闭供应商表单
-window.closeProviderForm = function() {
-    document.getElementById('providerFormModal').style.display = 'none';
+// 取消供应商表单（返回列表）
+window.cancelProviderForm = function() {
+    document.getElementById('providersListView').style.display = 'block';
+    document.getElementById('providerFormView').style.display = 'none';
 };
+
+// 兼容旧代码
+window.closeProviderForm = window.cancelProviderForm;
 
 // 添加模型输入行
 window.addModelRow = function(modelId = '', modelName = '') {
@@ -195,8 +200,10 @@ window.saveProvider = async function(event) {
             await apiRequest('/api/ai/provider/create', 'POST', data);
         }
         
-        closeProviderForm();
+        // 保存成功，返回列表
+        cancelProviderForm();
         await loadProviders();
+        showToast('保存成功', 'success');
         
         // 刷新AI聊天页面的模型缓存
         if (window.refreshModelCache) {
