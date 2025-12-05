@@ -1,12 +1,11 @@
 package handlers
 
 import (
-	"all_project/models"
+	"all_project/storage"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
-	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -25,27 +24,24 @@ var upgrader = websocket.Upgrader{
 }
 
 // WebSocketHandler WebSocket处理器
-type WebSocketHandler struct {
-	repo *models.ServerRepository
-}
+type WebSocketHandler struct{}
 
 // NewWebSocketHandler 创建WebSocket处理器
-func NewWebSocketHandler(repo *models.ServerRepository) *WebSocketHandler {
-	return &WebSocketHandler{repo: repo}
+func NewWebSocketHandler() *WebSocketHandler {
+	return &WebSocketHandler{}
 }
 
 // GinHandleWebSocket 处理 WebSocket 连接 (Gin版本)
 func (h *WebSocketHandler) GinHandleWebSocket(c *gin.Context) {
 	// 获取服务器ID
-	idStr := c.Query("server_id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		c.JSON(400, gin.H{"error": "无效的服务器ID"})
+	serverID := c.Query("server_id")
+	if serverID == "" {
+		c.JSON(400, gin.H{"error": "缺少服务器ID"})
 		return
 	}
 
-	// 从数据库获取服务器配置
-	server, err := h.repo.GetByID(uint(id))
+	// 从storage获取服务器配置
+	server, err := storage.GetServer(serverID)
 	if err != nil {
 		c.JSON(404, gin.H{"error": "服务器不存在"})
 		return
@@ -193,7 +189,7 @@ func (h *WebSocketHandler) GinHandleWebSocket(c *gin.Context) {
 }
 
 // connectSSH 连接 SSH 服务器
-func connectSSH(server *models.Server) (*ssh.Client, error) {
+func connectSSH(server *storage.Server) (*ssh.Client, error) {
 	config := &ssh.ClientConfig{
 		User: server.Username,
 		Auth: []ssh.AuthMethod{

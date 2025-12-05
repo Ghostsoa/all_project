@@ -1,175 +1,123 @@
 package handlers
 
 import (
-	"all_project/models"
+	"all_project/storage"
+	"crypto/rand"
+	"encoding/hex"
 	"net/http"
-	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
-type ServerHandler struct {
-	repo *models.ServerRepository
+type ServerHandler struct{}
+
+func NewServerHandler() *ServerHandler {
+	return &ServerHandler{}
 }
 
-func NewServerHandler(repo *models.ServerRepository) *ServerHandler {
-	return &ServerHandler{repo: repo}
-}
-
-// GinGetServers 获取所有服务器列表
+// GinGetServers 获取所有服务器
 func (h *ServerHandler) GinGetServers(c *gin.Context) {
-	servers, err := h.repo.GetAll()
+	servers, err := storage.GetServers()
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "获取服务器列表失败",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    servers,
-		"count":   len(servers),
-	})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": servers})
 }
 
-// GinGetServer 获取单个服务器详情
+// GinGetServer 获取单个服务器
 func (h *ServerHandler) GinGetServer(c *gin.Context) {
-	idStr := c.Query("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "无效的服务器ID",
-		})
+	id := c.Query("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "缺少id参数"})
 		return
 	}
 
-	server, err := h.repo.GetByID(uint(id))
+	server, err := storage.GetServer(id)
 	if err != nil {
-		c.JSON(http.StatusNotFound, gin.H{
-			"success": false,
-			"error":   "服务器不存在",
-		})
+		c.JSON(http.StatusNotFound, gin.H{"success": false, "error": err.Error()})
 		return
 	}
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    server,
-	})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": server})
 }
 
-// GinCreateServer 创建服务器配置
+// GinCreateServer 创建服务器
 func (h *ServerHandler) GinCreateServer(c *gin.Context) {
-	var server models.Server
+	var server storage.Server
 	if err := c.ShouldBindJSON(&server); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "无效的请求数据",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "参数错误: " + err.Error()})
 		return
 	}
 
-	// 设置默认值
-	if server.Port == 0 {
-		server.Port = 22
-	}
-	if server.AuthType == "" {
-		server.AuthType = "password"
-	}
+	// 生成随机ID
+	server.ID = generateID()
 
-	if err := h.repo.Create(&server); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "创建服务器失败",
-		})
+	if err := storage.CreateServer(&server); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 
-	// 清除敏感信息
-	server.Password = ""
-	server.PrivateKey = ""
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "服务器创建成功",
-		"data":    server,
-	})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": server})
 }
 
-// GinUpdateServer 更新服务器配置
+// GinUpdateServer 更新服务器
 func (h *ServerHandler) GinUpdateServer(c *gin.Context) {
-	var server models.Server
+	var server storage.Server
 	if err := c.ShouldBindJSON(&server); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "无效的请求数据",
-		})
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "参数错误: " + err.Error()})
 		return
 	}
 
-	if err := h.repo.Update(&server); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "更新服务器失败",
-		})
+	if server.ID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "缺少id"})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "服务器更新成功",
-	})
+	if err := storage.UpdateServer(&server); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": server})
 }
 
 // GinDeleteServer 删除服务器
 func (h *ServerHandler) GinDeleteServer(c *gin.Context) {
-	idStr := c.Query("id")
-	id, err := strconv.ParseUint(idStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "无效的服务器ID",
-		})
+	id := c.Query("id")
+	if id == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "缺少id参数"})
 		return
 	}
 
-	if err := h.repo.Delete(uint(id)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "删除服务器失败",
-		})
+	if err := storage.DeleteServer(id); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "服务器删除成功",
-	})
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "删除成功"})
 }
 
 // GinSearchServers 搜索服务器
 func (h *ServerHandler) GinSearchServers(c *gin.Context) {
-	keyword := c.Query("q")
-	if keyword == "" {
-		h.GinGetServers(c)
-		return
-	}
+	keyword := c.Query("keyword")
 
-	servers, err := h.repo.Search(keyword)
+	servers, err := storage.SearchServers(keyword)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "搜索失败",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    servers,
-		"count":   len(servers),
-	})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": servers})
+}
+
+// GetServerByID 根据ID获取服务器（内部使用）
+func (h *ServerHandler) GetServerByID(id string) (*storage.Server, error) {
+	return storage.GetServer(id)
+}
+
+// generateID 生成随机ID
+func generateID() string {
+	b := make([]byte, 16)
+	rand.Read(b)
+	return hex.EncodeToString(b)
 }

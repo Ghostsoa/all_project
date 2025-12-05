@@ -34,18 +34,18 @@ function hideAILoading() {
 // ========== 模型配置管理 ==========
 
 let tempSelectedModel = null;
-let tempSelectedEndpoint = null;
 let originalModel = null;
-let originalEndpoint = null;
+let allModels = []; // 缓存所有模型
 
 // 更新模型显示
 function updateModelDisplay() {
     const modelEl = document.getElementById('selectedModel');
     if (!modelEl) return;
     
-    if (currentSession?.config?.ai_model) {
-        const model = currentSession.config.ai_model;
-        modelEl.textContent = model.display_name || model.name || '未知模型';
+    if (currentSession?.model_id) {
+        // 根据model_id查找模型信息
+        const model = allModels.find(m => m.id === currentSession.model_id);
+        modelEl.textContent = model ? (model.name || model.id) : currentSession.model_id;
     } else {
         modelEl.textContent = '选择模型';
     }
@@ -62,42 +62,31 @@ window.toggleModelSelector = async function() {
         popup.style.display = 'none';
         resetTempSelection();
     } else {
-        // 记录原始选择 - 从当前会话的config中读取
-        originalModel = currentSession?.config?.ai_model?.ID || null;
-        originalEndpoint = currentSession?.config?.ai_endpoint?.ID || null;
+        // 记录原始选择
+        originalModel = currentSession?.model_id || null;
         tempSelectedModel = originalModel;
-        tempSelectedEndpoint = originalEndpoint;
         
-        // 加载模型和接口列表（只加载一次）
-        await loadModelAndEndpointLists();
+        // 加载模型列表
+        await loadModelList();
         
         // 隐藏保存/取消按钮
-        document.getElementById('popupActions').style.display = 'none';
+        const actionsEl = document.getElementById('popupActions');
+        if (actionsEl) actionsEl.style.display = 'none';
         
         popup.style.display = 'block';
     }
 };
 
-// 加载模型和接口列表
-async function loadModelAndEndpointLists() {
-    // 加载模型列表
+// 加载模型列表
+async function loadModelList() {
     try {
         const modelData = await apiRequest('/api/ai/models');
-        const models = modelData.data || [];
-        renderModelList(models);
+        allModels = modelData.data || [];
+        renderModelList(allModels);
     } catch (error) {
         console.error('加载模型列表失败:', error);
-        document.getElementById('modelList').innerHTML = '<div class="loading-small">加载失败</div>';
-    }
-    
-    // 加载接口列表
-    try {
-        const endpointData = await apiRequest('/api/ai/endpoints');
-        const endpoints = endpointData.data || [];
-        renderEndpointList(endpoints);
-    } catch (error) {
-        console.error('加载接口列表失败:', error);
-        document.getElementById('endpointList').innerHTML = '<div class="loading-small">加载失败</div>';
+        const container = document.getElementById('modelList');
+        if (container) container.innerHTML = '<div class="loading-small">加载失败</div>';
     }
 }
 
@@ -112,39 +101,18 @@ function renderModelList(models) {
     }
     
     container.innerHTML = models.map(model => `
-        <div class="model-option ${tempSelectedModel === model.ID ? 'active' : ''}"
-             onclick="selectTempModel(${model.ID})"
-             data-model-id="${model.ID}">
+        <div class="model-option ${tempSelectedModel === model.id ? 'active' : ''}"
+             onclick="selectTempModel('${model.id}')"
+             data-model-id="${model.id}">
             <div class="model-info">
-                <div class="model-name">${escapeHtml(model.display_name || model.name)}</div>
+                <div class="model-name">${escapeHtml(model.name || model.id)}</div>
             </div>
-            ${tempSelectedModel === model.ID ? '<i class="fa-solid fa-check"></i>' : ''}
+            ${tempSelectedModel === model.id ? '<i class="fa-solid fa-check"></i>' : ''}
         </div>
     `).join('');
 }
 
-// 渲染接口列表
-function renderEndpointList(endpoints) {
-    const container = document.getElementById('endpointList');
-    if (!container) return;
-    
-    if (endpoints.length === 0) {
-        container.innerHTML = '<div class="loading-small">暂无接口</div>';
-        return;
-    }
-    
-    container.innerHTML = endpoints.map(endpoint => `
-        <div class="model-option ${tempSelectedEndpoint === endpoint.ID ? 'active' : ''}"
-             onclick="selectTempEndpoint(${endpoint.ID})"
-             data-endpoint-id="${endpoint.ID}">
-            <div class="model-info">
-                <div class="model-name">${escapeHtml(endpoint.name)}</div>
-                <div class="model-endpoint">${escapeHtml(endpoint.base_url || '')}</div>
-            </div>
-            ${tempSelectedEndpoint === endpoint.ID ? '<i class="fa-solid fa-check"></i>' : ''}
-        </div>
-    `).join('');
-}
+// endpoint已移除，供应商信息自动关联到模型
 
 // 临时选择模型
 window.selectTempModel = function(modelId) {
@@ -153,7 +121,7 @@ window.selectTempModel = function(modelId) {
     // 只更新UI高亮状态
     const modelOptions = document.querySelectorAll('#modelList .model-option');
     modelOptions.forEach(opt => {
-        const optModelId = parseInt(opt.dataset.modelId);
+        const optModelId = opt.dataset.modelId;
         const oldCheck = opt.querySelector('i.fa-check');
         
         if (optModelId === modelId) {
@@ -172,35 +140,10 @@ window.selectTempModel = function(modelId) {
     checkIfChanged();
 };
 
-// 临时选择接口
-window.selectTempEndpoint = function(endpointId) {
-    tempSelectedEndpoint = endpointId;
-    
-    // 只更新UI高亮状态
-    const endpointOptions = document.querySelectorAll('#endpointList .model-option');
-    endpointOptions.forEach(opt => {
-        const optEndpointId = parseInt(opt.dataset.endpointId);
-        const oldCheck = opt.querySelector('i.fa-check');
-        
-        if (optEndpointId === endpointId) {
-            opt.classList.add('active');
-            if (!oldCheck) {
-                const icon = document.createElement('i');
-                icon.className = 'fa-solid fa-check';
-                opt.appendChild(icon);
-            }
-        } else {
-            opt.classList.remove('active');
-            if (oldCheck) oldCheck.remove();
-        }
-    });
-    
-    checkIfChanged();
-};
 
 // 检查是否有改动
 function checkIfChanged() {
-    const hasChanged = tempSelectedModel !== originalModel || tempSelectedEndpoint !== originalEndpoint;
+    const hasChanged = tempSelectedModel !== originalModel;
     const actionsEl = document.getElementById('popupActions');
     if (actionsEl) {
         actionsEl.style.display = hasChanged ? 'flex' : 'none';
@@ -210,9 +153,7 @@ function checkIfChanged() {
 // 重置临时选择
 function resetTempSelection() {
     tempSelectedModel = null;
-    tempSelectedEndpoint = null;
     originalModel = null;
-    originalEndpoint = null;
 }
 
 // 取消配置修改
@@ -223,23 +164,22 @@ window.cancelModelConfig = function() {
 // 保存模型配置
 window.saveModelConfig = async function() {
     if (!currentSession) return;
-    if (!tempSelectedModel || !tempSelectedEndpoint) {
-        alert('请同时选择模型和API接口');
+    if (!tempSelectedModel) {
+        alert('请选择模型');
         return;
     }
     
     try {
-        await apiRequest('/api/ai/session/update-config', {
+        await apiRequest('/api/ai/session/update-model', {
             method: 'POST',
             body: JSON.stringify({
-                session_id: currentSession.ID,
-                ai_model_id: tempSelectedModel,
-                ai_endpoint_id: tempSelectedEndpoint
+                session_id: currentSession.id,
+                model_id: tempSelectedModel
             })
         });
         
         // 重新加载会话信息
-        const data = await apiRequest(`/api/ai/session?id=${currentSession.ID}`);
+        const data = await apiRequest(`/api/ai/session?id=${currentSession.id}`);
         currentSession = data.data;
         updateModelDisplay();
         
@@ -262,7 +202,7 @@ export async function loadSessions() {
         
         // 如果有会话，自动选择第一个
         if (sessions.length > 0 && !currentSession) {
-            await selectAISession(sessions[0].ID);
+            await selectAISession(sessions[0].id);
         } else {
             hideAILoading();
         }
@@ -324,15 +264,15 @@ function renderSessionList() {
         </div>
         <div class="history-divider"></div>
     ` + sessions.map(session => `
-        <div class="history-item ${currentSession?.ID === session.ID ? 'active' : ''}" 
+        <div class="history-item ${currentSession?.id === session.id ? 'active' : ''}" 
              data-action="select-session"
-             data-session-id="${session.ID}">
+             data-session-id="${session.id}">
             <div class="history-item-title">${escapeHtml(session.title)}</div>
             <div class="history-item-meta">
-                <span>${formatTime(session.last_active_at)}</span>
-                ${session.config?.ai_model ? `<span class="model-tag">${escapeHtml(session.config.ai_model.display_name || session.config.ai_model.name)}</span>` : ''}
+                <span>${formatTime(session.updated_at)}</span>
+                ${session.model_id ? `<span class="model-tag">${escapeHtml(session.model_id)}</span>` : ''}
             </div>
-            <button class="history-item-delete" data-action="delete-session" data-session-id="${session.ID}" title="删除">
+            <button class="history-item-delete" data-action="delete-session" data-session-id="${session.id}" title="删除">
                 <i class="fa-solid fa-trash"></i>
             </button>
         </div>
@@ -350,11 +290,11 @@ function renderSessionList() {
             createNewAISession();
             toggleHistoryDropdown();
         } else if (action === 'select-session' && sessionId) {
-            selectAISession(parseInt(sessionId));
+            selectAISession(sessionId);
             toggleHistoryDropdown();
         } else if (action === 'delete-session' && sessionId) {
             e.stopPropagation();
-            deleteAISession(parseInt(sessionId));
+            deleteAISession(sessionId);
         }
     };
 }
@@ -455,7 +395,7 @@ window.deleteAISession = async function(sessionId) {
         await apiRequest(`/api/ai/session/delete?id=${sessionId}`, 'POST');
         
         // 如果删除的是当前会话，清空当前会话
-        if (currentSession?.ID === sessionId || currentSession?.id === sessionId) {
+        if (currentSession?.id === sessionId) {
             currentSession = null;
             const messagesContainer = document.getElementById('aiMessages');
             if (messagesContainer) {
@@ -487,7 +427,7 @@ window.clearCurrentAIChat = async function() {
     if (!confirm('确定要清空当前对话的所有消息吗？')) return;
     
     try {
-        await apiRequest(`/api/ai/session/clear?id=${currentSession.ID}`, 'POST');
+        await apiRequest(`/api/ai/session/clear?id=${currentSession.id}`, 'POST');
         
         // 清空消息显示
         const messagesContainer = document.getElementById('aiMessages');
@@ -562,7 +502,7 @@ window.saveEditedMessage = async function(messageId) {
         // 更新显示
         contentDiv.innerHTML = escapeHtml(newContent).replace(/\n/g, '<br>');
         // 重新加载消息以更新历史
-        await loadMessages(currentSession.ID);
+        await loadMessages(currentSession.id);
     } catch (error) {
         alert('编辑失败: ' + error.message);
         // 恢复原始内容
@@ -601,7 +541,7 @@ async function revokeMessageHandler(messageId) {
     try {
         await revokeMessage(messageId);
         // 重新加载消息
-        await loadMessages(currentSession.ID);
+        await loadMessages(currentSession.id);
     } catch (error) {
         alert('撤回失败: ' + error.message);
     }

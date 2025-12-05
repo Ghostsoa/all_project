@@ -1,147 +1,85 @@
 package handlers
 
 import (
-	"all_project/models"
+	"all_project/storage"
 	"net/http"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
 )
 
-type CommandHandler struct {
-	repo *models.CommandHistoryRepository
+type CommandHandler struct{}
+
+func NewCommandHandler() *CommandHandler {
+	return &CommandHandler{}
 }
 
-func NewCommandHandler(repo *models.CommandHistoryRepository) *CommandHandler {
-	return &CommandHandler{repo: repo}
-}
-
-// GinSaveCommand 保存命令记录
+// GinSaveCommand 保存命令历史
 func (h *CommandHandler) GinSaveCommand(c *gin.Context) {
-	var history models.CommandHistory
-	if err := c.ShouldBindJSON(&history); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "无效的请求数据",
-		})
+	var req struct {
+		ServerID string `json:"server_id"`
+		Command  string `json:"command"`
+	}
+
+	if err := c.ShouldBindJSON(&req); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "参数错误"})
 		return
 	}
 
-	// 1. 先保存到数据库
-	if err := h.repo.Create(&history); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "保存命令失败",
-		})
+	if err := storage.SaveCommand(req.ServerID, req.Command); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 
-	// 2. 更新内存缓存
-	GetCommandCache().Add(history.ServerID, &history)
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "命令保存成功",
-	})
+	c.JSON(http.StatusOK, gin.H{"success": true})
 }
 
 // GinGetServerCommands 获取指定服务器的命令历史
 func (h *CommandHandler) GinGetServerCommands(c *gin.Context) {
-	serverIDStr := c.Query("server_id")
-	serverID, err := strconv.ParseUint(serverIDStr, 10, 32)
+	serverID := c.Query("server_id")
+	if serverID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "缺少server_id参数"})
+		return
+	}
+
+	limitStr := c.DefaultQuery("limit", "100")
+	limit, _ := strconv.Atoi(limitStr)
+
+	commands, err := storage.GetCommandsByServer(serverID, limit)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "无效的服务器ID",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 
-	limitStr := c.Query("limit")
-	limit := 100
-	if limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil {
-			limit = l
-		}
-	}
-
-	// 1. 先从缓存读取
-	if cached, ok := GetCommandCache().Get(uint(serverID)); ok {
-		c.JSON(http.StatusOK, gin.H{
-			"success": true,
-			"data":    cached,
-		})
-		return
-	}
-
-	// 2. 缓存miss，从数据库读取
-	histories, err := h.repo.GetByServerID(uint(serverID), limit)
-	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "获取命令历史失败",
-		})
-		return
-	}
-
-	// 3. 更新缓存
-	GetCommandCache().Set(uint(serverID), histories)
-
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    histories,
-		"count":   len(histories),
-	})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": commands})
 }
 
 // GinGetRecentCommands 获取最近的命令
 func (h *CommandHandler) GinGetRecentCommands(c *gin.Context) {
-	limitStr := c.Query("limit")
-	limit := 50
-	if limitStr != "" {
-		if l, err := strconv.Atoi(limitStr); err == nil {
-			limit = l
-		}
-	}
+	limitStr := c.DefaultQuery("limit", "50")
+	limit, _ := strconv.Atoi(limitStr)
 
-	histories, err := h.repo.GetRecent(limit)
+	commands, err := storage.GetRecentCommands(limit)
 	if err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "获取最近命令失败",
-		})
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"data":    histories,
-		"count":   len(histories),
-	})
+	c.JSON(http.StatusOK, gin.H{"success": true, "data": commands})
 }
 
-// GinClearServerCommands 清除指定服务器的命令历史
+// GinClearServerCommands 清空指定服务器的命令历史
 func (h *CommandHandler) GinClearServerCommands(c *gin.Context) {
-	serverIDStr := c.Query("server_id")
-	serverID, err := strconv.ParseUint(serverIDStr, 10, 32)
-	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "无效的服务器ID",
-		})
+	serverID := c.Query("server_id")
+	if serverID == "" {
+		c.JSON(http.StatusBadRequest, gin.H{"success": false, "error": "缺少server_id参数"})
 		return
 	}
 
-	if err := h.repo.DeleteByServerID(uint(serverID)); err != nil {
-		c.JSON(http.StatusInternalServerError, gin.H{
-			"success": false,
-			"error":   "清除命令历史失败",
-		})
+	if err := storage.ClearCommandsByServer(serverID); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "命令历史已清除",
-	})
+	c.JSON(http.StatusOK, gin.H{"success": true, "message": "清空成功"})
 }

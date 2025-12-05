@@ -2,10 +2,9 @@ package main
 
 import (
 	"all_project/config"
-	"all_project/database"
 	"all_project/handlers"
 	"all_project/middleware"
-	"all_project/models"
+	"all_project/storage"
 	"fmt"
 	"log"
 	"net/http"
@@ -20,40 +19,33 @@ func main() {
 		log.Fatalf("❌ 配置文件加载失败: %v", err)
 	}
 
-	// 初始化数据库
-	if err := database.InitDB(); err != nil {
-		log.Fatalf("❌ 数据库初始化失败: %v", err)
+	// 初始化存储
+	if err := storage.Init(); err != nil {
+		log.Fatalf("❌ 存储初始化失败: %v", err)
 	}
-	defer database.Close()
+	log.Println("✓ 存储系统初始化成功")
 
-	// 自动迁移模型
-	if err := database.AutoMigrate(
-		&models.Server{},
-		&models.CommandHistory{},
-		&models.AIModel{},
-		&models.APIEndpoint{},
-		&models.ModelConfig{},
-		&models.ChatSession{},
-		&models.ChatMessage{},
-	); err != nil {
-		log.Fatalf("❌ 数据库迁移失败: %v", err)
-	}
-
-	// 创建仓储和处理器
-	serverRepo := models.NewServerRepository(database.DB)
-	commandRepo := models.NewCommandHistoryRepository(database.DB)
-	serverHandler := handlers.NewServerHandler(serverRepo)
-	commandHandler := handlers.NewCommandHandler(commandRepo)
-	wsHandler := handlers.NewWebSocketHandler(serverRepo)
+	// 创建处理器（使用新的storage系统）
+	serverHandler := handlers.NewServerHandler()
+	commandHandler := handlers.NewCommandHandler()
+	wsHandler := handlers.NewWebSocketHandler()
 	fileHandler := handlers.NewFileHandler()
 	localFileHandler := handlers.NewLocalFileHandler()
-	aiHandler := handlers.NewAIHandler(database.DB)
-	aiConfigHandler := handlers.NewAIConfigHandler(database.DB)
+
+	// AI相关handlers
+	aiProvidersHandler := handlers.NewAIProvidersHandler()
+	aiConfigHandler := handlers.NewAIConfigHandler()
+	aiSessionsHandler := handlers.NewAISessionsHandler()
+	aiChatHandler := handlers.NewAIChatHandler()
 
 	// 初始化全局本地终端
 	if err := handlers.InitGlobalLocalTerminal(); err != nil {
 		log.Printf("⚠️ 本地终端初始化失败: %v", err)
 	}
+
+	// 启动session清理任务
+	middleware.StartCleanupTask()
+	log.Println("✓ Session清理任务已启动")
 
 	// 设置Gin为发布模式（生产环境）
 	gin.SetMode(gin.ReleaseMode)
@@ -144,54 +136,46 @@ func main() {
 		api.POST("/local/files/rename", localFileHandler.RenameLocalFile)
 		api.POST("/local/files/copy", localFileHandler.CopyLocalFile)
 
-		// AI模型管理
-		api.GET("/ai/models", aiConfigHandler.GetModels)
-		api.POST("/ai/models/create", aiConfigHandler.CreateModel)
-		api.POST("/ai/models/update", aiConfigHandler.UpdateModel)
-		api.POST("/ai/models/delete", aiConfigHandler.DeleteModel)
+		// AI供应商和模型管理
+		api.GET("/ai/providers", aiProvidersHandler.GetProviders)
+		api.GET("/ai/provider", aiProvidersHandler.GetProvider)
+		api.POST("/ai/provider/create", aiProvidersHandler.CreateProvider)
+		api.POST("/ai/provider/update", aiProvidersHandler.UpdateProvider)
+		api.POST("/ai/provider/delete", aiProvidersHandler.DeleteProvider)
+		api.GET("/ai/models", aiProvidersHandler.GetAllModels) // 获取所有模型（扁平化列表）
 
-		// API接口管理
-		api.GET("/ai/endpoints", aiConfigHandler.GetEndpoints)
-		api.POST("/ai/endpoints/create", aiConfigHandler.CreateEndpoint)
-		api.POST("/ai/endpoints/update", aiConfigHandler.UpdateEndpoint)
-		api.POST("/ai/endpoints/delete", aiConfigHandler.DeleteEndpoint)
-
-		// 模型配置管理
-		api.GET("/ai/configs", aiConfigHandler.GetConfigs)
-		api.GET("/ai/configs/default", aiConfigHandler.GetDefaultConfig)
-		api.POST("/ai/configs/create", aiConfigHandler.CreateConfig)
-		api.POST("/ai/configs/update", aiConfigHandler.UpdateConfig)
-		api.POST("/ai/configs/set-default", aiConfigHandler.SetDefaultConfig)
-		api.POST("/ai/configs/delete", aiConfigHandler.DeleteConfig)
+		// 全局AI配置管理
+		api.GET("/ai/config", aiConfigHandler.GetConfig)
+		api.POST("/ai/config/update", aiConfigHandler.UpdateConfig)
 
 		// AI会话管理
-		api.GET("/ai/sessions", aiHandler.GetSessions)
-		api.GET("/ai/session", aiHandler.GetSession)
-		api.POST("/ai/session/create", aiHandler.CreateSession)
-		api.POST("/ai/session/delete", aiHandler.DeleteSession)
-		api.POST("/ai/session/clear", aiHandler.ClearSession)
-		api.GET("/ai/messages", aiHandler.GetMessages)
-
-		// AI消息操作
-		api.POST("/ai/message/edit", aiHandler.EditMessage)
-		api.POST("/ai/message/delete", aiHandler.DeleteMessage)
-		api.POST("/ai/message/revoke", aiHandler.RevokeMessage)
+		api.GET("/ai/sessions", aiSessionsHandler.GetSessions)
+		api.GET("/ai/session", aiSessionsHandler.GetSession)
+		api.POST("/ai/session/create", aiSessionsHandler.CreateSession)
+		api.POST("/ai/session/delete", aiSessionsHandler.DeleteSession)
+		api.POST("/ai/session/clear", aiSessionsHandler.ClearSession)
+		api.POST("/ai/session/update-model", aiSessionsHandler.UpdateSessionModel)
+		api.GET("/ai/messages", aiSessionsHandler.GetMessages)
+		// TODO: 消息编辑/删除/撤回功能后续实现
+		// api.POST("/ai/message/edit", aiHandler.EditMessage)
+		// api.POST("/ai/message/delete", aiHandler.DeleteMessage)
+		// api.POST("/ai/message/revoke", aiHandler.RevokeMessage)
 	}
 
 	// WebSocket 路由（需要认证，未登录则重定向）
 	r.GET("/ws", middleware.GinPageAuthMiddleware(), wsHandler.GinHandleWebSocket)
 	r.GET("/ws/local", middleware.GinPageAuthMiddleware(), handlers.GinHandleLocalTerminal)
 	r.GET("/ws/ai", middleware.GinPageAuthMiddleware(), func(c *gin.Context) {
-		aiHandler.ChatStream(c.Writer, c.Request)
+		aiChatHandler.ChatStream(c.Writer, c.Request)
 	})
 
 	// 启动服务器
 	port := config.GetPort()
 	fmt.Println("╔═══════════════════════════════════════════════════╗")
-	fmt.Println("║   🚀 Web SSH 客户端管理系统 (Gin Framework)      ║")
+	fmt.Println("║   🚀 Web SSH 客户端管理系统                       ║")
 	fmt.Printf("║   📡 服务地址: http://localhost:%s              ║\n", port)
-	fmt.Println("║   💾 数据库: PostgreSQL (my)                      ║")
-	fmt.Println("║   🔐 Token 认证已启用 (30天自动登录)             ║")
+	fmt.Println("║   💾 存储方式: JSON 文件 (./data/)                ║")
+	fmt.Println("║   🔐 Token 认证已启用                             ║")
 	fmt.Println("╚═══════════════════════════════════════════════════╝")
 
 	if err := r.Run(":" + port); err != nil {
