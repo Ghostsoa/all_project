@@ -2213,14 +2213,20 @@ function updateToolResult(messageElement, data) {
     // 通过 tool_call_id 精确查找对应的工具元素
     const toolElement = contentDiv.querySelector(`[data-tool-call-id="${tool_call_id}"]`);
     
+    console.log('🔄 更新工具结果:', { tool_call_id, toolName, resultObj, found: !!toolElement });
+    
     if (toolElement) {
         // 找到了对应的工具元素，替换为结果
         const toolResultHTML = aiToolsManager.renderToolResult(resultObj, toolName, tool_call_id);
+        console.log('📝 渲染的HTML:', toolResultHTML.substring(0, 200));
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = toolResultHTML;
         const newElement = tempDiv.querySelector('.tool-call');
         if (newElement) {
+            console.log('✅ 替换工具元素');
             toolElement.replaceWith(newElement);
+        } else {
+            console.error('❌ 未找到.tool-call元素');
         }
     } else {
         // 没找到（理论上不应该发生），直接添加

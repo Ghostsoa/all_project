@@ -177,7 +177,7 @@ class AIToolsManager {
         
         return `
             <div class="tool-call">
-                <div class="tool-container" data-tool-call-id="${toolCallId}">
+                <div class="tool-container" data-tool-call-id="${toolCallId}" onclick="aiToolsManager.handleToolClick('${toolCallId}')">
                     <div class="tool-header">
                         <div class="tool-file-icon">
                             ${fileIcon}
