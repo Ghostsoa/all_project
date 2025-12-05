@@ -1114,6 +1114,8 @@ async function streamChat(sessionId, message, thinkingId) {
         let assistantMessage = '';
         let reasoningContent = '';
         let messageElement = null;
+        let hasToolCall = false;  // 标记是否已有工具调用
+        let afterToolContent = '';  // 工具调用后的文本
         
         // 收集上下文信息
         const terminalInfo = window.getTerminalBuffer(200);  // 终端200行
@@ -1191,19 +1193,27 @@ async function streamChat(sessionId, message, thinkingId) {
                 
                 if (data.type === 'content') {
                     // 内容增量更新
-                    const isFirstContent = assistantMessage === '';
-                    assistantMessage += data.content;
+                    const isFirstContent = assistantMessage === '' && afterToolContent === '';
                     
-                    if (!messageElement) {
-                        // 第一条消息：将thinking元素转换为正式消息
-                        messageElement = convertThinkingToMessage(thinkingId);
+                    if (hasToolCall) {
+                        // 工具调用后的文本：添加到工具后面
+                        afterToolContent += data.content;
+                        updateAfterToolContent(messageElement, afterToolContent);
+                    } else {
+                        // 工具调用前的文本：正常更新
+                        assistantMessage += data.content;
+                        
                         if (!messageElement) {
-                            messageElement = createMessageElement('assistant', assistantMessage);
+                            // 第一条消息：将thinking元素转换为正式消息
+                            messageElement = convertThinkingToMessage(thinkingId);
+                            if (!messageElement) {
+                                messageElement = createMessageElement('assistant', assistantMessage);
+                            } else {
+                                updateMessageContent(messageElement, assistantMessage);
+                            }
                         } else {
                             updateMessageContent(messageElement, assistantMessage);
                         }
-                    } else {
-                        updateMessageContent(messageElement, assistantMessage);
                     }
                     
                     // 收到第一条正文内容时：1) 自动折叠思维链 2) 停止流光
@@ -1275,6 +1285,9 @@ async function streamChat(sessionId, message, thinkingId) {
                 } else if (data.type === 'tool_call') {
                     // AI 调用工具
                     console.log('🔧 工具调用:', data);
+                    
+                    // 标记已有工具调用
+                    hasToolCall = true;
                     
                     // 渲染执行中的工具
                     if (!messageElement) {
@@ -1515,6 +1528,22 @@ function updateMessageContent(messageElement, content) {
     if (contentDiv) {
         contentDiv.innerHTML = formatMessageContent(content);
     }
+}
+
+// 更新工具调用后的内容
+function updateAfterToolContent(messageElement, content) {
+    const contentWrapper = messageElement.querySelector('.message-content-wrapper');
+    if (!contentWrapper) return;
+    
+    // 查找或创建 after-tool-content div
+    let afterToolDiv = contentWrapper.querySelector('.after-tool-content');
+    if (!afterToolDiv) {
+        afterToolDiv = document.createElement('div');
+        afterToolDiv.className = 'message-content after-tool-content';
+        contentWrapper.appendChild(afterToolDiv);
+    }
+    
+    afterToolDiv.innerHTML = formatMessageContent(content);
 }
 
 // 更新思维链内容
