@@ -156,20 +156,23 @@ func AddMessage(sessionID string, message ChatMessage) error {
 
 // GetMessages 获取会话的所有消息（返回副本）
 func GetMessages(sessionID string, limit int) ([]ChatMessage, error) {
+	// 先尝试从缓存获取
 	sessionCacheLock.RLock()
-	defer sessionCacheLock.RUnlock()
-
 	session, ok := sessionCache[sessionID]
+	sessionCacheLock.RUnlock()
+
+	// 缓存未命中，加载会话
 	if !ok {
-		// 缓存未命中，尝试加载
-		sessionCacheLock.RUnlock()
 		loadedSession, err := GetSession(sessionID)
-		sessionCacheLock.RLock()
 		if err != nil {
 			return nil, err
 		}
 		session = loadedSession
 	}
+
+	// 再次加锁读取消息
+	sessionCacheLock.RLock()
+	defer sessionCacheLock.RUnlock()
 
 	if session.Messages == nil {
 		return []ChatMessage{}, nil
