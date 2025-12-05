@@ -32,6 +32,7 @@ func (h *AIChatHandler) GetToolExecutor() *ToolExecutor {
 
 // ChatRequest 聊天请求
 type ChatRequest struct {
+	Type         string `json:"type,omitempty"` // 消息类型：ping/stop/message
 	SessionID    string `json:"session_id"`
 	Content      string `json:"message"`                  // 改为message与前端一致
 	RealTimeInfo string `json:"real_time_info,omitempty"` // 终端缓冲区
@@ -61,16 +62,17 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 		}
 
 		// 处理心跳
-		if req.SessionID == "ping" {
+		if req.Type == "ping" {
 			ws.WriteJSON(map[string]string{"type": "pong"})
 			continue
 		}
 
-		// TODO: 处理停止信号
-		// if req.Type == "stop" {
-		// 	// 停止当前生成
-		// 	continue
-		// }
+		// 处理停止信号
+		if req.Type == "stop" {
+			log.Println("⏹️ 收到停止生成请求")
+			// TODO: 实现停止逻辑
+			continue
+		}
 
 		// 获取会话
 		session, err := storage.GetSession(req.SessionID)

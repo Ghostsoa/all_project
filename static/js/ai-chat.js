@@ -1415,9 +1415,16 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
                 // 这里先渲染为已完成状态的工具横条
                 const toolHTML = window.aiToolsManager.renderToolCallCompleted(toolData, argsObj);
                 
-                const toolDiv = document.createElement('div');
-                toolDiv.innerHTML = toolHTML;
-                contentWrapper.appendChild(toolDiv.firstChild);
+                if (toolHTML) {
+                    const toolDiv = document.createElement('div');
+                    toolDiv.innerHTML = toolHTML;
+                    const toolElement = toolDiv.querySelector('.tool-call');
+                    if (toolElement) {
+                        contentWrapper.appendChild(toolElement);
+                    } else {
+                        console.warn('工具调用元素未找到:', toolHTML);
+                    }
+                }
             }
         });
     }
