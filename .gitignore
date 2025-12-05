@@ -21,3 +21,8 @@ all_project
 # 临时文件
 *.tmp
 *.swp
+
+# NPM下载临时文件
+package/
+node_modules/
+*.tgz

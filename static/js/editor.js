@@ -104,24 +104,30 @@ function getFileIconHTML(fileName) {
 // 配置Monaco Editor（只配置一次）
 // 注意：require.config只能调用一次，否则会报错
 if (typeof require !== 'undefined' && typeof window.monaco === 'undefined') {
-    require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
+    require.config({ paths: { vs: '/static/vendor/monaco-editor/min/vs' } });
 }
 
-// 动态导入marked（使用ES模块）
+// 动态导入marked（使用本地文件）
 let markedLib = null;
 const loadMarked = async () => {
     if (!markedLib) {
         try {
-            markedLib = await import('https://cdn.jsdelivr.net/npm/marked@11.0.0/+esm');
-            console.log('✅ marked已动态导入');
+            // 使用本地marked库（非模块版本，直接使用window.marked）
+            if (typeof window.marked !== 'undefined') {
+                markedLib = { marked: window.marked };
+                console.log('✅ marked已加载（从全局变量）');
+            } else {
+                console.error('❌ marked未加载，请确认script标签已引入');
+                return null;
+            }
             return markedLib;
         } catch (error) {
-            console.error('❌ marked导入失败:', error);
+            console.error('❌ marked加载失败:', error);
             return null;
         }
     }
     return markedLib;
-};
+}
 
 // Office文档格式（需要特殊提示）
 const OFFICE_EXTENSIONS = new Set([
