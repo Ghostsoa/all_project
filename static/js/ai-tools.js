@@ -497,54 +497,79 @@ class AIToolsManager {
         }
 
         try {
-            // 1. 调用确认API更新状态
-            const confirmResponse = await fetch('/api/ai/edit/apply', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ preview_id: toolCallId })
-            });
-
-            const confirmResult = await confirmResponse.json();
-            
-            if (!confirmResult.success) {
-                this.showToast('确认失败: ' + confirmResult.error, 'error');
-                return;
-            }
-            
-            // 2. 执行实际的文件写入
+            // 1. 先执行实际的文件写入
             const { file_path, server_id, content, new_content, type } = edit;
             const writeContent = type === 'edit' ? new_content : content;
             
-            const writeResponse = await fetch('/api/files/write', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    server_id: server_id,
-                    path: file_path,
-                    content: writeContent
-                })
-            });
+            let writeResponse;
+            
+            if (server_id === 'local') {
+                // 本地文件
+                writeResponse = await fetch('/api/local/files/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        path: file_path,
+                        content: writeContent
+                    })
+                });
+            } else {
+                // 远程文件：获取session_id
+                const sessionId = this.getSessionIdByServerId(server_id);
+                if (!sessionId) {
+                    this.showToast('无法获取会话ID', 'error');
+                    return;
+                }
+                
+                writeResponse = await fetch('/api/files/save', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: sessionId,
+                        path: file_path,
+                        content: writeContent
+                    })
+                });
+            }
             
             const writeResult = await writeResponse.json();
             
-            if (writeResult.success) {
-                // 3. 更新 UI
-                this.updateToolStatus(toolCallId, 'accepted');
-                
-                // 清除装饰
-                this.clearDiffDecorations(toolCallId);
-                
-                // 移除待处理列表
-                this.pendingEdits.delete(toolCallId);
-                
-                // 标记为已应用
-                this.appliedEdits.add(toolCallId);
-                this.saveAppliedEdits();
-                
-                this.showToast('已应用并写入文件', 'success');
-            } else {
-                this.showToast('文件写入失败: ' + writeResult.error, 'error');
+            if (!writeResult.success) {
+                this.showToast('文件写入失败: ' + (writeResult.error || '未知错误'), 'error');
+                return;
             }
+            
+            // 2. 写入成功后，调用API更新数据库中的tool消息状态
+            const updateResponse = await fetch('/api/ai/edit/apply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    tool_call_id: toolCallId,
+                    status: 'accepted'
+                })
+            });
+
+            const updateResult = await updateResponse.json();
+            
+            if (!updateResult.success) {
+                console.warn('更新状态失败:', updateResult.error);
+                // 文件已写入，状态更新失败不影响
+            }
+            
+            // 3. 更新 UI
+            this.updateToolStatus(toolCallId, 'accepted');
+            
+            // 清除装饰
+            this.clearDiffDecorations(toolCallId);
+            
+            // 移除待处理列表
+            this.pendingEdits.delete(toolCallId);
+            
+            // 标记为已应用
+            this.appliedEdits.add(toolCallId);
+            this.saveAppliedEdits();
+            
+            this.showToast('已应用并写入文件', 'success');
         } catch (error) {
             console.error('应用编辑失败:', error);
             this.showToast('应用编辑失败: ' + error.message, 'error');
@@ -646,6 +671,22 @@ class AIToolsManager {
     getCurrentServerId() {
         // 从全局状态或 filetree 模块获取
         return window.state?.currentServer || '';
+    }
+
+    /**
+     * 根据server_id获取session_id
+     */
+    getSessionIdByServerId(serverId) {
+        // 如果是当前服务器，直接返回当前session
+        const currentServerId = this.getCurrentServerId();
+        if (serverId === currentServerId) {
+            return this.getCurrentSessionId();
+        }
+        
+        // 否则从state中查找
+        // 注意：可能需要根据实际的状态管理方式调整
+        console.warn('非当前服务器，可能无法获取session_id:', serverId);
+        return null;
     }
 
     /**

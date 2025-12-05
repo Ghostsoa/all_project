@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"all_project/storage"
 	"log"
 	"net/http"
 
@@ -19,10 +20,11 @@ func NewAIEditHandler() *AIEditHandler {
 
 // ApplyEditRequest 应用编辑请求
 type ApplyEditRequest struct {
-	PreviewID string `json:"preview_id"`
+	ToolCallID string `json:"tool_call_id"`
+	Status     string `json:"status"` // "accepted" or "rejected"
 }
 
-// ApplyEdit 应用编辑（用户确认） - 只返回成功，前端负责文件写入
+// ApplyEdit 应用编辑（用户确认） - 更新数据库中tool消息的状态
 func (h *AIEditHandler) ApplyEdit(c *gin.Context) {
 	var req ApplyEditRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -33,11 +35,20 @@ func (h *AIEditHandler) ApplyEdit(c *gin.Context) {
 		return
 	}
 
-	// 只返回成功，前端会自己调用文件API执行写入
-	log.Printf("✅ 用户确认编辑: %s", req.PreviewID)
+	// 更新数据库中对应的tool消息状态
+	if err := storage.UpdateToolMessageStatus(req.ToolCallID, req.Status); err != nil {
+		log.Printf("❌ 更新tool消息状态失败: %v", err)
+		c.JSON(http.StatusInternalServerError, gin.H{
+			"success": false,
+			"error":   "更新状态失败",
+		})
+		return
+	}
+
+	log.Printf("✅ 用户确认编辑: %s -> %s", req.ToolCallID, req.Status)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
-		"message": "已确认，前端执行写入",
+		"message": "状态已更新",
 	})
 }
 
@@ -52,8 +63,12 @@ func (h *AIEditHandler) RejectEdit(c *gin.Context) {
 		return
 	}
 
-	// 只返回成功，前端会自己清理UI
-	log.Printf("🚫 用户拒绝编辑: %s", req.PreviewID)
+	// 更新数据库中对应的tool消息状态
+	if err := storage.UpdateToolMessageStatus(req.ToolCallID, "rejected"); err != nil {
+		log.Printf("❌ 更新tool消息状态失败: %v", err)
+	}
+
+	log.Printf("🚫 已拒绝编辑: %s", req.ToolCallID)
 	c.JSON(http.StatusOK, gin.H{
 		"success": true,
 		"message": "已拒绝",
