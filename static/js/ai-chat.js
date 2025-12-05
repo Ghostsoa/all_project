@@ -1387,7 +1387,19 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
         contentWrapper.appendChild(reasoningDiv);
     }
     
-    // 如果是 assistant 且有工具调用，先渲染工具调用
+    // 先添加正文内容
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    // 用户消息只做简单转义，AI消息应用Markdown渲染
+    if (role === 'user') {
+        contentDiv.innerHTML = escapeHtml(content).replace(/\n/g, '<br>');
+    } else {
+        contentDiv.innerHTML = formatMessageContent(content);
+    }
+    
+    contentWrapper.appendChild(contentDiv);
+    
+    // 然后在正文后面渲染工具调用
     if (role === 'assistant' && fullMessage && fullMessage.tool_calls && fullMessage.tool_calls.length > 0) {
         console.log('🔧 渲染历史工具调用:', fullMessage.tool_calls);
         fullMessage.tool_calls.forEach(toolCall => {
@@ -1429,18 +1441,6 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
             }
         });
     }
-    
-    // 然后添加正文内容
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-    // 用户消息只做简单转义，AI消息应用Markdown渲染
-    if (role === 'user') {
-        contentDiv.innerHTML = escapeHtml(content).replace(/\n/g, '<br>');
-    } else {
-        contentDiv.innerHTML = formatMessageContent(content);
-    }
-    
-    contentWrapper.appendChild(contentDiv);
     
     messageDiv.appendChild(avatar);
     messageDiv.appendChild(contentWrapper);
