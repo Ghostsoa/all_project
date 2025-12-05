@@ -138,17 +138,31 @@ export function connectSSH(sessionId, server) {
         if (currentSession.ws.readyState === WebSocket.OPEN) {
             currentSession.ws.send(data);
             
-            // 捕获命令
+            // 捕获命令：当用户按回车时，从终端当前行提取完整命令
             if (data === '\r' || data === '\n') {
-                const command = currentSession.commandBuffer.trim();
-                if (command && command.length > 0) {
-                    saveCommandToHistory(server.id, server.name, command);
+                try {
+                    // 从终端buffer获取当前行内容
+                    const buffer = currentSession.term.buffer.active;
+                    const cursorY = buffer.cursorY;
+                    const line = buffer.getLine(cursorY);
+                    
+                    if (line) {
+                        // 提取行内容（去除ANSI转义序列和提示符）
+                        let lineText = line.translateToString(true).trim();
+                        
+                        // 尝试提取命令：去除常见的提示符（$, #, >, 等）
+                        const commandMatch = lineText.match(/[#$>]\s*(.+)$/);
+                        const command = commandMatch ? commandMatch[1].trim() : lineText;
+                        
+                        // 只保存有意义的命令（排除空命令和单个字符的交互响应）
+                        if (command && command.length > 1 && !['y', 'n', 'yes', 'no'].includes(command.toLowerCase())) {
+                            console.log('📝 捕获命令:', command);
+                            saveCommandToHistory(server.id, server.name, command);
+                        }
+                    }
+                } catch (error) {
+                    console.error('提取命令失败:', error);
                 }
-                currentSession.commandBuffer = '';
-            } else if (data === '\u007F' || data === '\b') {
-                currentSession.commandBuffer = currentSession.commandBuffer.slice(0, -1);
-            } else if (data >= ' ' && data <= '~') {
-                currentSession.commandBuffer += data;
             }
         }
     });
@@ -212,8 +226,7 @@ export function openLocalTerminal() {
         term,
         fitAddon,
         ws: null,
-        status: 'connecting',
-        commandBuffer: ''
+        status: 'connecting'
     });
     
     state.activeSessionId = sessionId;
@@ -328,16 +341,31 @@ function connectLocalTerminal(sessionId) {
         if (ws && ws.readyState === WebSocket.OPEN) {
             ws.send(data);
             
+            // 捕获命令：当用户按回车时，从终端当前行提取完整命令
             if (data === '\r' || data === '\n') {
-                const command = session.commandBuffer.trim();
-                if (command && command.length > 0) {
-                    saveCommandToHistory('0', '本地', command);
+                try {
+                    // 从终端buffer获取当前行内容
+                    const buffer = term.buffer.active;
+                    const cursorY = buffer.cursorY;
+                    const line = buffer.getLine(cursorY);
+                    
+                    if (line) {
+                        // 提取行内容（去除ANSI转义序列和提示符）
+                        let lineText = line.translateToString(true).trim();
+                        
+                        // 尝试提取命令：去除常见的提示符（$, #, >, PS1等）
+                        const commandMatch = lineText.match(/[#$>]\s*(.+)$/);
+                        const command = commandMatch ? commandMatch[1].trim() : lineText;
+                        
+                        // 只保存有意义的命令（排除空命令和单个字符的交互响应）
+                        if (command && command.length > 1 && !['y', 'n', 'yes', 'no'].includes(command.toLowerCase())) {
+                            console.log('📝 捕获本地命令:', command);
+                            saveCommandToHistory('0', '本地', command);
+                        }
+                    }
+                } catch (error) {
+                    console.error('提取本地命令失败:', error);
                 }
-                session.commandBuffer = '';
-            } else if (data === '\u007F' || data === '\b') {
-                session.commandBuffer = session.commandBuffer.slice(0, -1);
-            } else if (data >= ' ' && data <= '~') {
-                session.commandBuffer += data;
             }
         }
     });

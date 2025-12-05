@@ -66,13 +66,41 @@ export const api = {
         return res.json();
     },
     
-    // 命令历史相关
-    async saveCommand(serverId, command) {
+    // 命令历史相关（统一时间线）
+    async saveCommand(serverId, serverName, command) {
         return fetch(`${config.API_BASE}/command/save`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ server_id: String(serverId), command })
+            body: JSON.stringify({ 
+                server_id: String(serverId), 
+                server_name: serverName,
+                command 
+            })
         }).then(res => res.json());
+    },
+    
+    async getRecentCommands(limit = 200) {
+        const res = await fetch(`${config.API_BASE}/commands/recent?limit=${limit}`);
+        return res.json();
+    },
+    
+    async searchCommands(keyword, limit = 200) {
+        const res = await fetch(`${config.API_BASE}/commands/search?keyword=${encodeURIComponent(keyword)}&limit=${limit}`);
+        return res.json();
+    },
+    
+    async deleteCommand(id) {
+        const res = await fetch(`${config.API_BASE}/command/delete?id=${id}`, {
+            method: 'POST'
+        });
+        return res.json();
+    },
+    
+    async clearAllCommands() {
+        const res = await fetch(`${config.API_BASE}/commands/clear-all`, {
+            method: 'POST'
+        });
+        return res.json();
     },
     
     async getCommands(serverId, limit = 50) {
