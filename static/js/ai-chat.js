@@ -206,7 +206,9 @@ function renderSessionList() {
     if (sessions.length === 0) {
         // 没有对话历史：显示"开始新的对话 +"
         if (titleEl) titleEl.textContent = '开始新的对话';
-        if (arrowEl) arrowEl.textContent = '+';
+        if (arrowEl) {
+            arrowEl.className = 'fa-solid fa-plus history-arrow';
+        }
         
         // 修改点击行为：直接创建新对话
         if (triggerEl) {
@@ -223,7 +225,9 @@ function renderSessionList() {
     // 有对话历史：显示"对话历史 ▼"
     const currentTitle = currentSession?.title || '对话历史';
     if (titleEl) titleEl.textContent = currentTitle;
-    if (arrowEl) arrowEl.textContent = '▼';
+    if (arrowEl) {
+        arrowEl.className = 'fa-solid fa-chevron-down history-arrow';
+    }
     
     // 恢复点击行为：展开/收起列表
     if (triggerEl) {
