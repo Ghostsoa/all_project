@@ -304,10 +304,22 @@ func buildMessagesForAPI(history []storage.ChatMessage, systemPrompt string) []m
 
 	// 添加历史消息
 	for _, msg := range history {
-		messages = append(messages, map[string]interface{}{
+		message := map[string]interface{}{
 			"role":    msg.Role,
 			"content": msg.Content,
-		})
+		}
+
+		// 如果是 assistant 消息且有工具调用，添加 tool_calls
+		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 {
+			message["tool_calls"] = msg.ToolCalls
+		}
+
+		// 如果是 tool 消息，添加 tool_call_id
+		if msg.Role == "tool" && msg.ToolCallID != "" {
+			message["tool_call_id"] = msg.ToolCallID
+		}
+
+		messages = append(messages, message)
 	}
 
 	return messages

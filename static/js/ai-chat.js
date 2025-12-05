@@ -2173,7 +2173,7 @@ function appendToolCall(messageElement, toolData) {
     // 渲染执行中的工具
     const toolHTML = aiToolsManager.renderExecutingTool(toolData);
     
-    // 添加到消息内容前面，并添加标记供后续更新
+    // 添加到消息内容后面，并添加标记供后续更新
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = toolHTML;
     
@@ -2185,7 +2185,7 @@ function appendToolCall(messageElement, toolData) {
     }
     
     toolElement.setAttribute('data-tool-call-id', toolData.tool_call_id);
-    contentDiv.insertBefore(toolElement, contentDiv.firstChild);
+    contentDiv.appendChild(toolElement);  // 改为 appendChild，添加到最后
 }
 
 /**
