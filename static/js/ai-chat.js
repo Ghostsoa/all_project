@@ -1333,11 +1333,11 @@ function createMessageElement(role, content, reasoning = null, messageId = null)
         const reasoningDiv = document.createElement('div');
         reasoningDiv.className = 'message-reasoning';
         reasoningDiv.innerHTML = `
-            <div class="reasoning-header" onclick="toggleReasoning(this)">
+            <div class="reasoning-header collapsed" onclick="toggleReasoning(this)">
                 <span class="thought-text">Thought</span>
-                <span class="reasoning-arrow">▶</span>
+                <i class="fa-solid fa-chevron-right reasoning-arrow"></i>
             </div>
-            <div class="reasoning-content" style="display: none;">${formatMessageContent(reasoning)}</div>
+            <div class="reasoning-content collapsed">${formatMessageContent(reasoning)}</div>
         `;
         contentWrapper.appendChild(reasoningDiv);
     }
@@ -1413,7 +1413,7 @@ function updateReasoningContent(messageElement, reasoning, autoCollapse = false,
         reasoningDiv.innerHTML = `
             <div class="reasoning-header" onclick="toggleReasoning(this)">
                 <span class="thought-text">Thought</span>
-                <span class="reasoning-arrow">▼</span>
+                <i class="fa-solid fa-chevron-right reasoning-arrow"></i>
             </div>
             <div class="reasoning-content"></div>
         `;

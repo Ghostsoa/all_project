@@ -100,11 +100,16 @@ export function initFileTree() {
 
 // 手动刷新当前目录
 async function refreshCurrentDirectory() {
-    console.log('🔄 刷新按钮点击', { currentSessionID, currentPath });
-    
     if (!currentSessionID || !currentPath) {
-        console.warn('⚠️ 未连接服务器或无当前路径');
+        showToast('请先连接服务器', 'warning');
         return;
+    }
+    
+    const btn = document.getElementById('refreshBtn');
+    const icon = btn?.querySelector('i');
+    
+    if (icon) {
+        icon.classList.add('fa-spin');
     }
     
     try {
@@ -113,6 +118,12 @@ async function refreshCurrentDirectory() {
         showToast('刷新成功', 'success');
     } catch (error) {
         showToast('刷新失败: ' + error.message, 'error');
+    } finally {
+        if (icon) {
+            setTimeout(() => {
+                icon.classList.remove('fa-spin');
+            }, 500);
+        }
     }
 }
 

@@ -889,8 +889,8 @@
 }
 
 .reasoning-arrow {
-    transition: transform 0.2s ease;
     display: inline-block;
+    transition: transform 0.2s ease;
     color: rgba(255, 255, 255, 0.4);
 }
 
@@ -899,8 +899,9 @@
     background: none;
 }
 
-.reasoning-header.collapsed .reasoning-arrow {
-    transform: rotate(-90deg);
+/* 展开时箭头向下 */
+.reasoning-header:not(.collapsed) .reasoning-arrow {
+    transform: rotate(90deg);
 }
 
 .reasoning-content {
