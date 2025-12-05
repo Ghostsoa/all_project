@@ -335,8 +335,8 @@ async function loadMessages(sessionId) {
             appendMessage(msg.role, msg.content, msg.reasoning_content, msg.ID);
         });
         
-        // 滚动到底部
-        scrollToBottom();
+        // 滚动到底部（强制）
+        scrollToBottom(true);
         
         // 添加滚动监听（如果还没有）
         setupScrollListener();
@@ -379,18 +379,11 @@ async function loadMoreMessages() {
         const messagesContainer = document.getElementById('aiMessages');
         if (!messagesContainer) return;
         
-        // 保存当前滚动位置
-        const oldScrollHeight = messagesContainer.scrollHeight;
-        const oldScrollTop = messagesContainer.scrollTop;
-        
         // 在顶部插入消息（倒序插入，因为后端返回的是时间顺序）
+        // 不保持滚动位置，让消息自然往上扩展，用户自己滚动上去查看
         messages.reverse().forEach(msg => {
             prependMessage(msg.role, msg.content, msg.reasoning_content, msg.ID);
         });
-        
-        // 恢复滚动位置（保持在原来看的地方）
-        const newScrollHeight = messagesContainer.scrollHeight;
-        messagesContainer.scrollTop = oldScrollTop + (newScrollHeight - oldScrollHeight);
         
         console.log(`📊 加载了 ${messages.length} 条消息, offset: ${currentOffset}, 还有更多: ${hasMoreMessages}`);
     } catch (error) {
@@ -1070,7 +1063,7 @@ window.sendAIMessage = async function() {
     
     // 显示用户消息
     appendMessage('user', message);
-    scrollToBottom();
+    scrollToBottom(true); // 发送消息时强制滚动
     
     // 显示思考中状态
     const thinkingId = showThinking();
@@ -1646,12 +1639,25 @@ window.executeCode = function(codeId) {
     }
 };
 
-// 滚动到底部
-function scrollToBottom() {
+// 滚动到底部（智能滚动：只在用户本来就在底部时才滚动）
+function scrollToBottom(force = false) {
     const messagesContainer = document.getElementById('aiMessages');
-    if (messagesContainer) {
+    if (!messagesContainer) return;
+    
+    // 如果强制滚动，直接滚到底部
+    if (force) {
+        messagesContainer.scrollTop = messagesContainer.scrollHeight;
+        return;
+    }
+    
+    // 检测用户是否在底部附近（距离底部50px以内）
+    const isNearBottom = messagesContainer.scrollHeight - messagesContainer.scrollTop - messagesContainer.clientHeight < 50;
+    
+    // 只有用户在底部时才自动滚动
+    if (isNearBottom) {
         messagesContainer.scrollTop = messagesContainer.scrollHeight;
     }
+    // 否则，用户正在查看历史消息，不打扰
 }
 
 // 格式化时间
