@@ -413,9 +413,26 @@ class AIToolsManager {
      * @param {Object} edit 
      */
     async openFileWithDiff(edit, toolCallId) {
-        const { server_id, file_path, operations } = edit;
+        const { server_id, file_path, operations, type } = edit;
+        
+        console.log('🔍 打开文件并显示diff:', { file_path, server_id, type, operations });
         
         try {
+            // Write 工具：没有diff，只打开文件显示内容
+            if (type === 'write') {
+                console.log('📝 Write工具：打开文件预览');
+                // TODO: 可以显示将要创建的内容
+                this.showToast('点击Accept将创建此文件', 'info');
+                return;
+            }
+            
+            // Edit 工具：需要显示diff
+            if (!operations || operations.length === 0) {
+                console.warn('⚠️ 没有operations数据，无法显示diff');
+                this.showToast('无diff数据', 'warning');
+                return;
+            }
+            
             // 1. 获取当前 sessionID
             const sessionID = this.getCurrentSessionId();
             if (!sessionID) {
@@ -424,11 +441,22 @@ class AIToolsManager {
             }
             
             // 2. 打开文件（调用 editor.js 的函数）
-            if (window.openFile) {
+            console.log('📂 打开文件:', file_path);
+            if (window.openFileEditor) {
+                await window.openFileEditor(file_path, server_id, sessionID);
+            } else if (window.openFile) {
                 await window.openFile(file_path, server_id, sessionID);
+            } else {
+                console.error('❌ 未找到openFile函数');
+                this.showToast('无法打开文件', 'error');
+                return;
             }
             
-            // 3. 应用 diff decorations
+            // 3. 等待编辑器加载完成（给一点时间）
+            await new Promise(resolve => setTimeout(resolve, 300));
+            
+            // 4. 应用 diff decorations
+            console.log('🎨 应用diff装饰');
             this.applyDiffDecorations(file_path, operations, toolCallId);
             
         } catch (error) {
@@ -444,18 +472,34 @@ class AIToolsManager {
      * @param {string} toolCallId 
      */
     applyDiffDecorations(filePath, operations, toolCallId) {
+        console.log('🎨 applyDiffDecorations:', { filePath, operations, toolCallId });
+        
         // 获取对应的编辑器实例
-        const editor = window.getEditorByPath && window.getEditorByPath(filePath);
+        console.log('🔍 查找编辑器实例，getEditorByPath存在:', !!window.getEditorByPath);
+        let editor = window.getEditorByPath && window.getEditorByPath(filePath);
         if (!editor) {
-            console.warn('找不到编辑器实例:', filePath);
-            return;
+            console.warn('❌ 找不到编辑器实例:', filePath);
+            console.log('尝试使用其他方法获取编辑器...');
+            
+            // 尝试从全局编辑器列表获取
+            if (window.editors && window.editors[filePath]) {
+                console.log('✅ 从window.editors获取编辑器');
+                editor = window.editors[filePath];
+            } else {
+                console.error('❌ 完全无法获取编辑器实例');
+                this.showToast('无法获取编辑器，请确保文件已打开', 'error');
+                return;
+            }
         }
 
+        console.log('✅ 获取到编辑器实例');
         const decorations = [];
         const model = editor.getModel();
         
-        operations.forEach(op => {
+        console.log('📝 处理operations:', operations.length, '个操作');
+        operations.forEach((op, index) => {
             const { type, start_line, end_line } = op;
+            console.log(`  操作 ${index + 1}:`, { type, start_line, end_line });
             
             if (type === 'replace') {
                 // 高亮修改的行
@@ -474,14 +518,17 @@ class AIToolsManager {
             }
         });
 
+        console.log('🎨 应用', decorations.length, '个装饰');
         // 应用装饰并保存ID（用于后续清除）
         const decorationIds = editor.deltaDecorations([], decorations);
+        console.log('✅ 装饰已应用，ID:', decorationIds);
         
         // 保存装饰ID到编辑信息中
         const edit = this.pendingEdits.get(toolCallId);
         if (edit) {
             edit.decorationIds = decorationIds;
             edit.editorInstance = editor;
+            console.log('✅ 装饰ID已保存到edit对象');
         }
     }
 
