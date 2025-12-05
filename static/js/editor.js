@@ -639,7 +639,7 @@ export function saveCurrentContentTabsState() {
 }
 
 // 全局函数 - 内容标签切换（只处理文件标签）
-// 找到相邻的标签（优先左边，其次右边，最后终端）
+// 找到相邻的标签（优先左边，其次右边）
 function findAdjacentTab(currentTabId) {
     const allTabs = Array.from(document.querySelectorAll('.content-tab-item'));
     const currentIndex = allTabs.findIndex(tab => 
@@ -651,13 +651,19 @@ function findAdjacentTab(currentTabId) {
     // 优先选择前一个标签（左边）
     if (currentIndex > 0) {
         const prevTab = allTabs[currentIndex - 1];
-        return prevTab.dataset.tabId || prevTab.dataset.sessionId;
+        return {
+            id: prevTab.dataset.tabId || prevTab.dataset.sessionId,
+            isTerminal: !!prevTab.dataset.sessionId && !prevTab.dataset.tabId
+        };
     }
     
     // 其次选择后一个标签（右边）
     if (currentIndex < allTabs.length - 1) {
         const nextTab = allTabs[currentIndex + 1];
-        return nextTab.dataset.tabId || nextTab.dataset.sessionId;
+        return {
+            id: nextTab.dataset.tabId || nextTab.dataset.sessionId,
+            isTerminal: !!nextTab.dataset.sessionId && !nextTab.dataset.tabId
+        };
     }
     
     // 都没有，返回null
@@ -709,9 +715,9 @@ window.closeContentTab = async function(id) {
         }
         
         // 如果关闭的是当前激活的标签，找到要切换到的标签
-        let targetTabId = null;
+        let targetTab = null;
         if (isCurrentlyActive) {
-            targetTabId = findAdjacentTab(id);
+            targetTab = findAdjacentTab(id);
         }
         
         const pane = document.querySelector(`.editor-pane[data-tab-id="${id}"]`);
@@ -731,16 +737,20 @@ window.closeContentTab = async function(id) {
         }
         
         // 如果关闭的是当前标签，切换到相邻标签
-        if (isCurrentlyActive && targetTabId) {
-            window.switchContentTab(targetTabId);
+        if (isCurrentlyActive && targetTab) {
+            if (targetTab.isTerminal && window.switchToTerminal) {
+                window.switchToTerminal(targetTab.id);
+            } else {
+                window.switchContentTab(targetTab.id);
+            }
         }
     
     // 如果是媒体查看器标签
     } else if (id.startsWith('media-')) {
         // 如果关闭的是当前激活的标签，找到要切换到的标签
-        let targetTabId = null;
+        let targetTab = null;
         if (isCurrentlyActive) {
-            targetTabId = findAdjacentTab(id);
+            targetTab = findAdjacentTab(id);
         }
         
         const tab = document.querySelector(`.content-tab-item[data-tab-id="${id}"]`);
@@ -758,8 +768,12 @@ window.closeContentTab = async function(id) {
         }
         
         // 如果关闭的是当前标签，切换到相邻标签
-        if (isCurrentlyActive && targetTabId) {
-            window.switchContentTab(targetTabId);
+        if (isCurrentlyActive && targetTab) {
+            if (targetTab.isTerminal && window.switchToTerminal) {
+                window.switchToTerminal(targetTab.id);
+            } else {
+                window.switchContentTab(targetTab.id);
+            }
         }
     } 
     // 如果是终端标签（不允许关闭）
