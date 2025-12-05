@@ -272,7 +272,8 @@ class FileTreeCache {
     
     // 工具方法
     makeKey(sessionID, path) {
-        return `${sessionID}:${path}`;
+        const showHidden = this.showHiddenGetter ? this.showHiddenGetter() : false;
+        return `${sessionID}:${path}:${showHidden}`;
     }
     
     async fetchFiles(sessionID, path) {
