@@ -63,10 +63,42 @@ func (h *AISessionsHandler) CreateSession(c *gin.Context) {
 		return
 	}
 
+	// 如果没有指定模型，自动选择默认模型
+	modelID := req.ModelID
+	if modelID == "" {
+		// 1. 优先继承最新会话的模型
+		sessions, err := storage.GetAllSessions()
+		if err == nil && len(sessions) > 0 {
+			// 按更新时间排序，取最新的
+			latestSession := sessions[0]
+			for _, s := range sessions {
+				if s.UpdatedAt.After(latestSession.UpdatedAt) {
+					latestSession = s
+				}
+			}
+			if latestSession.ModelID != "" {
+				modelID = latestSession.ModelID
+			}
+		}
+
+		// 2. 如果没有历史会话或历史会话没有模型，使用第一个模型
+		if modelID == "" {
+			providers, err := storage.GetProviders()
+			if err == nil && len(providers) > 0 {
+				for _, provider := range providers {
+					if len(provider.Models) > 0 {
+						modelID = provider.Models[0].ID
+						break
+					}
+				}
+			}
+		}
+	}
+
 	session := &storage.ChatSession{
 		ID:      generateSessionID(),
 		Title:   req.Title,
-		ModelID: req.ModelID,
+		ModelID: modelID,
 	}
 
 	if err := storage.CreateSession(session); err != nil {

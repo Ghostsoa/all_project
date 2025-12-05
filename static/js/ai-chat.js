@@ -334,12 +334,17 @@ window.createNewAISession = async function() {
     if (!title) return;
     
     try {
+        // 后端会自动处理默认模型：继承最新会话或使用第一个模型
         const data = await apiRequest('/api/ai/session/create', 'POST', {
             title: title
-            // config_id 不传，后端会使用默认配置
         });
         
         currentSession = data.data;
+        
+        // 确保模型列表已加载
+        if (!modelsLoaded) {
+            await loadModelList();
+        }
         
         // 重新加载会话列表
         await loadSessions();
