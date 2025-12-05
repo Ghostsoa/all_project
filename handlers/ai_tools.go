@@ -94,7 +94,7 @@ func (te *ToolExecutor) readFile(args FileOperationArgs) (string, error) {
 	return string(resultJSON), nil
 }
 
-// writeFile 写入文件（创建或覆盖） - 只返回预览信息，不执行写入
+// writeFile 写入文件（创建或覆盖） - 只返回pending状态，不执行写入
 func (te *ToolExecutor) writeFile(args FileOperationArgs) (string, error) {
 	// 检查文件是否已存在
 	fileExists := false
@@ -102,15 +102,16 @@ func (te *ToolExecutor) writeFile(args FileOperationArgs) (string, error) {
 		fileExists = true
 	}
 
+	// 只返回pending状态，不执行实际操作
 	result := map[string]interface{}{
 		"success":     true,
+		"status":      "pending",
+		"action":      "write",
 		"type":        "write",
 		"server_id":   args.ServerID,
 		"file_path":   args.FilePath,
-		"content":     args.Content,
-		"size":        len(args.Content),
 		"file_exists": fileExists,
-		"message":     fmt.Sprintf("准备创建文件: %s", args.FilePath),
+		"message":     fmt.Sprintf("等待用户确认: %s", args.FilePath),
 	}
 
 	resultJSON, _ := json.Marshal(result)
@@ -152,18 +153,18 @@ func (te *ToolExecutor) editFile(args FileOperationArgs) (string, error) {
 	// 5. 计算差异操作
 	operations := te.computeOperations(content, newContent, args.OldString, args.NewString)
 
-	// 6. 返回预览结果（前端负责显示和确认）
+	// 6. 返回pending状态（前端负责显示和确认）
 	result := map[string]interface{}{
 		"success":     true,
+		"status":      "pending",
+		"action":      "edit",
 		"type":        "edit",
 		"server_id":   args.ServerID,
 		"file_path":   args.FilePath,
-		"old_string":  args.OldString,
-		"new_string":  args.NewString,
 		"new_content": newContent, // 完整的新文件内容，供前端确认后写入
 		"operations":  operations,
 		"summary": fmt.Sprintf(
-			"准备编辑 %s: %d 行修改",
+			"等待用户确认: %s (%d 行修改)",
 			filepath.Base(args.FilePath),
 			len(operations),
 		),

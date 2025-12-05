@@ -1289,6 +1289,18 @@ async function streamChat(sessionId, message, thinkingId) {
                     // 标记已有工具调用
                     hasToolCall = true;
                     
+                    // 保存tool_call参数供后续使用
+                    if (!window.currentToolCalls) {
+                        window.currentToolCalls = {};
+                    }
+                    // 解析参数
+                    try {
+                        const toolArgs = JSON.parse(data.arguments || '{}');
+                        window.currentToolCalls[data.tool_call_id] = toolArgs;
+                    } catch (e) {
+                        console.error('解析tool_call参数失败:', e);
+                    }
+                    
                     // 渲染执行中的工具
                     if (!messageElement) {
                         messageElement = convertThinkingToMessage(thinkingId);
@@ -1449,6 +1461,14 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
                 const functionName = functionData.name || '';
                 const toolCallId = toolCall.id;
                 
+                // 解析tool_calls参数
+                let toolCallArgs = null;
+                try {
+                    toolCallArgs = JSON.parse(functionData.arguments || '{}');
+                } catch (e) {
+                    console.error('解析tool_call参数失败:', e);
+                }
+                
                 // 查找对应的 tool 结果
                 const toolResultData = toolResults.get(toolCallId);
                 
@@ -1458,14 +1478,15 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
                     toolHTML = window.aiToolsManager.renderToolResult(
                         toolResultData.result, 
                         toolResultData.toolName || functionName,
-                        toolCallId
+                        toolCallId,
+                        toolCallArgs  // 传递tool_calls参数
                     );
                 } else {
                     // 无结果：显示执行中状态
                     toolHTML = window.aiToolsManager.renderExecutingTool({
                         tool_call_id: toolCallId,
                         name: functionName,
-                        arguments: toolCall.function.arguments
+                        arguments: functionData.arguments
                     });
                 }
                 
@@ -2267,14 +2288,20 @@ function updateToolResult(messageElement, data) {
         resultObj = { success: false, error: '解析结果失败' };
     }
     
+    // 查找对应的tool_call参数（从当前消息的tool_calls中）
+    let toolCallArgs = null;
+    if (window.currentToolCalls && window.currentToolCalls[tool_call_id]) {
+        toolCallArgs = window.currentToolCalls[tool_call_id];
+    }
+    
     // 通过 tool_call_id 精确查找对应的工具元素
     const toolElement = contentWrapper.querySelector(`[data-tool-call-id="${tool_call_id}"]`);
     
-    console.log('🔄 更新工具结果:', { tool_call_id, toolName, resultObj, found: !!toolElement });
+    console.log('🔄 更新工具结果:', { tool_call_id, toolName, resultObj, toolCallArgs, found: !!toolElement });
     
     if (toolElement) {
         // 找到了对应的工具元素，替换为结果
-        const toolResultHTML = aiToolsManager.renderToolResult(resultObj, toolName, tool_call_id);
+        const toolResultHTML = aiToolsManager.renderToolResult(resultObj, toolName, tool_call_id, toolCallArgs);
         console.log('📝 渲染的HTML:', toolResultHTML.substring(0, 200));
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = toolResultHTML;
@@ -2288,7 +2315,7 @@ function updateToolResult(messageElement, data) {
     } else {
         // 没找到（理论上不应该发生），直接添加
         console.warn('未找到对应的工具元素:', tool_call_id);
-        const toolResultHTML = aiToolsManager.renderToolResult(resultObj, toolName, tool_call_id);
+        const toolResultHTML = aiToolsManager.renderToolResult(resultObj, toolName, tool_call_id, toolCallArgs);
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = toolResultHTML;
         const newElement = tempDiv.querySelector('.tool-call');

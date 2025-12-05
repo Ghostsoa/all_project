@@ -48,12 +48,18 @@ class AIToolsManager {
      * @param {string} toolName - 工具名称
      * @returns {string} HTML
      */
-    renderToolResult(toolResult, toolName, toolCallId) {
+    renderToolResult(toolResult, toolName, toolCallId, toolCallArgs = null) {
         if (toolName !== 'file_operation') {
             return this.renderGenericTool(toolResult, toolName);
         }
 
-        const { type } = toolResult;
+        const { type, status } = toolResult;
+        
+        // 如果status是pending，需要从toolCallArgs获取完整参数
+        if (status === 'pending' && toolCallArgs) {
+            // 合并tool结果和tool_calls参数
+            toolResult = { ...toolResult, ...toolCallArgs };
+        }
         
         switch (type) {
             case 'read':
@@ -485,27 +491,44 @@ class AIToolsManager {
      */
     async acceptEdit(toolCallId) {
         const edit = this.pendingEdits.get(toolCallId);
-        if (!edit) return;
+        if (!edit) {
+            console.error('未找到编辑信息:', toolCallId);
+            return;
+        }
 
         try {
-            // 调用后端 API更新状态
-            const response = await fetch('/api/ai/edit/apply', {
+            // 1. 调用确认API更新状态
+            const confirmResponse = await fetch('/api/ai/edit/apply', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ preview_id: toolCallId })
             });
 
-            const result = await response.json();
+            const confirmResult = await confirmResponse.json();
             
-            if (result.success) {
-                // TODO: 调用文件API执行实际写入
-                const { file_path, new_content, content, type } = edit;
-                const writeContent = type === 'edit' ? new_content : content;
-                
-                // 这里应该调用 /api/files/write 执行实际写入
-                console.log('TODO: Write to file:', file_path, writeContent);
-                
-                // 更新 UI
+            if (!confirmResult.success) {
+                this.showToast('确认失败: ' + confirmResult.error, 'error');
+                return;
+            }
+            
+            // 2. 执行实际的文件写入
+            const { file_path, server_id, content, new_content, type } = edit;
+            const writeContent = type === 'edit' ? new_content : content;
+            
+            const writeResponse = await fetch('/api/files/write', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    server_id: server_id,
+                    path: file_path,
+                    content: writeContent
+                })
+            });
+            
+            const writeResult = await writeResponse.json();
+            
+            if (writeResult.success) {
+                // 3. 更新 UI
                 this.updateToolStatus(toolCallId, 'accepted');
                 
                 // 清除装饰
@@ -518,13 +541,13 @@ class AIToolsManager {
                 this.appliedEdits.add(toolCallId);
                 this.saveAppliedEdits();
                 
-                this.showToast('已应用编辑', 'success');
+                this.showToast('已应用并写入文件', 'success');
             } else {
-                this.showToast('应用失败: ' + result.error, 'error');
+                this.showToast('文件写入失败: ' + writeResult.error, 'error');
             }
         } catch (error) {
             console.error('应用编辑失败:', error);
-            this.showToast('应用编辑失败', 'error');
+            this.showToast('应用编辑失败: ' + error.message, 'error');
         }
     }
 
