@@ -1,6 +1,6 @@
 /* AI设置页面样式 */
 
-/* 通用设置面板 - 纯黑主题 */
+/* 设置面板 - 覆盖中间终端区域 */
 .settings-panel,
 .ai-settings-panel {
     position: absolute;
@@ -31,6 +31,7 @@
     color: #ffffff;
 }
 
+.settings-panel-header .btn-close-panel,
 .settings-panel-header .close-btn {
     width: 40px;
     height: 40px;
@@ -46,6 +47,7 @@
     font-size: 18px;
 }
 
+.settings-panel-header .btn-close-panel:hover,
 .settings-panel-header .close-btn:hover {
     background: rgba(239, 68, 68, 0.2);
     border-color: #ef4444;

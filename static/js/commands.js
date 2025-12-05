@@ -121,12 +121,18 @@ export async function loadCommandHistory(serverId, serverName) {
     const displayName = serverId === 0 ? '💻 本地终端' : serverName || '未知服务器';
     document.getElementById('commandsServerName').textContent = displayName;
     
+    console.log('🔍 加载命令历史:', serverId, serverName);
+    
     // 1. 先从缓存读取（立即显示）
     if (commandCache.has(serverId)) {
+        console.log('📦 从缓存加载命令:', commandCache.get(serverId).length, '条');
         renderCommandHistory(commandCache.get(serverId));
     }
     
-    // 2. 后台静默刷新
+    // 2. 后台刷新
+    // 如果没有缓存，立即加载；如果有缓存，延迟加载
+    const delay = commandCache.has(serverId) ? 300 : 0;
+    
     if (loadHistoryTimer) clearTimeout(loadHistoryTimer);
     
     loadHistoryTimer = setTimeout(async () => {
@@ -135,21 +141,16 @@ export async function loadCommandHistory(serverId, serverName) {
             
             if (data.success) {
                 const commands = data.data || [];
+                console.log('✅ 从服务器加载命令:', commands.length, '条');
                 commandCache.set(serverId, commands); // 更新缓存
                 
-                // 如果还在查看这个服务器，静默更新UI
-                const session = state.terminals.get(state.activeSessionId);
-                if (session) {
-                    const sessionServerId = state.activeSessionId.startsWith('local') ? 0 : session.server.id;
-                    if (String(sessionServerId) === String(serverId)) {
-                        renderCommandHistory(commands);
-                    }
-                }
+                // 直接渲染，不检查activeSessionId（因为可能还没初始化）
+                renderCommandHistory(commands);
             }
         } catch (error) {
-            console.error('加载命令历史失败:', error);
+            console.error('❌ 加载命令历史失败:', error);
         }
-    }, 300);
+    }, delay);
 }
 
 let isSelectMode = false;
