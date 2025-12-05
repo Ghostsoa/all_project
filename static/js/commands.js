@@ -2,10 +2,58 @@
 import { state } from './config.js';
 import { showToast } from './toast.js';
 import { api } from './api.js';
-import { escapeHtml, formatTime } from './utils.js';
+import { escapeHtml } from './utils.js';
 
 // 内存缓存：每个服务器的命令历史
 const commandCache = new Map(); // Map<serverID, commands[]>
+
+// 格式化命令时间
+function formatCommandTime(timeStr) {
+    if (!timeStr) return '未知时间';
+    
+    try {
+        const date = new Date(timeStr);
+        if (isNaN(date.getTime())) return '未知时间';
+        
+        const now = new Date();
+        const diff = now - date;
+        
+        // 小于1分钟
+        if (diff < 60000) {
+            return '刚刚';
+        }
+        
+        // 小于1小时
+        if (diff < 3600000) {
+            const minutes = Math.floor(diff / 60000);
+            return `${minutes}分钟前`;
+        }
+        
+        // 小于24小时
+        if (diff < 86400000) {
+            const hours = Math.floor(diff / 3600000);
+            return `${hours}小时前`;
+        }
+        
+        // 同一年
+        if (date.getFullYear() === now.getFullYear()) {
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+            const hour = String(date.getHours()).padStart(2, '0');
+            const minute = String(date.getMinutes()).padStart(2, '0');
+            return `${month}-${day} ${hour}:${minute}`;
+        }
+        
+        // 不同年
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+    } catch (error) {
+        console.error('时间格式化失败:', error);
+        return '未知时间';
+    }
+}
 
 let commandSaveQueue = [];
 let commandSaveTimer = null;
@@ -42,8 +90,13 @@ export function saveCommandToHistory(serverId, command) {
     
     // 2. 立即更新UI（无延迟）
     const session = state.terminals.get(state.activeSessionId);
-    if (session && session.server.id === serverId) {
-        renderCommandHistory(cached);
+    if (session) {
+        const sessionServerId = state.activeSessionId.startsWith('local') ? 0 : session.server.id;
+        // 类型转换比较：都转为字符串
+        if (String(sessionServerId) === String(serverId)) {
+            console.log('🔄 立即更新命令UI:', command);
+            renderCommandHistory(cached);
+        }
     }
     
     // 3. 异步保存到服务器（批量）
@@ -86,8 +139,11 @@ export async function loadCommandHistory(serverId, serverName) {
                 
                 // 如果还在查看这个服务器，静默更新UI
                 const session = state.terminals.get(state.activeSessionId);
-                if (session && session.server.id === serverId) {
-                    renderCommandHistory(commands);
+                if (session) {
+                    const sessionServerId = state.activeSessionId.startsWith('local') ? 0 : session.server.id;
+                    if (String(sessionServerId) === String(serverId)) {
+                        renderCommandHistory(commands);
+                    }
                 }
             }
         } catch (error) {
@@ -115,8 +171,7 @@ function renderCommandHistory(commands) {
                 <button class="btn-cancel-select" onclick="window.cancelSelectMode()">✕ 取消</button>
             </div>
         ` + commands.map(cmd => {
-            const date = new Date(cmd.created_at);
-            const timeStr = formatTime(date);
+            const timeStr = formatCommandTime(cmd.created_at);
             const isSelected = selectedCommands.has(cmd.id);
             
             return `
@@ -133,8 +188,7 @@ function renderCommandHistory(commands) {
         }).join('');
     } else {
         list.innerHTML = commands.map(cmd => {
-            const date = new Date(cmd.created_at);
-            const timeStr = formatTime(date);
+            const timeStr = formatCommandTime(cmd.created_at);
             const escapedCmd = escapeHtml(cmd.command).replace(/'/g, "\\'");
             
             return `

@@ -1,6 +1,7 @@
 /* AI设置页面样式 */
 
-/* AI设置面板 - 纯黑主题 */
+/* 通用设置面板 - 纯黑主题 */
+.settings-panel,
 .ai-settings-panel {
     position: absolute;
     top: 0;
