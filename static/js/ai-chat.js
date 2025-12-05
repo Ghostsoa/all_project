@@ -2215,16 +2215,22 @@ function updateToolResult(messageElement, data) {
     
     if (toolElement) {
         // 找到了对应的工具元素，替换为结果
-        const toolResultHTML = aiToolsManager.renderToolResult(resultObj, toolName);
+        const toolResultHTML = aiToolsManager.renderToolResult(resultObj, toolName, tool_call_id);
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = toolResultHTML;
-        toolElement.replaceWith(tempDiv.firstChild);
+        const newElement = tempDiv.querySelector('.tool-call');
+        if (newElement) {
+            toolElement.replaceWith(newElement);
+        }
     } else {
         // 没找到（理论上不应该发生），直接添加
         console.warn('未找到对应的工具元素:', tool_call_id);
-        const toolResultHTML = aiToolsManager.renderToolResult(resultObj, toolName);
+        const toolResultHTML = aiToolsManager.renderToolResult(resultObj, toolName, tool_call_id);
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = toolResultHTML;
-        contentDiv.insertBefore(tempDiv.firstChild, contentDiv.firstChild);
+        const newElement = tempDiv.querySelector('.tool-call');
+        if (newElement) {
+            contentDiv.insertBefore(newElement, contentDiv.firstChild);
+        }
     }
 }

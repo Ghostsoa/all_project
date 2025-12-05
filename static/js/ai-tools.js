@@ -48,7 +48,7 @@ class AIToolsManager {
      * @param {string} toolName - 工具名称
      * @returns {string} HTML
      */
-    renderToolResult(toolResult, toolName) {
+    renderToolResult(toolResult, toolName, toolCallId) {
         if (toolName !== 'file_operation') {
             return this.renderGenericTool(toolResult, toolName);
         }
@@ -61,9 +61,9 @@ class AIToolsManager {
             case 'list':
                 return this.renderListTool(toolResult);
             case 'edit':
-                return this.renderEditTool(toolResult);
+                return this.renderEditTool(toolResult, toolCallId);
             case 'write':
-                return this.renderWriteTool(toolResult);
+                return this.renderWriteTool(toolResult, toolCallId);
             default:
                 return this.renderGenericTool(toolResult, toolName);
         }
@@ -110,24 +110,25 @@ class AIToolsManager {
     /**
      * 渲染 edit 工具
      */
-    renderEditTool(result) {
-        const { preview_id, server_id, file_path, operations } = result;
+    renderEditTool(result, toolCallId) {
+        const { server_id, file_path, operations, new_content } = result;
         const fileName = file_path.split('/').pop();
         const fileIcon = this.getFileIconHTML(fileName);
         
-        // 保存到待处理列表
-        this.pendingEdits.set(preview_id, {
-            preview_id,
+        // 保存到待处理列表（使用tool_call_id作为key）
+        this.pendingEdits.set(toolCallId, {
+            tool_call_id: toolCallId,
             server_id,
             file_path,
             operations,
+            new_content,
             status: 'pending',
             type: 'edit'
         });
         
         return `
             <div class="tool-call">
-                <div class="tool-container" data-preview-id="${preview_id}" onclick="aiToolsManager.handleToolClick('${preview_id}')">
+                <div class="tool-container" data-tool-call-id="${toolCallId}" onclick="aiToolsManager.handleToolClick('${toolCallId}')">
                     <div class="tool-header">
                         <div class="tool-file-icon">
                             ${fileIcon}
@@ -140,11 +141,11 @@ class AIToolsManager {
                             <span class="tool-type-badge tool-type-edit">Edit</span>
                             <span class="tool-status-badge tool-status-pending">Pending</span>
                             <div class="tool-actions" onclick="event.stopPropagation()">
-                                <button class="tool-btn tool-btn-accept" onclick="aiToolsManager.acceptEdit('${preview_id}')">
+                                <button class="tool-btn tool-btn-accept" onclick="aiToolsManager.acceptEdit('${toolCallId}')">
                                     <i class="fa-solid fa-check"></i>
                                     Accept
                                 </button>
-                                <button class="tool-btn tool-btn-reject" onclick="aiToolsManager.rejectEdit('${preview_id}')">
+                                <button class="tool-btn tool-btn-reject" onclick="aiToolsManager.rejectEdit('${toolCallId}')">
                                     <i class="fa-solid fa-xmark"></i>
                                     Reject
                                 </button>
@@ -159,14 +160,24 @@ class AIToolsManager {
     /**
      * 渲染 write 工具
      */
-    renderWriteTool(result) {
-        const { server_id, file_path, size } = result;
+    renderWriteTool(result, toolCallId) {
+        const { server_id, file_path, size, content } = result;
         const fileName = file_path.split('/').pop();
         const fileIcon = this.getFileIconHTML(fileName);
         
+        // 保存到待处理列表
+        this.pendingEdits.set(toolCallId, {
+            tool_call_id: toolCallId,
+            server_id,
+            file_path,
+            content,
+            status: 'pending',
+            type: 'write'
+        });
+        
         return `
             <div class="tool-call">
-                <div class="tool-container">
+                <div class="tool-container" data-tool-call-id="${toolCallId}">
                     <div class="tool-header">
                         <div class="tool-file-icon">
                             ${fileIcon}
@@ -177,7 +188,17 @@ class AIToolsManager {
                         </div>
                         <div class="tool-status">
                             <span class="tool-type-badge tool-type-write">Create</span>
-                            <span class="tool-status-badge tool-status-accepted">✓ Created (${this.formatSize(size)})</span>
+                            <span class="tool-status-badge tool-status-pending">Pending</span>
+                            <div class="tool-actions" onclick="event.stopPropagation()">
+                                <button class="tool-btn tool-btn-accept" onclick="aiToolsManager.acceptEdit('${toolCallId}')">
+                                    <i class="fa-solid fa-check"></i>
+                                    Accept
+                                </button>
+                                <button class="tool-btn tool-btn-reject" onclick="aiToolsManager.rejectEdit('${toolCallId}')">
+                                    <i class="fa-solid fa-xmark"></i>
+                                    Reject
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -361,10 +382,10 @@ class AIToolsManager {
     
     /**
      * 处理工具横条点击
-     * @param {string} previewId 
+     * @param {string} toolCallId 
      */
-    async handleToolClick(previewId) {
-        const edit = this.pendingEdits.get(previewId);
+    async handleToolClick(toolCallId) {
+        const edit = this.pendingEdits.get(toolCallId);
         if (!edit) return;
 
         const { server_id, file_path } = edit;
@@ -374,7 +395,7 @@ class AIToolsManager {
         
         if (server_id === currentServerId) {
             // 同一服务器：打开文件并显示 diff
-            await this.openFileWithDiff(edit);
+            await this.openFileWithDiff(edit, toolCallId);
         } else {
             // 不同服务器：提示用户
             this.showServerMismatchNotification(server_id, currentServerId);
@@ -385,8 +406,8 @@ class AIToolsManager {
      * 打开文件并显示 diff
      * @param {Object} edit 
      */
-    async openFileWithDiff(edit) {
-        const { server_id, file_path, operations, preview_id } = edit;
+    async openFileWithDiff(edit, toolCallId) {
+        const { server_id, file_path, operations } = edit;
         
         try {
             // 1. 获取当前 sessionID
@@ -402,7 +423,7 @@ class AIToolsManager {
             }
             
             // 3. 应用 diff decorations
-            this.applyDiffDecorations(file_path, operations, preview_id);
+            this.applyDiffDecorations(file_path, operations, toolCallId);
             
         } catch (error) {
             console.error('打开文件失败:', error);
@@ -414,9 +435,9 @@ class AIToolsManager {
      * 应用 diff 装饰
      * @param {string} filePath 
      * @param {Array} operations 
-     * @param {string} previewId 
+     * @param {string} toolCallId 
      */
-    applyDiffDecorations(filePath, operations, previewId) {
+    applyDiffDecorations(filePath, operations, toolCallId) {
         // 获取对应的编辑器实例
         const editor = window.getEditorByPath && window.getEditorByPath(filePath);
         if (!editor) {
@@ -451,7 +472,7 @@ class AIToolsManager {
         const decorationIds = editor.deltaDecorations([], decorations);
         
         // 保存装饰ID到编辑信息中
-        const edit = this.pendingEdits.get(previewId);
+        const edit = this.pendingEdits.get(toolCallId);
         if (edit) {
             edit.decorationIds = decorationIds;
             edit.editorInstance = editor;
@@ -460,34 +481,41 @@ class AIToolsManager {
 
     /**
      * 接受编辑
-     * @param {string} previewId 
+     * @param {string} toolCallId 
      */
-    async acceptEdit(previewId) {
-        const edit = this.pendingEdits.get(previewId);
+    async acceptEdit(toolCallId) {
+        const edit = this.pendingEdits.get(toolCallId);
         if (!edit) return;
 
         try {
-            // 调用后端 API
+            // 调用后端 API更新状态
             const response = await fetch('/api/ai/edit/apply', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ preview_id: previewId })
+                body: JSON.stringify({ preview_id: toolCallId })
             });
 
             const result = await response.json();
             
             if (result.success) {
+                // TODO: 调用文件API执行实际写入
+                const { file_path, new_content, content, type } = edit;
+                const writeContent = type === 'edit' ? new_content : content;
+                
+                // 这里应该调用 /api/files/write 执行实际写入
+                console.log('TODO: Write to file:', file_path, writeContent);
+                
                 // 更新 UI
-                this.updateToolStatus(previewId, 'accepted');
+                this.updateToolStatus(toolCallId, 'accepted');
                 
                 // 清除装饰
-                this.clearDiffDecorations(previewId);
+                this.clearDiffDecorations(toolCallId);
                 
                 // 移除待处理列表
-                this.pendingEdits.delete(previewId);
+                this.pendingEdits.delete(toolCallId);
                 
                 // 标记为已应用
-                this.appliedEdits.add(previewId);
+                this.appliedEdits.add(toolCallId);
                 this.saveAppliedEdits();
                 
                 this.showToast('已应用编辑', 'success');
@@ -502,31 +530,31 @@ class AIToolsManager {
 
     /**
      * 拒绝编辑
-     * @param {string} previewId 
+     * @param {string} toolCallId 
      */
-    async rejectEdit(previewId) {
-        const edit = this.pendingEdits.get(previewId);
+    async rejectEdit(toolCallId) {
+        const edit = this.pendingEdits.get(toolCallId);
         if (!edit) return;
 
         try {
-            // 调用后端 API
+            // 调用后端 API更新状态
             const response = await fetch('/api/ai/edit/reject', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ preview_id: previewId })
+                body: JSON.stringify({ preview_id: toolCallId })
             });
 
             const result = await response.json();
             
             if (result.success) {
                 // 更新 UI
-                this.updateToolStatus(previewId, 'rejected');
+                this.updateToolStatus(toolCallId, 'rejected');
                 
                 // 清除装饰
-                this.clearDiffDecorations(previewId);
+                this.clearDiffDecorations(toolCallId);
                 
                 // 移除待处理列表
-                this.pendingEdits.delete(previewId);
+                this.pendingEdits.delete(toolCallId);
                 
                 this.showToast('已拒绝编辑', 'info');
             } else {
@@ -547,10 +575,10 @@ class AIToolsManager {
      */
     onFileOpened(filePath, serverId) {
         // 查找该文件的 pending edit
-        for (const [previewId, edit] of this.pendingEdits.entries()) {
+        for (const [toolCallId, edit] of this.pendingEdits.entries()) {
             if (edit.file_path === filePath && edit.server_id === serverId) {
                 // 自动显示 diff
-                this.applyDiffDecorations(filePath, edit.operations, previewId);
+                this.applyDiffDecorations(filePath, edit.operations, toolCallId);
             }
         }
     }
@@ -560,8 +588,8 @@ class AIToolsManager {
     /**
      * 更新工具状态显示
      */
-    updateToolStatus(previewId, status) {
-        const container = document.querySelector(`[data-preview-id="${previewId}"]`);
+    updateToolStatus(toolCallId, status) {
+        const container = document.querySelector(`[data-tool-call-id="${toolCallId}"]`);
         if (!container) return;
 
         const statusBadge = container.querySelector('.tool-status-badge');
@@ -580,8 +608,8 @@ class AIToolsManager {
     /**
      * 清除 diff 装饰
      */
-    clearDiffDecorations(previewId) {
-        const edit = this.pendingEdits.get(previewId);
+    clearDiffDecorations(toolCallId) {
+        const edit = this.pendingEdits.get(toolCallId);
         if (edit && edit.editorInstance && edit.decorationIds) {
             edit.editorInstance.deltaDecorations(edit.decorationIds, []);
             delete edit.decorationIds;
