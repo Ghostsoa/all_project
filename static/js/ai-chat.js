@@ -3,6 +3,7 @@
 import { apiRequest } from './api.js';
 import { state } from './config.js';
 import { getEditorInstance } from './editor.js';
+import { showToast } from './toast.js';
 
 // 全局变量
 let currentSession = null;
@@ -139,7 +140,7 @@ window.selectTempModel = async function(modelId) {
         toggleModelSelector();
     } catch (error) {
         console.error('切换模型失败:', error);
-        alert('切换模型失败: ' + error.message);
+        showToast('切换模型失败: ' + error.message, 'error');
     }
 };
 
@@ -299,7 +300,7 @@ window.selectAISession = async function(sessionId) {
     } catch (error) {
         console.error('选择会话失败:', error);
         hideAILoading();
-        alert('加载会话失败: ' + error.message);
+        showToast('加载会话失败: ' + error.message, 'error');
     }
 };
 
@@ -366,7 +367,7 @@ window.createNewAISession = async function() {
         if (menu) menu.style.display = 'none';
     } catch (error) {
         console.error('创建会话失败:', error);
-        alert('创建会话失败: ' + error.message);
+        showToast('创建会话失败: ' + error.message, 'error');
     }
 };
 
@@ -395,14 +396,14 @@ window.deleteAISession = async function(sessionId) {
         await loadSessions();
     } catch (error) {
         console.error('删除会话失败:', error);
-        alert('删除会话失败: ' + error.message);
+        showToast('删除会话失败: ' + error.message, 'error');
     }
 };
 
 // 清空当前对话
 window.clearCurrentAIChat = async function() {
     if (!currentSession) {
-        alert('请先选择一个对话');
+        showToast('请先选择一个对话', 'warning');
         return;
     }
     
@@ -423,7 +424,7 @@ window.clearCurrentAIChat = async function() {
         }
     } catch (error) {
         console.error('清空对话失败:', error);
-        alert('清空对话失败: ' + error.message);
+        showToast('清空对话失败: ' + error.message, 'error');
     }
 };
 
@@ -474,7 +475,7 @@ window.saveEditedMessage = async function(messageId) {
     const newContent = textarea.value.trim();
     
     if (!newContent) {
-        alert('消息内容不能为空');
+        showToast('消息内容不能为空', 'warning');
         return;
     }
     
@@ -485,7 +486,7 @@ window.saveEditedMessage = async function(messageId) {
         // 重新加载消息以更新历史
         await loadMessages(currentSession.id);
     } catch (error) {
-        alert('编辑失败: ' + error.message);
+        showToast('编辑失败: ' + error.message, 'error');
         // 恢复原始内容
         const originalContent = contentDiv.dataset.originalContent;
         contentDiv.innerHTML = escapeHtml(originalContent).replace(/\n/g, '<br>');
@@ -524,7 +525,7 @@ async function revokeMessageHandler(messageId) {
         // 重新加载消息
         await loadMessages(currentSession.id);
     } catch (error) {
-        alert('撤回失败: ' + error.message);
+        showToast('撤回失败: ' + error.message, 'error');
     }
 }
 
@@ -1482,7 +1483,7 @@ window.executeCode = function(codeId) {
     // 获取当前激活的终端
     const activeTerminal = document.querySelector('.terminal-pane.active');
     if (!activeTerminal) {
-        alert('请先打开一个终端');
+        showToast('请先打开一个终端', 'warning');
         return;
     }
     
@@ -1490,7 +1491,7 @@ window.executeCode = function(codeId) {
     const session = state.terminals.get(sessionId);
     
     if (!session || !session.ws || session.ws.readyState !== WebSocket.OPEN) {
-        alert('终端未连接');
+        showToast('终端未连接', 'warning');
         return;
     }
     

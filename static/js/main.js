@@ -1,7 +1,8 @@
 // 主入口文件
 import { state } from './config.js';
 import { api } from './api.js';
-import { showToast } from './utils.js';
+import './toast.js'; // Toast组件（自动初始化到全局）
+import { showToast } from './toast.js';
 import { loadServers, searchServers, deleteServer, renderServerList } from './server.js';
 import { createTerminal, connectSSH, openLocalTerminal } from './terminal.js';
 import { loadCommandHistory, clearCurrentCommands, saveCommandToHistory } from './commands.js';
@@ -154,7 +155,7 @@ window.selectServer = async function(id) {
     try {
         const data = await api.getServer(id);
         if (!data.success) {
-            alert('获取服务器信息失败');
+            showToast('获取服务器信息失败', 'error');
             return;
         }
         
@@ -230,7 +231,7 @@ window.selectServer = async function(id) {
         // 文件树会在WebSocket连接成功后自动加载
     } catch (error) {
         console.error('连接失败:', error);
-        alert('连接失败');
+        showToast('连接失败', 'error');
     }
 };
 
@@ -398,7 +399,10 @@ window.switchTab = function(sessionId) {
         // 检查是否为本地终端
         const isLocal = sessionId.startsWith('local');
         
-        if (!isLocal) {
+        // 加载对应的命令记录
+        if (isLocal) {
+            loadCommandHistory(0, '本地终端');
+        } else {
             loadCommandHistory(session.server.id, session.server.name);
         }
         
@@ -547,7 +551,7 @@ window.editServer = async function(id) {
         }
     } catch (error) {
         console.error('加载服务器信息失败:', error);
-        alert('加载服务器信息失败');
+        showToast('加载服务器信息失败', 'error');
     }
 };
 
@@ -565,7 +569,7 @@ window.saveServer = async function() {
     };
     
     if (!server.name || !server.host || !server.username) {
-        alert('请填写必填项');
+        showToast('请填写必填项', 'warning');
         return;
     }
     
@@ -576,7 +580,7 @@ window.saveServer = async function() {
             data = await api.updateServer(server);
         } else {
             if (!server.password) {
-                alert('密码不能为空');
+                showToast('密码不能为空', 'warning');
                 return;
             }
             data = await api.createServer(server);
@@ -585,13 +589,13 @@ window.saveServer = async function() {
         if (data.success) {
             closeModal();
             loadServers();
-            alert(data.message || '保存成功');
+            showToast(data.message || '保存成功', 'success');
         } else {
-            alert(data.error || '保存失败');
+            showToast(data.error || '保存失败', 'error');
         }
     } catch (error) {
         console.error('保存失败:', error);
-        alert('保存失败');
+        showToast('保存失败', 'error');
     }
 };
 

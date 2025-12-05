@@ -17,10 +17,7 @@ window.toggleHistoryDropdown = function() {
     }
 };
 
-// 打开AI设置
-window.openAISettings = function() {
-    alert('设置功能开发中...');
-};
+// 打开AI设置（在ai-settings.js中实现）
 
 // 切换模型选择器
 window.toggleModelSelector = function() {

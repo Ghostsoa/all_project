@@ -1,5 +1,6 @@
 // 服务器管理模块
-import { state } from './config.js';
+import { state } from './state.js';
+import { showToast } from './toast.js';
 import { api } from './api.js';
 import { escapeHtml } from './utils.js';
 
@@ -93,12 +94,12 @@ export async function deleteServer(id) {
                 }
             }
             await loadServers();
-            alert('删除成功');
+            showToast('删除成功', 'success');
         } else {
-            alert(data.error || '删除失败');
+            showToast(data.error || '删除失败', 'error');
         }
     } catch (error) {
         console.error('删除失败:', error);
-        alert('删除失败');
+        showToast('删除失败', 'error');
     }
 }

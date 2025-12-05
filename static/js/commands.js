@@ -1,5 +1,6 @@
 // 命令历史管理模块
-import { state } from './config.js';
+import { state } from './state.js';
+import { showToast } from './toast.js';
 import { api } from './api.js';
 import { escapeHtml, formatTime } from './utils.js';
 
@@ -201,7 +202,7 @@ window.cancelSelectMode = function() {
 
 window.deleteSelectedCommands = async function() {
     if (selectedCommands.size === 0) {
-        alert('请先选择要删除的命令');
+        showToast('请先选择要删除的命令', 'warning');
         return;
     }
     
@@ -209,7 +210,7 @@ window.deleteSelectedCommands = async function() {
     
     try {
         // TODO: 实现批量删除API
-        alert('批量删除功能待后端支持');
+        showToast('批量删除功能待后端支持', 'info');
         isSelectMode = false;
         selectedCommands.clear();
         const session = state.terminals.get(state.activeSessionId);
@@ -218,14 +219,14 @@ window.deleteSelectedCommands = async function() {
         }
     } catch (error) {
         console.error('删除失败:', error);
-        alert('删除失败');
+        showToast('删除失败', 'error');
     }
 };
 
 export async function clearCurrentCommands() {
     const session = state.terminals.get(state.activeSessionId);
     if (!session) {
-        alert('请先选择一个终端');
+        showToast('请先选择一个终端', 'warning');
         return;
     }
     

@@ -1,4 +1,5 @@
-// AI设置管理 - 重构版
+// AI设置管理
+import { showToast } from './toast.js'; - 重构版
 
 import { apiRequest } from './api.js';
 
@@ -157,7 +158,7 @@ window.saveProvider = async function(event) {
     const apiKey = document.getElementById('providerApiKey').value.trim();
     
     if (!providerId || !providerName || !baseUrl || !apiKey) {
-        alert('请填写所有必填字段');
+        showToast('请填写所有必填字段', 'warning');
         return;
     }
     
@@ -173,7 +174,7 @@ window.saveProvider = async function(event) {
     });
     
     if (models.length === 0) {
-        alert('请至少添加一个模型');
+        showToast('请至少添加一个模型', 'warning');
         return;
     }
     
@@ -202,7 +203,7 @@ window.saveProvider = async function(event) {
             window.refreshModelCache();
         }
     } catch (error) {
-        alert('保存失败: ' + error.message);
+        showToast('保存失败: ' + error.message, 'error');
     }
 };
 
@@ -224,7 +225,7 @@ window.deleteProvider = async function(providerId) {
             window.refreshModelCache();
         }
     } catch (error) {
-        alert('删除失败: ' + error.message);
+        showToast('删除失败: ' + error.message, 'error');
     }
 };
 
@@ -248,7 +249,7 @@ async function loadGlobalConfig() {
         updateRangeDisplay();
     } catch (error) {
         console.error('加载配置失败:', error);
-        alert('加载配置失败: ' + error.message);
+        showToast('加载配置失败: ' + error.message, 'error');
     }
 }
 
@@ -267,9 +268,9 @@ window.saveGlobalConfig = async function(event) {
     
     try {
         await apiRequest('/api/ai/config/update', 'POST', config);
-        alert('配置已保存');
+        showToast('配置已保存', 'success');
     } catch (error) {
-        alert('保存失败: ' + error.message);
+        showToast('保存失败: ' + error.message, 'error');
     }
 };
 
