@@ -21,10 +21,22 @@ func UpdateToolMessageStatus(toolCallID, status string) error {
 			sessionID := file.Name()[:len(file.Name())-5]
 			sessionFile := filepath.Join(sessionsDir, file.Name())
 
-			// 读取session
-			var session ChatSession
-			if err := readJSON(sessionFile, &session); err != nil {
-				continue
+			// 先尝试从缓存获取
+			sessionCacheLock.RLock()
+			cachedSession, inCache := sessionCache[sessionID]
+			sessionCacheLock.RUnlock()
+
+			var session *ChatSession
+			if inCache {
+				// 使用缓存中的数据
+				session = cachedSession
+			} else {
+				// 从文件读取
+				var loadedSession ChatSession
+				if err := readJSON(sessionFile, &loadedSession); err != nil {
+					continue
+				}
+				session = &loadedSession
 			}
 
 			// 查找并更新tool消息
@@ -54,15 +66,16 @@ func UpdateToolMessageStatus(toolCallID, status string) error {
 				}
 			}
 
-			// 如果更新了，写回文件
+			// 如果更新了，写回文件和缓存
 			if updated {
-				if err := writeJSON(sessionFile, &session); err != nil {
+				// 写入文件
+				if err := writeJSON(sessionFile, session); err != nil {
 					return err
 				}
 
-				// 同时更新缓存
+				// 更新缓存
 				sessionCacheLock.Lock()
-				sessionCache[sessionID] = &session
+				sessionCache[sessionID] = session
 				sessionCacheLock.Unlock()
 
 				return nil
