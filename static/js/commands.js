@@ -67,9 +67,10 @@ export function saveCommandToHistory(serverId, command) {
     const existingIndex = cached.findIndex(c => c.command === command);
     
     if (existingIndex >= 0) {
-        // 已存在：更新时间并移到最前
+        // 已存在：更新时间，移到最前
         const existing = cached[existingIndex];
-        existing.created_at = new Date().toISOString();
+        existing.timestamp = new Date().toISOString();
+        existing.created_at = existing.timestamp; // 兼容旧字段
         
         // 从原位置删除
         cached = [...cached.slice(0, existingIndex), ...cached.slice(existingIndex + 1)];
@@ -77,11 +78,13 @@ export function saveCommandToHistory(serverId, command) {
         cached.unshift(existing);
     } else {
         // 不存在：创建新命令并添加到最前
+        const timestamp = new Date().toISOString();
         const newCommand = {
             id: Date.now(),
             server_id: serverId,
             command: command,
-            created_at: new Date().toISOString()
+            timestamp: timestamp,
+            created_at: timestamp  // 兼容旧字段
         };
         cached.unshift(newCommand);
     }
@@ -172,7 +175,7 @@ function renderCommandHistory(commands) {
                 <button class="btn-cancel-select" onclick="window.cancelSelectMode()">✕ 取消</button>
             </div>
         ` + commands.map(cmd => {
-            const timeStr = formatCommandTime(cmd.created_at);
+            const timeStr = formatCommandTime(cmd.timestamp || cmd.created_at);
             const isSelected = selectedCommands.has(cmd.id);
             
             return `
@@ -189,7 +192,7 @@ function renderCommandHistory(commands) {
         }).join('');
     } else {
         list.innerHTML = commands.map(cmd => {
-            const timeStr = formatCommandTime(cmd.created_at);
+            const timeStr = formatCommandTime(cmd.timestamp || cmd.created_at);
             const escapedCmd = escapeHtml(cmd.command).replace(/'/g, "\\'");
             
             return `

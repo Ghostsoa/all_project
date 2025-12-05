@@ -35,6 +35,10 @@
 .settings-panel-header .close-btn {
     width: 40px;
     height: 40px;
+    min-width: 40px;
+    min-height: 40px;
+    padding: 0;
+    margin: 0;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -44,7 +48,11 @@
     color: #ef4444;
     cursor: pointer;
     transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-    font-size: 18px;
+    font-size: 20px;
+    font-weight: 300;
+    line-height: 1;
+    outline: none;
+    flex-shrink: 0;
 }
 
 .settings-panel-header .btn-close-panel:hover,

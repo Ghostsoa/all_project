@@ -25,6 +25,27 @@ func main() {
 	}
 	log.Println("✓ 存储系统初始化成功")
 
+	// 加载命令历史到内存（启动时只读取一次）
+	if err := storage.LoadCommandsCache(); err != nil {
+		log.Printf("⚠️  命令历史加载失败: %v", err)
+	} else {
+		log.Println("✓ 命令历史已加载到内存")
+	}
+
+	// 加载AI供应商配置到内存
+	if err := storage.LoadProvidersCache(); err != nil {
+		log.Printf("⚠️  AI供应商加载失败: %v", err)
+	} else {
+		log.Println("✓ AI供应商配置已加载到内存")
+	}
+
+	// 加载AI全局配置到内存
+	if err := storage.LoadAIConfigCache(); err != nil {
+		log.Printf("⚠️  AI配置加载失败: %v", err)
+	} else {
+		log.Println("✓ AI全局配置已加载到内存")
+	}
+
 	// 创建处理器（使用新的storage系统）
 	serverHandler := handlers.NewServerHandler()
 	commandHandler := handlers.NewCommandHandler()

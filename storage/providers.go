@@ -1,14 +1,44 @@
 package storage
 
-import "fmt"
+import (
+	"fmt"
+	"sync"
+)
 
-// GetProviders 获取所有供应商
-func GetProviders() ([]Provider, error) {
-	var providers []Provider
-	if err := readJSON(providersFile, &providers); err != nil {
-		return nil, err
+// 供应商内存缓存（启动时全量加载）
+var (
+	providersCache     []Provider
+	providersCacheLock sync.RWMutex
+	providersLoaded    bool
+)
+
+// LoadProvidersCache 加载供应商到内存（服务器启动时调用一次）
+func LoadProvidersCache() error {
+	providersCacheLock.Lock()
+	defer providersCacheLock.Unlock()
+
+	if err := readJSON(providersFile, &providersCache); err != nil {
+		// 文件不存在，初始化空列表
+		providersCache = []Provider{}
 	}
-	return providers, nil
+
+	providersLoaded = true
+	return nil
+}
+
+// GetProviders 获取所有供应商（从内存读取）
+func GetProviders() ([]Provider, error) {
+	providersCacheLock.RLock()
+	defer providersCacheLock.RUnlock()
+
+	if !providersLoaded {
+		return []Provider{}, nil
+	}
+
+	// 返回副本，避免外部修改
+	result := make([]Provider, len(providersCache))
+	copy(result, providersCache)
+	return result, nil
 }
 
 // GetProvider 根据ID获取供应商
@@ -26,35 +56,42 @@ func GetProvider(id string) (*Provider, error) {
 	return nil, fmt.Errorf("供应商不存在: %s", id)
 }
 
-// CreateProvider 创建供应商
+// CreateProvider 创建供应商（操作内存+写文件）
 func CreateProvider(provider *Provider) error {
-	providers, err := GetProviders()
-	if err != nil {
-		return err
+	providersCacheLock.Lock()
+	defer providersCacheLock.Unlock()
+
+	if !providersLoaded {
+		return fmt.Errorf("供应商缓存未初始化")
 	}
 
 	// 检查ID是否已存在
-	for _, p := range providers {
+	for _, p := range providersCache {
 		if p.ID == provider.ID {
 			return fmt.Errorf("供应商ID已存在: %s", provider.ID)
 		}
 	}
 
-	providers = append(providers, *provider)
-	return writeJSON(providersFile, providers)
+	// 添加到内存
+	providersCache = append(providersCache, *provider)
+
+	// 写入文件
+	return writeJSON(providersFile, providersCache)
 }
 
-// UpdateProvider 更新供应商
+// UpdateProvider 更新供应商（操作内存+写文件）
 func UpdateProvider(provider *Provider) error {
-	providers, err := GetProviders()
-	if err != nil {
-		return err
+	providersCacheLock.Lock()
+	defer providersCacheLock.Unlock()
+
+	if !providersLoaded {
+		return fmt.Errorf("供应商缓存未初始化")
 	}
 
 	found := false
-	for i, p := range providers {
+	for i, p := range providersCache {
 		if p.ID == provider.ID {
-			providers[i] = *provider
+			providersCache[i] = *provider
 			found = true
 			break
 		}
@@ -64,19 +101,22 @@ func UpdateProvider(provider *Provider) error {
 		return fmt.Errorf("供应商不存在: %s", provider.ID)
 	}
 
-	return writeJSON(providersFile, providers)
+	// 写入文件
+	return writeJSON(providersFile, providersCache)
 }
 
-// DeleteProvider 删除供应商
+// DeleteProvider 删除供应商（操作内存+写文件）
 func DeleteProvider(id string) error {
-	providers, err := GetProviders()
-	if err != nil {
-		return err
+	providersCacheLock.Lock()
+	defer providersCacheLock.Unlock()
+
+	if !providersLoaded {
+		return fmt.Errorf("供应商缓存未初始化")
 	}
 
 	newProviders := []Provider{}
 	found := false
-	for _, p := range providers {
+	for _, p := range providersCache {
 		if p.ID != id {
 			newProviders = append(newProviders, p)
 		} else {
@@ -88,7 +128,11 @@ func DeleteProvider(id string) error {
 		return fmt.Errorf("供应商不存在: %s", id)
 	}
 
-	return writeJSON(providersFile, newProviders)
+	// 更新内存
+	providersCache = newProviders
+
+	// 写入文件
+	return writeJSON(providersFile, providersCache)
 }
 
 // FindProviderByModel 根据模型ID查找供应商
