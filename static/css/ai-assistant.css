@@ -326,8 +326,7 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding-top: 2px;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    padding-top: 4px;
 }
 
 /* 内联模型选择器 */
@@ -528,25 +527,24 @@
 
 /* 发送图标按钮 */
 .send-icon-btn {
-    width: 22px;
-    height: 22px;
+    width: 24px;
+    height: 24px;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: white;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
     border: none;
     border-radius: 50%;
-    color: #1a1a1a;
-    font-size: 11px;
+    color: white;
+    font-size: 12px;
     cursor: pointer;
     transition: all 0.2s ease;
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 2px 6px rgba(102, 126, 234, 0.4);
 }
 
 .send-icon-btn:hover {
-    background: #f0f0f0;
-    transform: scale(1.08);
-    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.6);
 }
 
 .send-icon-btn:active {
@@ -554,7 +552,7 @@
 }
 
 .send-icon-btn i {
-    transform: rotate(45deg);
+    font-size: 11px;
 }
 
 /* 滚动条样式 */
@@ -705,13 +703,13 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 8px 12px;
+    padding: 4px 8px;
     background: rgba(0, 0, 0, 0.3);
     border-bottom: 1px solid rgba(255, 255, 255, 0.1);
 }
 
 .code-lang {
-    font-size: 12px;
+    font-size: 10px;
     color: rgba(255, 255, 255, 0.6);
     text-transform: uppercase;
     font-weight: 500;
@@ -719,7 +717,7 @@
 
 .code-actions {
     display: flex;
-    gap: 4px;
+    gap: 6px;
 }
 
 .code-copy-btn,
@@ -728,10 +726,18 @@
     border: none;
     color: rgba(255, 255, 255, 0.5);
     cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 4px;
+    padding: 2px 6px;
+    border-radius: 3px;
     transition: all 0.2s ease;
-    font-size: 14px;
+    font-size: 10px;
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+}
+
+.code-copy-btn i,
+.code-execute-btn i {
+    font-size: 9px;
 }
 
 .code-copy-btn:hover,
@@ -970,19 +976,28 @@
 }
 
 .clear-chat-btn {
-    background: none;
-    border: none;
-    color: rgba(255, 255, 255, 0.4);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: rgba(255, 255, 255, 0.6);
     cursor: pointer;
-    padding: 0;
-    font-size: 16px;
+    padding: 4px 8px;
+    font-size: 10px;
     line-height: 1;
     transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
 }
 
 .clear-chat-btn:hover {
-    transform: scale(1.1);
-    filter: brightness(1.2);
+    background: rgba(255, 255, 255, 0.1);
+    color: rgba(255, 255, 255, 0.9);
+    border-color: rgba(255, 255, 255, 0.2);
+}
+
+.clear-chat-btn i {
+    font-size: 9px;
 }
 
 /* 停止生成按钮 */

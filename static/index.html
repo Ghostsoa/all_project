@@ -400,14 +400,16 @@
                             </div>
                             <div class="input-buttons">
                                 <!-- 清空对话按钮 -->
-                                <button class="clear-chat-btn" onclick="clearCurrentAIChat()" title="清空当前对话">🗑️</button>
+                                <button class="clear-chat-btn" onclick="clearCurrentAIChat()" title="清空当前对话">
+                                    <i class="fa-solid fa-trash-can"></i> Clear
+                                </button>
                                 <!-- 停止生成按钮 -->
                                 <button class="stop-generate-btn" id="stopGenerateBtn" onclick="stopAIGeneration()" title="停止生成" style="display: none;">
                                     <i class="fa-solid fa-stop"></i>
                                 </button>
-                                <!-- 发送按钮（图标） -->
+                                <!-- 发送按钮（箭头图标） -->
                                 <button class="send-icon-btn" id="sendAIBtn" onclick="sendAIMessage()" title="发送 (Ctrl+Enter)">
-                                    <i class="fa-solid fa-paper-plane"></i>
+                                    <i class="fa-solid fa-arrow-up"></i>
                                 </button>
                             </div>
                         </div>
