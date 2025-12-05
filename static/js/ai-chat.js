@@ -1073,7 +1073,12 @@ async function streamChat(sessionId, message, thinkingId) {
                     
                 } else if (data.type === 'reasoning') {
                     // 思维链内容
-                    reasoningContent += data.content;
+                    const newReasoning = data.reasoning_content || data.content || '';
+                    if (newReasoning) {
+                        reasoningContent += newReasoning;
+                    } else {
+                        console.warn('⚠️ 收到空的reasoning数据:', data);
+                    }
                     
                     // 如果还没有消息元素，将thinking转换为正式消息
                     if (!messageElement) {
@@ -1083,9 +1088,11 @@ async function streamChat(sessionId, message, thinkingId) {
                         }
                     }
                     
-                    // 更新思维链，第一次创建时带流光
-                    updateReasoningContent(messageElement, reasoningContent, false, true);
-                    scrollToBottom();
+                    // 只有内容不为空时才更新思维链
+                    if (reasoningContent) {
+                        updateReasoningContent(messageElement, reasoningContent, false, true);
+                        scrollToBottom();
+                    }
                     
                 } else if (data.type === 'done') {
                     // 完成
