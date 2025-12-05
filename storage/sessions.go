@@ -29,9 +29,16 @@ func GetAllSessions() ([]ChatSession, error) {
 			if err != nil {
 				continue
 			}
-			// 只保留元数据，清空消息（减少内存）
-			session.Messages = nil
-			sessions = append(sessions, *session)
+			// 创建副本，只保留元数据（不影响缓存）
+			sessionCopy := ChatSession{
+				ID:        session.ID,
+				Title:     session.Title,
+				ModelID:   session.ModelID,
+				CreatedAt: session.CreatedAt,
+				UpdatedAt: session.UpdatedAt,
+				Messages:  nil, // 不包含消息，减少内存
+			}
+			sessions = append(sessions, sessionCopy)
 		}
 	}
 
@@ -156,33 +163,29 @@ func AddMessage(sessionID string, message ChatMessage) error {
 
 // GetMessages 获取会话的所有消息（返回副本）
 func GetMessages(sessionID string, limit int) ([]ChatMessage, error) {
+	// 1. 确保session已加载到缓存
+	_, err := GetSession(sessionID)
+	if err != nil {
+		return nil, err
+	}
+
+	// 2. 从缓存读取（加读锁保护）
 	sessionCacheLock.RLock()
 	defer sessionCacheLock.RUnlock()
 
-	session, ok := sessionCache[sessionID]
-	if !ok {
-		// 缓存未命中，尝试加载
-		sessionCacheLock.RUnlock()
-		loadedSession, err := GetSession(sessionID)
-		sessionCacheLock.RLock()
-		if err != nil {
-			return nil, err
-		}
-		session = loadedSession
-	}
-
-	if session.Messages == nil {
+	session := sessionCache[sessionID]
+	if session == nil || session.Messages == nil {
 		return []ChatMessage{}, nil
 	}
 
 	messages := session.Messages
 
-	// 限制返回数量
+	// 3. 限制返回数量
 	if limit > 0 && len(messages) > limit {
 		messages = messages[len(messages)-limit:]
 	}
 
-	// 返回副本
+	// 4. 返回副本，避免外部修改
 	result := make([]ChatMessage, len(messages))
 	copy(result, messages)
 
