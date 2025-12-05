@@ -15,10 +15,19 @@ import (
 	"github.com/gorilla/websocket"
 )
 
-type AIChatHandler struct{}
+type AIChatHandler struct {
+	toolExecutor *ToolExecutor
+}
 
 func NewAIChatHandler() *AIChatHandler {
-	return &AIChatHandler{}
+	return &AIChatHandler{
+		toolExecutor: NewToolExecutor(),
+	}
+}
+
+// GetToolExecutor 获取工具执行器（用于edit handler）
+func (h *AIChatHandler) GetToolExecutor() *ToolExecutor {
+	return h.toolExecutor
 }
 
 // ChatRequest 聊天请求
@@ -201,6 +210,25 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 				// 执行工具
 				result := h.executeToolCall(functionName, getString(functionData, "arguments"))
 
+				// 如果是file_operation且类型为edit，解析结果并发送edit_preview
+				if functionName == "file_operation" {
+					var opResult map[string]interface{}
+					if err := json.Unmarshal([]byte(result), &opResult); err == nil {
+						if success, ok := opResult["success"].(bool); ok && success {
+							if opType, ok := opResult["type"].(string); ok && opType == "edit" {
+								// 发送编辑预览给前端
+								ws.WriteJSON(map[string]interface{}{
+									"type":       "edit_preview",
+									"preview_id": opResult["preview_id"],
+									"server_id":  opResult["server_id"],
+									"file_path":  opResult["file_path"],
+									"operations": opResult["operations"],
+								})
+							}
+						}
+					}
+				}
+
 				// 添加工具结果到消息历史
 				messages = append(messages, map[string]interface{}{
 					"role":         "tool",
@@ -302,8 +330,7 @@ func (h *AIChatHandler) streamChatWithTools(
 		"temperature": config.Temperature,
 		"max_tokens":  config.MaxTokens,
 		"top_p":       config.TopP,
-		// TODO: 添加tools定义
-		// "tools": getToolsDefinition(),
+		"tools":       GetToolsDefinition(), // 添加工具定义
 	}
 
 	if config.FrequencyPenalty != 0 {
@@ -455,14 +482,20 @@ func (h *AIChatHandler) streamChatWithTools(
 	return toolCalls, fullContent.String(), reasoningContent, nil
 }
 
-// executeToolCall 执行工具调用（当前返回占位符，后续实现具体工具）
+// executeToolCall 执行工具调用
 func (h *AIChatHandler) executeToolCall(toolName, argsJSON string) string {
 	log.Printf("🔧 执行工具: %s, 参数: %s", toolName, argsJSON)
 
-	// TODO: 实现具体工具执行逻辑
-	// 根据toolName调用不同的工具函数
+	// 使用统一工具执行器
+	result, err := h.toolExecutor.Execute(toolName, argsJSON)
+	if err != nil {
+		log.Printf("❌ 工具执行失败: %v", err)
+		// 返回错误信息给AI
+		return fmt.Sprintf(`{"success": false, "error": "%s"}`, err.Error())
+	}
 
-	return fmt.Sprintf("[工具 %s] 执行完成（功能开发中）", toolName)
+	log.Printf("✅ 工具执行成功: %s", toolName)
+	return result
 }
 
 // 辅助函数

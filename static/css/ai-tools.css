@@ -1,0 +1,296 @@
+/* AI 工具调用显示样式 */
+
+/* 工具调用容器 */
+.tool-call {
+    margin: 8px 0;
+    font-size: 13px;
+}
+
+/* ==================== 简单工具（read/list）==================== */
+/* 灰色文本样式，类似思维链 */
+.tool-simple {
+    color: rgba(255, 255, 255, 0.4);
+    padding: 4px 0;
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.tool-simple-icon {
+    margin-right: 6px;
+    font-size: 11px;
+}
+
+/* 流光动画（执行中） */
+.tool-simple.executing {
+    background: linear-gradient(
+        90deg,
+        rgba(150, 150, 150, 0.3) 0%,
+        rgba(255, 255, 255, 0.6) 50%,
+        rgba(150, 150, 150, 0.3) 100%
+    );
+    background-size: 200% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: shimmer-tool 2s infinite linear;
+}
+
+@keyframes shimmer-tool {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
+/* 完成状态 */
+.tool-simple.completed {
+    color: rgba(255, 255, 255, 0.35);
+}
+
+/* ==================== 复杂工具（edit/write）==================== */
+/* 横条容器 */
+.tool-container {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 8px 0;
+    transition: all 0.2s ease;
+    cursor: pointer;
+}
+
+.tool-container:hover {
+    background: rgba(255, 255, 255, 0.05);
+    border-color: rgba(255, 255, 255, 0.12);
+}
+
+/* 工具头部 */
+.tool-header {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+/* 文件图标 */
+.tool-file-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tool-file-icon img {
+    width: 16px;
+    height: 16px;
+}
+
+.tool-file-icon i {
+    font-size: 16px;
+    color: rgba(255, 255, 255, 0.6);
+}
+
+/* 文件信息 */
+.tool-file-info {
+    flex: 1;
+    min-width: 0;
+}
+
+.tool-file-name {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.9);
+    font-weight: 500;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.tool-file-path {
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.4);
+    margin-top: 2px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* 工具状态区域 */
+.tool-status {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-shrink: 0;
+}
+
+/* 加载指示器 */
+.tool-spinner {
+    width: 16px;
+    height: 16px;
+    border: 2px solid rgba(255, 255, 255, 0.1);
+    border-top-color: rgba(255, 255, 255, 0.6);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+/* 工具操作按钮 */
+.tool-actions {
+    display: flex;
+    gap: 6px;
+}
+
+.tool-btn {
+    padding: 4px 12px;
+    border-radius: 4px;
+    border: 1px solid;
+    background: none;
+    font-size: 12px;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    white-space: nowrap;
+}
+
+.tool-btn:active {
+    transform: scale(0.95);
+}
+
+.tool-btn i {
+    font-size: 11px;
+}
+
+/* 接受按钮 */
+.tool-btn-accept {
+    border-color: rgba(16, 185, 129, 0.3);
+    color: #10b981;
+}
+
+.tool-btn-accept:hover {
+    background: rgba(16, 185, 129, 0.15);
+    border-color: #10b981;
+}
+
+/* 拒绝按钮 */
+.tool-btn-reject {
+    border-color: rgba(239, 68, 68, 0.3);
+    color: #ef4444;
+}
+
+.tool-btn-reject:hover {
+    background: rgba(239, 68, 68, 0.15);
+    border-color: #ef4444;
+}
+
+/* 查看按钮 */
+.tool-btn-view {
+    border-color: rgba(59, 130, 246, 0.3);
+    color: #3b82f6;
+}
+
+.tool-btn-view:hover {
+    background: rgba(59, 130, 246, 0.15);
+    border-color: #3b82f6;
+}
+
+/* 工具状态标记 */
+.tool-status-badge {
+    padding: 3px 8px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 500;
+}
+
+.tool-status-pending {
+    background: rgba(234, 179, 8, 0.15);
+    color: #eab308;
+}
+
+.tool-status-accepted {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+.tool-status-rejected {
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+}
+
+/* 操作类型标记 */
+.tool-type-badge {
+    padding: 2px 6px;
+    border-radius: 3px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+}
+
+.tool-type-edit {
+    background: rgba(59, 130, 246, 0.15);
+    color: #3b82f6;
+}
+
+.tool-type-write {
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+}
+
+/* 折叠详情 */
+.tool-details {
+    margin-top: 10px;
+    padding-top: 10px;
+    border-top: 1px solid rgba(255, 255, 255, 0.05);
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+}
+
+.tool-details.expanded {
+    max-height: 500px;
+}
+
+/* 操作摘要 */
+.tool-summary {
+    padding: 8px 0;
+    line-height: 1.5;
+}
+
+.tool-summary-item {
+    display: flex;
+    gap: 6px;
+    margin: 4px 0;
+}
+
+.tool-summary-label {
+    color: rgba(255, 255, 255, 0.5);
+    min-width: 60px;
+}
+
+.tool-summary-value {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+/* ==================== Monaco Diff 装饰样式 ==================== */
+
+/* 修改的行 */
+.diff-line-modified {
+    background-color: rgba(59, 130, 246, 0.1);
+    border-left: 3px solid #3b82f6;
+}
+
+/* Glyph 图标（行号旁边的标记） */
+.diff-glyph-modified {
+    background-color: #3b82f6;
+    width: 4px !important;
+    margin-left: 3px;
+}

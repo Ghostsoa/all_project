@@ -4,6 +4,7 @@ import { apiRequest } from './api.js';
 import { state } from './config.js';
 import { getEditorInstance } from './editor.js';
 import { showToast } from './toast.js';
+import aiToolsManager from './ai-tools.js';
 
 // 全局变量
 let currentSession = null;
@@ -1262,6 +1263,37 @@ async function streamChat(sessionId, message, thinkingId) {
                     
                     resolve();
                     
+                } else if (data.type === 'tool_call') {
+                    // AI 调用工具
+                    console.log('🔧 工具调用:', data.tool_call);
+                    
+                    // 渲染执行中的工具
+                    if (!messageElement) {
+                        messageElement = convertThinkingToMessage(thinkingId);
+                        if (!messageElement) {
+                            messageElement = createMessageElement('assistant', '');
+                        }
+                    }
+                    
+                    appendToolCall(messageElement, data.tool_call);
+                    scrollToBottom();
+                    
+                } else if (data.type === 'tool_result') {
+                    // 工具执行结果
+                    console.log('✅ 工具结果:', data);
+                    
+                    if (messageElement) {
+                        updateToolResult(messageElement, data);
+                        scrollToBottom();
+                    }
+                    
+                } else if (data.type === 'edit_preview') {
+                    // 编辑预览（edit工具特殊处理）
+                    console.log('📝 编辑预览:', data);
+                    
+                    // edit_preview 已经在 tool_result 中显示了横条
+                    // 这里不需要额外处理，由用户点击横条查看
+                    
                 } else if (data.type === 'error') {
                     // 错误
                     const errorMsg = data.error || data.content || '未知错误';
@@ -2072,5 +2104,68 @@ export async function initAIChat() {
     if (input) {
         input.addEventListener('input', autoResizeAIInput);
         input.addEventListener('keydown', handleAIInputKeydown);
+    }
+}
+
+// ========== 工具调用相关 ==========
+
+/**
+ * 添加工具调用（执行中状态）
+ * @param {HTMLElement} messageElement 
+ * @param {Object} toolCall 
+ */
+function appendToolCall(messageElement, toolCall) {
+    const contentDiv = messageElement.querySelector('.message-content');
+    if (!contentDiv) return;
+    
+    // 渲染执行中的工具
+    const toolHTML = aiToolsManager.renderExecutingTool(toolCall);
+    
+    // 添加到消息内容前面
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = toolHTML;
+    contentDiv.insertBefore(tempDiv.firstChild, contentDiv.firstChild);
+}
+
+/**
+ * 更新工具结果
+ * @param {HTMLElement} messageElement 
+ * @param {Object} data 
+ */
+function updateToolResult(messageElement, data) {
+    const contentDiv = messageElement.querySelector('.message-content');
+    if (!contentDiv) return;
+    
+    const { tool_call_id, name: toolName, result } = data;
+    
+    // 解析result（可能是JSON字符串）
+    let resultObj;
+    try {
+        resultObj = typeof result === 'string' ? JSON.parse(result) : result;
+    } catch (e) {
+        resultObj = { success: false, error: '解析结果失败' };
+    }
+    
+    // 查找对应的执行中工具元素，替换为结果
+    const toolCalls = contentDiv.querySelectorAll('.tool-call');
+    let replaced = false;
+    
+    toolCalls.forEach(toolCall => {
+        // 如果是执行中的工具（有spinner），替换为结果
+        if (toolCall.querySelector('.tool-spinner')) {
+            const toolResultHTML = aiToolsManager.renderToolResult(resultObj, toolName);
+            const tempDiv = document.createElement('div');
+            tempDiv.innerHTML = toolResultHTML;
+            toolCall.replaceWith(tempDiv.firstChild);
+            replaced = true;
+        }
+    });
+    
+    // 如果没有找到执行中的工具，直接添加结果
+    if (!replaced) {
+        const toolResultHTML = aiToolsManager.renderToolResult(resultObj, toolName);
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = toolResultHTML;
+        contentDiv.insertBefore(tempDiv.firstChild, contentDiv.firstChild);
     }
 }
