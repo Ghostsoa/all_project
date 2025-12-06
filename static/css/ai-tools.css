@@ -307,6 +307,24 @@
     font-style: italic;
 }
 
+/* 添加的行（Content Widget） */
+.diff-added-line {
+    background-color: rgba(16, 185, 129, 0.15);
+    border-left: 3px solid #10b981;
+    padding: 2px 8px;
+    margin: 2px 0;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 13px;
+    color: #10b981;
+    line-height: 1.5;
+}
+
+.diff-line-prefix {
+    margin-right: 8px;
+    font-weight: bold;
+    color: #10b981;
+}
+
 /* 修改的行（蓝色，备用） */
 .diff-line-modified {
     background-color: rgba(59, 130, 246, 0.1);

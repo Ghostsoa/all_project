@@ -594,6 +594,10 @@ class AIToolsManager {
         const model = editor.getModel();
         
         console.log('📝 处理operations:', operations.length, '个操作');
+        
+        // 收集需要添加的 content widget
+        const widgets = [];
+        
         operations.forEach((op, index) => {
             const { type, start_line, end_line, old_text, new_text } = op;
             console.log(`  操作 ${index + 1}:`, { type, start_line, end_line, old_text, new_text });
@@ -614,19 +618,27 @@ class AIToolsManager {
                     }
                 });
                 
-                // 添加行（绿色背景，显示新内容）
-                // 在删除行后面添加虚拟行来显示新内容
-                decorations.push({
-                    range: new monaco.Range(start_line, model.getLineMaxColumn(start_line), start_line, model.getLineMaxColumn(start_line)),
-                    options: {
-                        after: {
-                            content: `  + ${new_text}`,
-                            inlineClassName: 'diff-line-added-inline'
-                        },
-                        hoverMessage: { value: `**添加:** \`${new_text}\`` }
-                    }
+                // 添加行（绿色行，在删除行下面显示）
+                // 创建一个 content widget 来显示添加的内容
+                const widgetId = `diff-added-${toolCallId}-${index}`;
+                const widgetNode = document.createElement('div');
+                widgetNode.className = 'diff-added-line';
+                widgetNode.innerHTML = `<span class="diff-line-prefix">+</span> ${this.escapeHtml(new_text)}`;
+                
+                widgets.push({
+                    getId: () => widgetId,
+                    getDomNode: () => widgetNode,
+                    getPosition: () => ({
+                        position: { lineNumber: start_line + 1, column: 1 },
+                        preference: [monaco.editor.ContentWidgetPositionPreference.BELOW]
+                    })
                 });
             }
+        });
+        
+        // 添加 content widgets
+        widgets.forEach(widget => {
+            editor.addContentWidget(widget);
         });
 
         console.log('🎨 应用', decorations.length, '个装饰');
@@ -634,13 +646,23 @@ class AIToolsManager {
         const decorationIds = editor.deltaDecorations([], decorations);
         console.log('✅ 装饰已应用，ID:', decorationIds);
         
-        // 保存装饰ID到编辑信息中
+        // 保存装饰ID和widgets到编辑信息中
         const edit = this.pendingEdits.get(toolCallId);
         if (edit) {
             edit.decorationIds = decorationIds;
+            edit.contentWidgets = widgets;
             edit.editorInstance = editor;
-            console.log('✅ 装饰ID已保存到edit对象');
+            console.log('✅ 装饰ID和widgets已保存到edit对象');
         }
+    }
+    
+    /**
+     * HTML 转义
+     */
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     /**
@@ -789,6 +811,12 @@ class AIToolsManager {
         console.log('📂 文件已打开，检查pending edits:', { filePath, serverId });
         console.log('📋 当前pendingEdits:', this.pendingEdits);
         
+        // 如果 serverId 为 null/undefined，尝试获取当前 serverId
+        if (!serverId) {
+            serverId = this.getCurrentServerId();
+            console.log('🔧 serverId为空，使用当前serverId:', serverId);
+        }
+        
         // 查找该文件的 pending edit
         let found = false;
         for (const [toolCallId, edit] of this.pendingEdits.entries()) {
@@ -839,9 +867,19 @@ class AIToolsManager {
      */
     clearDiffDecorations(toolCallId) {
         const edit = this.pendingEdits.get(toolCallId);
-        if (edit && edit.editorInstance && edit.decorationIds) {
-            edit.editorInstance.deltaDecorations(edit.decorationIds, []);
-            delete edit.decorationIds;
+        if (edit && edit.editorInstance) {
+            // 清除装饰
+            if (edit.decorationIds) {
+                edit.editorInstance.deltaDecorations(edit.decorationIds, []);
+                delete edit.decorationIds;
+            }
+            // 清除 content widgets
+            if (edit.contentWidgets) {
+                edit.contentWidgets.forEach(widget => {
+                    edit.editorInstance.removeContentWidget(widget);
+                });
+                delete edit.contentWidgets;
+            }
             delete edit.editorInstance;
         }
     }
