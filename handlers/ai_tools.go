@@ -184,10 +184,8 @@ func (te *ToolExecutor) editFile(args FileOperationArgs, conversationID string, 
 	operations := te.computeFullDiff(diskContentStr, newContent)
 
 	// 6. 保存到pending状态
-	// toolCallID使用 messageID + 文件路径的组合来保证唯一性
-	toolCallID := fmt.Sprintf("%s_%s", messageID, filepath.Base(args.FilePath))
-
-	if err := manager.AddVersion(conversationID, args.FilePath, toolCallID, newContent, messageID); err != nil {
+	// 直接使用messageID作为toolCallID（与前端保持一致）
+	if err := manager.AddVersion(conversationID, args.FilePath, messageID, newContent, messageID); err != nil {
 		return "", fmt.Errorf("保存pending状态失败: %v", err)
 	}
 
@@ -201,7 +199,7 @@ func (te *ToolExecutor) editFile(args FileOperationArgs, conversationID string, 
 		"file_path":    args.FilePath,
 		"new_content":  newContent, // 完整的新文件内容，供前端确认后写入
 		"operations":   operations,
-		"tool_call_id": toolCallID,
+		"tool_call_id": messageID,
 		"summary": fmt.Sprintf(
 			"等待用户确认: %s (%d 行修改)",
 			filepath.Base(args.FilePath),
