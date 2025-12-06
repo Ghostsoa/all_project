@@ -308,7 +308,6 @@
 /* Zone Widget 中的每一行 */
 .diff-zone-line {
     position: relative;
-    padding-left: 58px;  /* 与编辑器文本对齐（行号宽度） */
     display: block;
     height: 20px;
     line-height: 20px;
