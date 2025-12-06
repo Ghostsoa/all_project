@@ -1253,11 +1253,11 @@ async function streamChat(sessionId, message, thinkingId) {
                                 updateReasoningContent(messageElement, reasoningContent, true, false);
                             }
                         }
-                        // 停止思维链header的流光
-                        const reasoningHeader = messageElement.querySelector('.reasoning-header');
-                        if (reasoningHeader) {
-                            reasoningHeader.classList.remove('shimmer-text');
-                        }
+                        // 停止所有思维链header的流光
+                        const allReasoningHeaders = messageElement.querySelectorAll('.reasoning-header');
+                        allReasoningHeaders.forEach(header => {
+                            header.classList.remove('shimmer-text');
+                        });
                     }
                     
                     scrollToBottom();
@@ -1316,8 +1316,19 @@ async function streamChat(sessionId, message, thinkingId) {
                     
                     // 停止所有流光效果
                     if (messageElement) {
+                        // 1. 移除所有shimmer-text类
                         const shimmerElements = messageElement.querySelectorAll('.shimmer-text');
-                        shimmerElements.forEach(el => el.classList.remove('shimmer-text'));
+                        shimmerElements.forEach(el => {
+                            el.classList.remove('shimmer-text');
+                        });
+                        
+                        // 2. 特别处理reasoning header（确保流光被移除）
+                        const allReasoningHeaders = messageElement.querySelectorAll('.reasoning-header');
+                        allReasoningHeaders.forEach(header => {
+                            header.classList.remove('shimmer-text');
+                        });
+                        
+                        console.log('✅ 移除所有流光，reasoning headers:', allReasoningHeaders.length);
                     }
                     
                     // 如果只有reasoning没有content，清除空内容
