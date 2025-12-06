@@ -799,7 +799,11 @@ class AIToolsManager {
      * 获取当前服务器 ID
      */
     getCurrentServerId() {
-        // 从全局状态或 filetree 模块获取
+        // 检查是否是本地模式
+        if (window.state?.isLocalMode || window.isLocalTerminal) {
+            return 'local';
+        }
+        // 从全局状态获取远程服务器ID
         return window.state?.currentServer || '';
     }
 
