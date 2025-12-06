@@ -282,7 +282,32 @@
 
 /* ==================== Monaco Diff 装饰样式 ==================== */
 
-/* 修改的行 */
+/* 删除的行（红色） */
+.diff-line-deleted {
+    background-color: rgba(239, 68, 68, 0.15);
+    border-left: 3px solid #ef4444;
+    text-decoration: line-through;
+    opacity: 0.7;
+}
+
+/* 删除行的 Glyph */
+.diff-glyph-deleted {
+    background-color: #ef4444;
+    width: 4px !important;
+    margin-left: 3px;
+}
+
+/* 添加的行（绿色，inline显示） */
+.diff-line-added-inline {
+    color: #10b981 !important;
+    background-color: rgba(16, 185, 129, 0.15);
+    padding: 2px 6px;
+    border-radius: 3px;
+    margin-left: 8px;
+    font-style: italic;
+}
+
+/* 修改的行（蓝色，备用） */
 .diff-line-modified {
     background-color: rgba(59, 130, 246, 0.1);
     border-left: 3px solid #3b82f6;

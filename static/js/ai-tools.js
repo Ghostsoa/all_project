@@ -595,21 +595,35 @@ class AIToolsManager {
         
         console.log('📝 处理operations:', operations.length, '个操作');
         operations.forEach((op, index) => {
-            const { type, start_line, end_line } = op;
-            console.log(`  操作 ${index + 1}:`, { type, start_line, end_line });
+            const { type, start_line, end_line, old_text, new_text } = op;
+            console.log(`  操作 ${index + 1}:`, { type, start_line, end_line, old_text, new_text });
             
             if (type === 'replace') {
-                // 高亮修改的行
+                // 删除行（红色背景，显示旧内容）
                 decorations.push({
-                    range: new monaco.Range(start_line, 1, end_line, 1),
+                    range: new monaco.Range(start_line, 1, start_line, model.getLineMaxColumn(start_line)),
                     options: {
                         isWholeLine: true,
-                        className: 'diff-line-modified',
-                        glyphMarginClassName: 'diff-glyph-modified',
+                        className: 'diff-line-deleted',
+                        glyphMarginClassName: 'diff-glyph-deleted',
                         minimap: {
-                            color: '#3b82f6',
+                            color: '#ef4444',
                             position: monaco.editor.MinimapPosition.Inline
-                        }
+                        },
+                        hoverMessage: { value: `**删除:** \`${old_text}\`` }
+                    }
+                });
+                
+                // 添加行（绿色背景，显示新内容）
+                // 在删除行后面添加虚拟行来显示新内容
+                decorations.push({
+                    range: new monaco.Range(start_line, model.getLineMaxColumn(start_line), start_line, model.getLineMaxColumn(start_line)),
+                    options: {
+                        after: {
+                            content: `  + ${new_text}`,
+                            inlineClassName: 'diff-line-added-inline'
+                        },
+                        hoverMessage: { value: `**添加:** \`${new_text}\`` }
                     }
                 });
             }
@@ -772,12 +786,29 @@ class AIToolsManager {
      * @param {string} serverId 
      */
     onFileOpened(filePath, serverId) {
+        console.log('📂 文件已打开，检查pending edits:', { filePath, serverId });
+        console.log('📋 当前pendingEdits:', this.pendingEdits);
+        
         // 查找该文件的 pending edit
+        let found = false;
         for (const [toolCallId, edit] of this.pendingEdits.entries()) {
+            console.log('🔍 检查edit:', { 
+                toolCallId, 
+                edit_path: edit.file_path, 
+                edit_server: edit.server_id,
+                match: edit.file_path === filePath && edit.server_id === serverId
+            });
+            
             if (edit.file_path === filePath && edit.server_id === serverId) {
+                console.log('✅ 找到匹配的pending edit，自动应用diff');
+                found = true;
                 // 自动显示 diff
                 this.applyDiffDecorations(filePath, edit.operations, toolCallId);
             }
+        }
+        
+        if (!found) {
+            console.log('❌ 没有找到匹配的pending edit');
         }
     }
 
