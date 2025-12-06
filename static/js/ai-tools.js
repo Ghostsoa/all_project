@@ -54,6 +54,11 @@ class AIToolsManager {
     renderToolResult(toolResult, toolName, toolCallId, toolCallArgs = null) {
         console.log('🎨 renderToolResult:', { toolResult, toolName, toolCallId, success: toolResult.success });
         
+        // code_search特殊处理
+        if (toolName === 'code_search') {
+            return this.renderCodeSearchTool(toolResult, toolCallId);
+        }
+        
         if (toolName !== 'file_operation') {
             return this.renderGenericTool(toolResult, toolName);
         }
@@ -422,6 +427,74 @@ class AIToolsManager {
                     </div>
                     <div class="tool-card-right">
                         <span class="tool-card-stat added">+${total_lines}</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * 渲染code_search工具结果（简洁列表格式）
+     */
+    renderCodeSearchTool(result, toolCallId) {
+        // code_search返回纯文本，包含XML格式的代码片段
+        const resultText = typeof result === 'string' ? result : (result.content || result.result || '');
+        
+        // 解析<file>标签
+        const filePattern = /<file name="([^"]+)" start_line="(\d+)" end_line="(\d+)" full_length="(\d+)">/g;
+        const files = [];
+        let match;
+        
+        while ((match = filePattern.exec(resultText)) !== null) {
+            files.push({
+                path: match[1],
+                startLine: parseInt(match[2]),
+                endLine: parseInt(match[3]),
+                fullLength: parseInt(match[4])
+            });
+        }
+        
+        if (files.length === 0) {
+            // 没有找到文件标签，显示简单提示
+            return `
+                <div class="tool-call">
+                    <div class="tool-simple completed">
+                        <i class="fa-solid fa-magnifying-glass-chart tool-simple-icon"></i>
+                        code_search: No results
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 渲染文件列表（类似grep结果）
+        const resultId = `code-search-${toolCallId}`;
+        const filesHTML = files.map((file, index) => {
+            const fileName = file.path.split('/').pop() || file.path;
+            const fileIcon = this.getFileIconHTML(fileName);
+            const lineRange = `${file.startLine}-${file.endLine}`;
+            
+            return `
+                <div class="grep-match-item">
+                    <i class="${fileIcon} grep-match-icon"></i>
+                    <span class="grep-match-path">${this.escapeHtml(file.path)}</span>
+                    <span class="grep-match-line">lines ${lineRange}</span>
+                </div>
+            `;
+        }).join('');
+        
+        return `
+            <div class="tool-call">
+                <div class="tool-result-expandable">
+                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
+                        <i class="fa-solid fa-magnifying-glass-chart tool-result-icon"></i>
+                        <span class="tool-result-title">
+                            code_search
+                        </span>
+                        <span class="tool-result-count">${files.length} snippets</span>
+                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
+                    </div>
+                    <div class="tool-result-content" id="${resultId}">
+                        ${filesHTML}
                     </div>
                 </div>
             </div>

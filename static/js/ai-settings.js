@@ -254,6 +254,7 @@ async function loadGlobalConfig() {
         document.getElementById('topP').value = config.top_p || 1.0;
         document.getElementById('frequencyPenalty').value = config.frequency_penalty || 0;
         document.getElementById('presencePenalty').value = config.presence_penalty || 0;
+        document.getElementById('codeSearchModel').value = config.code_search_model || '';
         
         // 显示当前值
         updateRangeDisplay();
@@ -273,7 +274,8 @@ window.saveGlobalConfig = async function(event) {
         max_tokens: parseInt(document.getElementById('maxTokens').value),
         top_p: parseFloat(document.getElementById('topP').value),
         frequency_penalty: parseFloat(document.getElementById('frequencyPenalty').value),
-        presence_penalty: parseFloat(document.getElementById('presencePenalty').value)
+        presence_penalty: parseFloat(document.getElementById('presencePenalty').value),
+        code_search_model: document.getElementById('codeSearchModel').value.trim()
     };
     
     try {
