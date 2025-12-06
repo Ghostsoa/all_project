@@ -962,6 +962,9 @@ class AIToolsManager {
             const result = await response.json();
             
             if (result.success) {
+                // 保存文件路径（用于查找剩余pending）
+                const filePath = edit.file_path;
+                
                 // 更新 UI
                 this.updateToolStatus(toolCallId, 'rejected');
                 
@@ -971,6 +974,9 @@ class AIToolsManager {
                 // 移除待处理列表
                 this.pendingEdits.delete(toolCallId);
                 
+                // 重新显示同一文件的剩余pending diff（如果有）
+                this.reapplyRemainingDiff(filePath);
+                
                 this.showToast('已拒绝编辑', 'info');
             } else {
                 this.showToast('操作失败: ' + result.error, 'error');
@@ -978,6 +984,33 @@ class AIToolsManager {
         } catch (error) {
             console.error('拒绝编辑失败:', error);
             this.showToast('操作失败: ' + error.message, 'error');
+        }
+    }
+
+    /**
+     * 重新显示同一文件的剩余pending diff
+     * @param {string} filePath 
+     */
+    reapplyRemainingDiff(filePath) {
+        console.log('🔄 检查剩余pending diff:', filePath);
+        
+        // 查找同一文件的最后一个pending edit
+        let latestPendingEdit = null;
+        let latestToolCallId = null;
+        
+        for (const [toolCallId, edit] of this.pendingEdits.entries()) {
+            if (edit.file_path === filePath && edit.status === 'pending' && edit.type === 'edit') {
+                latestPendingEdit = edit;
+                latestToolCallId = toolCallId;
+            }
+        }
+        
+        if (latestPendingEdit && latestToolCallId) {
+            console.log('✅ 找到剩余pending，重新显示:', latestToolCallId);
+            // 重新应用diff装饰
+            this.applyDiffDecorations(filePath, latestPendingEdit.operations, latestToolCallId);
+        } else {
+            console.log('ℹ️ 没有剩余pending，清空显示');
         }
     }
 
