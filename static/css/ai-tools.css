@@ -50,7 +50,64 @@
 }
 
 /* ==================== 复杂工具（edit/write）==================== */
-/* 横条容器 */
+/* 紧凑工具显示（纯文本样式） */
+.tool-compact {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 2px 0;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.6);
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+.tool-compact:hover {
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.tool-compact-icon {
+    width: 14px;
+    height: 14px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.tool-compact-icon img {
+    width: 12px;
+    height: 12px;
+}
+
+.tool-compact-icon i {
+    font-size: 12px;
+}
+
+.tool-compact-name {
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.tool-compact-type {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 10px;
+}
+
+.tool-compact-stat {
+    font-size: 10px;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+}
+
+.tool-compact-stat.added {
+    color: #10b981;
+}
+
+.tool-compact-stat.deleted {
+    color: #ef4444;
+}
+
+/* 旧版横条容器（保留用于已完成的工具） */
 .tool-container {
     background: rgba(255, 255, 255, 0.03);
     border: 1px solid rgba(255, 255, 255, 0.08);

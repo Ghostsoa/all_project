@@ -208,24 +208,12 @@ class AIToolsManager {
         
         return `
             <div class="tool-call">
-                <div class="tool-container" data-tool-call-id="${toolCallId}" onclick="aiToolsManager.handleToolClick('${toolCallId}')">
-                    <div class="tool-header">
-                        <div class="tool-file-icon">
-                            ${fileIcon}
-                        </div>
-                        <div class="tool-file-info">
-                            <div class="tool-file-name">${fileName}</div>
-                            <div class="tool-file-path">${file_path}</div>
-                        </div>
-                        <div class="tool-status">
-                            <span class="tool-type-badge tool-type-edit">Edit</span>
-                            <span class="tool-status-badge tool-status-pending">
-                                ${lines_deleted > 0 ? `-${lines_deleted}` : ''}
-                                ${lines_deleted > 0 && lines_added > 0 ? ' ' : ''}
-                                ${lines_added > 0 ? `+${lines_added}` : ''}
-                            </span>
-                        </div>
-                    </div>
+                <div class="tool-compact" data-tool-call-id="${toolCallId}" onclick="aiToolsManager.handleToolClick('${toolCallId}')">
+                    <span class="tool-compact-icon">${fileIcon}</span>
+                    <span class="tool-compact-name">${fileName}</span>
+                    <span class="tool-compact-type">edit</span>
+                    ${lines_added > 0 ? `<span class="tool-compact-stat added">+${lines_added}</span>` : ''}
+                    ${lines_deleted > 0 ? `<span class="tool-compact-stat deleted">-${lines_deleted}</span>` : ''}
                 </div>
             </div>
         `;
@@ -254,20 +242,11 @@ class AIToolsManager {
         
         return `
             <div class="tool-call">
-                <div class="tool-container" data-tool-call-id="${toolCallId}" onclick="aiToolsManager.handleToolClick('${toolCallId}')">
-                    <div class="tool-header">
-                        <div class="tool-file-icon">
-                            ${fileIcon}
-                        </div>
-                        <div class="tool-file-info">
-                            <div class="tool-file-name">${fileName}</div>
-                            <div class="tool-file-path">${file_path}</div>
-                        </div>
-                        <div class="tool-status">
-                            <span class="tool-type-badge tool-type-write">New</span>
-                            <span class="tool-status-badge tool-status-pending">+${total_lines}</span>
-                        </div>
-                    </div>
+                <div class="tool-compact" data-tool-call-id="${toolCallId}" onclick="aiToolsManager.handleToolClick('${toolCallId}')">
+                    <span class="tool-compact-icon">${fileIcon}</span>
+                    <span class="tool-compact-name">${fileName}</span>
+                    <span class="tool-compact-type">write</span>
+                    <span class="tool-compact-stat added">+${total_lines}</span>
                 </div>
             </div>
         `;
@@ -1096,12 +1075,51 @@ class AIToolsManager {
     updatePendingActionsBar() {
         const pendingCount = this.pendingEdits.size;
         const actionsBar = document.getElementById('pendingActionsBar');
-        const countSpan = document.getElementById('pendingCount');
+        const infoDiv = document.querySelector('.pending-info');
         
-        if (actionsBar && countSpan) {
-            countSpan.textContent = pendingCount;
-            actionsBar.style.display = pendingCount > 0 ? 'flex' : 'none';
+        if (!actionsBar || !infoDiv) return;
+        
+        if (pendingCount === 0) {
+            actionsBar.style.display = 'none';
+            return;
         }
+        
+        // 统计文件和改动
+        const fileSet = new Set();
+        let totalAdded = 0;
+        let totalDeleted = 0;
+        
+        for (const [toolCallId, edit] of this.pendingEdits.entries()) {
+            fileSet.add(edit.file_path);
+            
+            if (edit.type === 'edit') {
+                // 从operations计算改动
+                if (edit.operations) {
+                    for (const op of edit.operations) {
+                        const oldLines = op.old_text ? op.old_text.split('\n').length : 0;
+                        const newLines = op.new_text ? op.new_text.split('\n').length : 0;
+                        totalDeleted += oldLines;
+                        totalAdded += newLines;
+                    }
+                }
+            } else if (edit.type === 'write') {
+                // write是纯新增
+                const lines = edit.content ? edit.content.split('\n').length : 0;
+                totalAdded += lines;
+            }
+        }
+        
+        const fileCount = fileSet.size;
+        
+        // 更新显示
+        infoDiv.innerHTML = `
+            <span class="pending-file-count">${fileCount} file${fileCount > 1 ? 's' : ''}</span>
+            <i class="fa-solid fa-file-pen pending-file-icon"></i>
+            ${totalAdded > 0 ? `<span class="pending-stat-added">+${totalAdded}</span>` : ''}
+            ${totalDeleted > 0 ? `<span class="pending-stat-deleted">-${totalDeleted}</span>` : ''}
+        `;
+        
+        actionsBar.style.display = 'flex';
     }
 
     /**

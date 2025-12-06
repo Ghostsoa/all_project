@@ -289,8 +289,14 @@
     background: rgba(255, 255, 255, 0.05);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 8px;
-    transition: border-color 0.2s ease;
+    transition: border-color 0.2s ease, border-radius 0.2s ease;
     padding: 8px 12px;
+}
+
+/* Pending Bar显示时，输入框上边框圆角为0，实现无缝连接 */
+.pending-actions-bar + .ai-input-container .input-box {
+    border-radius: 0 0 8px 8px;
+    border-top-color: rgba(255, 255, 255, 0.05);
 }
 
 .input-box:focus-within {
@@ -1221,68 +1227,90 @@
     transform: scale(1.2);
 }
 
-/* Pending Actions Bar */
+/* Pending Actions Bar - 输入框延伸样式 */
 .pending-actions-bar {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px 20px;
-    background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(139, 92, 246, 0.1) 100%);
-    border: 1px solid rgba(59, 130, 246, 0.3);
-    border-radius: 8px;
-    margin: 0 20px 12px;
+    padding: 8px 16px;
+    background: rgba(30, 30, 30, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-bottom: none;
+    border-radius: 8px 8px 0 0;
+    margin: 0 20px;
     backdrop-filter: blur(10px);
+    font-size: 11px;
 }
 
 .pending-info {
     display: flex;
     align-items: center;
-    gap: 8px;
-    color: rgba(255, 255, 255, 0.9);
-    font-size: 14px;
+    gap: 6px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 11px;
 }
 
-.pending-info i {
-    color: #3b82f6;
+.pending-file-count {
+    font-weight: 500;
+    color: rgba(255, 255, 255, 0.8);
+}
+
+.pending-file-icon {
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 11px;
+}
+
+.pending-stat-added {
+    color: #10b981;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+}
+
+.pending-stat-deleted {
+    color: #ef4444;
+    font-weight: 600;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
 }
 
 .pending-buttons {
     display: flex;
-    gap: 10px;
+    gap: 6px;
 }
 
 .btn-accept-all,
 .btn-reject-all {
-    padding: 8px 16px;
-    border: none;
-    border-radius: 6px;
-    font-size: 13px;
+    padding: 4px 10px;
+    border: 1px solid transparent;
+    border-radius: 4px;
+    font-size: 11px;
     font-weight: 500;
     cursor: pointer;
     transition: all 0.2s ease;
     display: flex;
     align-items: center;
-    gap: 6px;
+    gap: 4px;
 }
 
 .btn-accept-all {
-    background: linear-gradient(135deg, #10b981 0%, #059669 100%);
-    color: white;
+    background: rgba(16, 185, 129, 0.15);
+    color: #10b981;
+    border-color: rgba(16, 185, 129, 0.3);
 }
 
 .btn-accept-all:hover {
-    background: linear-gradient(135deg, #059669 0%, #047857 100%);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(16, 185, 129, 0.4);
+    background: rgba(16, 185, 129, 0.25);
+    border-color: rgba(16, 185, 129, 0.5);
 }
 
 .btn-reject-all {
-    background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
-    color: white;
+    background: rgba(239, 68, 68, 0.15);
+    color: #ef4444;
+    border-color: rgba(239, 68, 68, 0.3);
 }
 
 .btn-reject-all:hover {
-    background: linear-gradient(135deg, #dc2626 0%, #b91c1c 100%);
-    transform: translateY(-1px);
-    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+    background: rgba(239, 68, 68, 0.25);
+    border-color: rgba(239, 68, 68, 0.5);
 }
