@@ -750,6 +750,9 @@ class AIToolsManager {
             // 清除装饰
             this.clearDiffDecorations(toolCallId);
             
+            // 4. 刷新编辑器内容（如果文件已打开）
+            await this.refreshEditorContent(file_path, server_id);
+            
             // 移除待处理列表
             this.pendingEdits.delete(toolCallId);
             
@@ -894,6 +897,43 @@ class AIToolsManager {
                 delete edit.zoneIds;
             }
             delete edit.editorInstance;
+        }
+    }
+
+    /**
+     * 刷新编辑器内容
+     */
+    async refreshEditorContent(filePath, serverId) {
+        console.log('🔄 刷新编辑器内容:', { filePath, serverId });
+        
+        // 获取编辑器实例
+        const editor = window.getEditorByPath && window.getEditorByPath(filePath);
+        if (!editor) {
+            console.log('❌ 编辑器未打开，跳过刷新');
+            return;
+        }
+        
+        try {
+            // 重新读取文件内容
+            const sessionId = serverId === 'local' ? 'local' : this.getSessionIdByServerId(serverId);
+            const endpoint = serverId === 'local' ? '/api/local/files/read' : '/api/files/read';
+            
+            const response = await fetch(`${endpoint}?${serverId === 'local' ? '' : 'session_id=' + sessionId + '&'}path=${encodeURIComponent(filePath)}`);
+            const data = await response.json();
+            
+            if (!data.success) {
+                console.error('读取文件失败:', data.error);
+                return;
+            }
+            
+            // 更新编辑器内容
+            const model = editor.getModel();
+            if (model) {
+                model.setValue(data.content);
+                console.log('✅ 编辑器内容已刷新');
+            }
+        } catch (error) {
+            console.error('刷新编辑器失败:', error);
         }
     }
 
