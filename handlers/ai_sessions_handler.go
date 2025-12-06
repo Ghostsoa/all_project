@@ -334,13 +334,15 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 	if len(fileAcceptedCount) > 0 {
 		historyManager := models.GetFileHistoryManager()
 		for filePath, count := range fileAcceptedCount {
-			log.Printf("📝 文件 %s 需要恢复 %d 次", filePath, count)
+			log.Printf("📝 文件 %s 需要恢复 %d 次（撤销%d个accepted edit）", filePath, count, count)
 			for i := 0; i < count; i++ {
-				if err := historyManager.RestoreLatestVersion(filePath); err != nil {
+				// 使用RestoreAndRemoveLatestVersion，恢复后删除该版本
+				// 这样下一次恢复时会恢复前一个版本
+				if err := historyManager.RestoreAndRemoveLatestVersion(filePath); err != nil {
 					log.Printf("⚠️ 恢复文件失败 (第%d次): %s, error: %v", i+1, filePath, err)
 					break
 				} else {
-					log.Printf("✅ 已恢复文件 (第%d/%d次): %s", i+1, count, filePath)
+					log.Printf("✅ 已恢复文件并删除历史版本 (第%d/%d次): %s", i+1, count, filePath)
 				}
 			}
 		}

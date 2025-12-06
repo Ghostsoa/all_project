@@ -186,7 +186,7 @@ func (m *FileHistoryManager) GetVersionList(filePath string) []HistoryVersion {
 	return history.Versions
 }
 
-// RestoreLatestVersion 从历史恢复文件的最后一个版本
+// RestoreLatestVersion 从历史恢复文件的最后一个版本（不删除版本）
 func (m *FileHistoryManager) RestoreLatestVersion(filePath string) error {
 	m.mutex.RLock()
 	history, exists := m.histories[filePath]
@@ -210,6 +210,46 @@ func (m *FileHistoryManager) RestoreLatestVersion(filePath string) error {
 
 	log.Printf("✅ 已从历史恢复文件: %s (版本 %d)", filePath, latestVersionID)
 	return nil
+}
+
+// RestoreAndRemoveLatestVersion 从历史恢复文件的最后一个版本，并删除该版本（用于撤销）
+func (m *FileHistoryManager) RestoreAndRemoveLatestVersion(filePath string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	history, exists := m.histories[filePath]
+	if !exists || len(history.Versions) == 0 {
+		return fmt.Errorf("文件没有历史版本: %s", filePath)
+	}
+
+	// 获取最后一个版本
+	latestVersionID := len(history.Versions)
+
+	// 临时解锁以调用ReconstructVersion（它需要读锁）
+	m.mutex.Unlock()
+	content, err := m.ReconstructVersion(filePath, latestVersionID)
+	m.mutex.Lock()
+
+	if err != nil {
+		return fmt.Errorf("重建版本失败: %v", err)
+	}
+
+	// 写入磁盘
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("写入文件失败: %v", err)
+	}
+
+	// 删除最后一个版本
+	history.Versions = history.Versions[:len(history.Versions)-1]
+
+	// 如果没有版本了，删除整个文件历史
+	if len(history.Versions) == 0 {
+		delete(m.histories, filePath)
+	}
+
+	log.Printf("✅ 已从历史恢复文件并删除该版本: %s (版本 %d)", filePath, latestVersionID)
+
+	return m.saveLocked()
 }
 
 // DeleteConversationHistory 删除指定会话的所有历史版本
