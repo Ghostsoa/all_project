@@ -1310,6 +1310,12 @@ async function streamChat(sessionId, message, thinkingId) {
                     
                     // 只有内容不为空时才更新思维链
                     if (reasoningContent) {
+                        // 🔍 添加唯一标识追踪
+                        if (!messageElement.dataset.debugId) {
+                            messageElement.dataset.debugId = 'msg-' + Date.now();
+                        }
+                        console.log('🔍 Reasoning更新，messageElement ID:', messageElement.dataset.debugId);
+                        
                         updateReasoningContent(messageElement, reasoningContent, false, true);
                         scrollToBottom();
                     }
@@ -1351,7 +1357,8 @@ async function streamChat(sessionId, message, thinkingId) {
                     console.log('🔍 messageElement状态:', {
                         exists: !!messageElement,
                         inDOM: messageElement ? document.body.contains(messageElement) : false,
-                        hasParent: messageElement ? !!messageElement.parentElement : false
+                        hasParent: messageElement ? !!messageElement.parentElement : false,
+                        debugId: messageElement ? messageElement.dataset.debugId : null
                     });
                     
                     // 🔧 标记已有tool_call，后续reasoning将被忽略
@@ -1359,6 +1366,7 @@ async function streamChat(sessionId, message, thinkingId) {
                     
                     // 如果还没有消息元素，创建一个（从工具开始）
                     if (!messageElement) {
+                        console.error('❌❌❌ BUG: tool_call到来时messageElement不存在！这会创建第二个assistant消息！');
                         if (thinkingId) {
                             // 替换thinking元素
                             const thinkingElement = document.getElementById(thinkingId);
@@ -1373,12 +1381,16 @@ async function streamChat(sessionId, message, thinkingId) {
                             messageElement = createMessageElement('assistant', '');
                             messagesContainer.appendChild(messageElement);
                         }
+                    } else {
+                        console.log('✅ tool_call到来，messageElement已存在，使用现有元素');
                     }
                     
                     // 🔧 修复：在添加工具调用前，如果有思维链div已创建，先折叠它
                     if (messageElement) {
                         const existingReasoningDivs = messageElement.querySelectorAll('.message-reasoning');
                         console.log('🔍 Tool call到来，reasoning div数量:', existingReasoningDivs.length);
+                        console.log('🔍 messageElement.innerHTML长度:', messageElement.innerHTML.length);
+                        console.log('🔍 contentWrapper子元素:', Array.from(messageElement.querySelector('.message-content-wrapper')?.children || []).map(c => c.className));
                         
                         if (existingReasoningDivs.length > 0) {
                             // 已存在div，折叠并停止流光
