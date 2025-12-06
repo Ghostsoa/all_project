@@ -25,6 +25,15 @@ export function getCurrentSessionID() {
     return currentSessionID;
 }
 
+// 获取当前serverID（供其他模块使用）
+export function getCurrentServerID() {
+    return currentServerID;
+}
+
+// 挂载到 window，供非模块化脚本使用
+window.getCurrentSessionID = getCurrentSessionID;
+window.getCurrentServerID = getCurrentServerID;
+
 // 防止重复初始化标志
 let isFileTreeInitialized = false;
 

@@ -821,22 +821,16 @@ class AIToolsManager {
     getCurrentServerId() {
         // 检查是否是本地模式（sessionID为'local'表示本地）
         const sessionId = this.getCurrentSessionId();
-        console.log('🔍 getCurrentSessionId 返回:', sessionId);
-        
         if (sessionId === 'local') {
             return 'local';
         }
         
         // 从全局函数获取远程服务器ID
         if (window.getCurrentServerID) {
-            const serverId = window.getCurrentServerID();
-            console.log('🔍 window.getCurrentServerID 返回:', serverId);
-            return serverId;
+            return window.getCurrentServerID();
         }
         
-        // 如果什么都没有，假设是本地模式（临时解决方案）
-        console.warn('⚠️ 无法获取serverId，假设为local');
-        return 'local';
+        return null;
     }
 
     /**
@@ -863,11 +857,7 @@ class AIToolsManager {
         if (window.getCurrentSessionID) {
             return window.getCurrentSessionID();
         }
-        
-        // 如果无法获取，且serverId是local，返回'local'
-        // 这是临时解决方案，因为 filetree 的 getCurrentSessionID 没有暴露到 window
-        console.warn('⚠️ window.getCurrentSessionID 不存在，假设为本地模式');
-        return 'local';
+        return null;
     }
 
     /**
