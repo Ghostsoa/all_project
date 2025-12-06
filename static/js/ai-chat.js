@@ -1362,13 +1362,13 @@ async function streamChat(sessionId, message, thinkingId) {
                     // 🔧 修复：在添加工具调用前，如果有思维链内容，先折叠它
                     if (reasoningContent && messageElement) {
                         updateReasoningContent(messageElement, reasoningContent, true, false);
-                        // 停止思维链header的流光
-                        const reasoningHeader = messageElement.querySelector('.reasoning-header');
-                        if (reasoningHeader) {
-                            reasoningHeader.classList.remove('shimmer-text');
-                        }
-                        // 🔧 重置reasoningContent，让后续的reasoning创建新的思维链div
-                        reasoningContent = '';
+                        // 停止所有思维链header的流光
+                        const allReasoningHeaders = messageElement.querySelectorAll('.reasoning-header');
+                        allReasoningHeaders.forEach(header => {
+                            header.classList.remove('shimmer-text');
+                        });
+                        // 🔧 不要重置reasoningContent，避免后续reasoning创建重复的div
+                        // reasoningContent = '';
                     }
                     
                     appendToolCall(messageElement, data);
@@ -1666,13 +1666,8 @@ function updateReasoningContent(messageElement, reasoning, autoCollapse = false,
     let reasoningDiv = allReasoningDivs.length > 0 ? allReasoningDivs[allReasoningDivs.length - 1] : null;
     let isNewDiv = false;
     
-    // 如果已有reasoning div且已折叠（说明是工具调用前的旧思维链），创建新的
-    if (reasoningDiv) {
-        const reasoningContent = reasoningDiv.querySelector('.reasoning-content');
-        if (reasoningContent && reasoningContent.classList.contains('collapsed')) {
-            reasoningDiv = null; // 强制创建新div
-        }
-    }
+    // 🔧 修复：不要因为折叠就创建新div，继续使用现有的div更新内容
+    // 这样可以避免出现多个thought元素
     
     if (!reasoningDiv) {
         isNewDiv = true;
@@ -1701,14 +1696,23 @@ function updateReasoningContent(messageElement, reasoning, autoCollapse = false,
     }
     
     const reasoningContent = reasoningDiv.querySelector('.reasoning-content');
+    const header = reasoningDiv.querySelector('.reasoning-header');
+    
     if (reasoningContent) {
         // 使用Markdown渲染思维链内容
         reasoningContent.innerHTML = formatMessageContent(reasoning);
+        
+        // 🔧 如果正在更新内容（不是自动折叠），且div已折叠，则展开它
+        if (!autoCollapse && reasoningContent.classList.contains('collapsed')) {
+            reasoningContent.classList.remove('collapsed');
+            if (header) {
+                header.classList.remove('collapsed');
+            }
+        }
     }
     
     // 自动折叠
     if (autoCollapse) {
-        const header = reasoningDiv.querySelector('.reasoning-header');
         const content = reasoningDiv.querySelector('.reasoning-content');
         if (header && content) {
             header.classList.add('collapsed');
