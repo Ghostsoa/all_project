@@ -1121,6 +1121,7 @@ async function streamChat(sessionId, message, thinkingId) {
         let messageElement = null;
         let currentContentDiv = null;  // 当前正在更新的 content div
         let currentBlockText = '';      // 当前块的文本（工具前后分开）
+        let hasToolCall = false;         // 🔧 标记是否已有tool_call（避免后续reasoning重复更新）
         
         // 收集上下文信息
         const terminalInfo = window.getTerminalBuffer(200);  // 终端200行
@@ -1262,6 +1263,12 @@ async function streamChat(sessionId, message, thinkingId) {
                     scrollToBottom();
                     
                 } else if (data.type === 'reasoning') {
+                    // 🔧 如果已有tool_call，忽略后续的reasoning（避免创建重复的thought）
+                    if (hasToolCall) {
+                        console.log('⚠️ 忽略tool_call之后的reasoning数据');
+                        return;
+                    }
+                    
                     // 思维链内容
                     let newReasoning = data.reasoning_content || data.content || '';
                     
@@ -1323,35 +1330,24 @@ async function streamChat(sessionId, message, thinkingId) {
                     
                     resolve();
                     
-                } else if (data.type === 'stopped') {
-                    // 停止生成（后端已推送"[生成已停止]"文本）
-                    console.log('⏹️ 生成已停止');
-                    
-                    // 清理thinking元素
-                    removeThinking(thinkingId);
-                    
-                    resolve();
-                    
                 } else if (data.type === 'tool_call') {
-                    // AI 调用工具
+                    // 工具调用
                     console.log('🔧 工具调用:', data);
                     
-                    // 保存tool_call参数供后续使用
-                    if (!window.currentToolCalls) {
-                        window.currentToolCalls = {};
-                    }
-                    // 解析参数
-                    try {
-                        const toolArgs = JSON.parse(data.arguments || '{}');
-                        window.currentToolCalls[data.tool_call_id] = toolArgs;
-                    } catch (e) {
-                        console.error('解析tool_call参数失败:', e);
-                    }
+                    // 🔧 标记已有tool_call，后续reasoning将被忽略
+                    hasToolCall = true;
                     
-                    // 渲染执行中的工具
+                    // 如果还没有消息元素，创建一个（从工具开始）
                     if (!messageElement) {
-                        messageElement = convertThinkingToMessage(thinkingId);
-                        if (!messageElement) {
+                        if (thinkingId) {
+                            // 替换thinking元素
+                            const thinkingElement = document.getElementById(thinkingId);
+                            if (thinkingElement) {
+                                messageElement = createMessageElement('assistant', '');
+                                thinkingElement.replaceWith(messageElement);
+                                thinkingId = null;
+                            }
+                        } else {
                             // 创建新消息元素并添加到DOM
                             const messagesContainer = document.getElementById('aiMessages');
                             messageElement = createMessageElement('assistant', '');
