@@ -282,13 +282,17 @@
 
 /* ==================== Monaco Diff 装饰样式 ==================== */
 
-/* 隐藏被Zone替换的原始行 */
-.diff-line-hidden-for-zone {
-    display: none !important;
-    opacity: 0 !important;
-    height: 0 !important;
-    line-height: 0 !important;
-    visibility: hidden !important;
+/* 删除行（红色背景，标记在原始行上） */
+.diff-line-deleted {
+    background-color: rgba(239, 68, 68, 0.3) !important;
+    opacity: 1 !important;
+}
+
+/* 删除行的Glyph */
+.diff-glyph-deleted {
+    background-color: #ef4444;
+    width: 4px !important;
+    margin-left: 3px;
 }
 
 /* Zone Widget 容器 */
@@ -304,12 +308,6 @@
     white-space: pre;
     padding: 0;
     margin: 0;
-}
-
-/* 删除行（红色，在Zone中） */
-.diff-zone-deleted {
-    background-color: rgba(239, 68, 68, 0.3);
-    color: #fca5a5;
 }
 
 /* 添加行（绿色，在Zone中） */

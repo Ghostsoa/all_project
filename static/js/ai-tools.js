@@ -653,12 +653,13 @@ class AIToolsManager {
                 const fontFamily = editorOptions.get(monaco.editor.EditorOption.fontFamily);
                 const lineHeight = editorOptions.get(monaco.editor.EditorOption.lineHeight);
                 
-                // 为每组创建一个Zone
-                groups.forEach((group, groupIdx) => {
+                // 从后往前为每组创建Zone（避免行号偏移）
+                for (let groupIdx = groups.length - 1; groupIdx >= 0; groupIdx--) {
+                    const group = groups[groupIdx];
                     const firstIdx = group[0];
                     const lastIdx = group[group.length - 1];
                     
-                    // 隐藏这组的原始行
+                    // 标记这组的原始行为红色删除状态（不隐藏）
                     for (let idx = firstIdx; idx <= lastIdx; idx++) {
                         if (idx < (end_line - start_line + 1)) {
                             const lineNum = start_line + idx;
@@ -666,13 +667,14 @@ class AIToolsManager {
                                 range: new monaco.Range(lineNum, 1, lineNum, model.getLineMaxColumn(lineNum)),
                                 options: {
                                     isWholeLine: true,
-                                    className: 'diff-line-hidden-for-zone'
+                                    className: 'diff-line-deleted',
+                                    glyphMarginClassName: 'diff-glyph-deleted'
                                 }
                             });
                         }
                     }
                     
-                    // 创建Zone显示这组的diff
+                    // 创建Zone只显示绿色添加行
                     const domNode = document.createElement('div');
                     domNode.className = 'diff-zone-widget';
                     domNode.style.fontSize = `${fontSize}px`;
@@ -680,44 +682,30 @@ class AIToolsManager {
                     domNode.style.lineHeight = `${lineHeight}px`;
                     
                     const linesHtml = [];
-                    const deletedLines = [];
-                    const addedLines = [];
                     
-                    // 先收集所有删除和添加的行
+                    // 只显示绿色添加行
                     for (const idx of group) {
-                        const oldLine = oldLines[idx] || '';
                         const newLine = newLines[idx] || '';
-                        
-                        if (oldLine) {
-                            deletedLines.push(oldLine);
-                        }
                         if (newLine) {
-                            addedLines.push(newLine);
+                            linesHtml.push(`<div class="diff-zone-line diff-zone-added">${this.escapeHtml(newLine)}</div>`);
                         }
-                    }
-                    
-                    // 先显示所有红色删除行
-                    for (const line of deletedLines) {
-                        linesHtml.push(`<div class="diff-zone-line diff-zone-deleted">${this.escapeHtml(line)}</div>`);
-                    }
-                    
-                    // 再显示所有绿色添加行
-                    for (const line of addedLines) {
-                        linesHtml.push(`<div class="diff-zone-line diff-zone-added">${this.escapeHtml(line)}</div>`);
                     }
                     
                     domNode.innerHTML = linesHtml.join('');
                     console.log(`📦 组 ${groupIdx + 1} 包含 ${linesHtml.length} 行HTML`);
                     
-                    const zoneWidget = {
-                        domNode: domNode,
-                        afterLineNumber: start_line + firstIdx - 1,
-                        heightInLines: linesHtml.length,
-                        suppressMouseDown: true
-                    };
-                    
-                    zoneWidgets.push(zoneWidget);
-                });
+                    // 只有当有添加行时才创建Zone
+                    if (linesHtml.length > 0) {
+                        const zoneWidget = {
+                            domNode: domNode,
+                            afterLineNumber: start_line + lastIdx,
+                            heightInLines: linesHtml.length,
+                            suppressMouseDown: true
+                        };
+                        
+                        zoneWidgets.push(zoneWidget);
+                    }
+                }
             }
         });
 
