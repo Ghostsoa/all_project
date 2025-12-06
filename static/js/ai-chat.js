@@ -1337,6 +1337,12 @@ async function streamChat(sessionId, message, thinkingId) {
                         reasoningContent = '';
                     }
                     
+                    // 🔧 删除可能存在的空content div（在tool_call前如果没有收到content）
+                    if (messageElement && currentContentDiv && currentContentDiv.textContent.trim() === '') {
+                        currentContentDiv.remove();
+                        currentContentDiv = null;
+                    }
+                    
                     appendToolCall(messageElement, data);
                     
                     // 重置当前块，准备接收工具后的文本
@@ -1454,8 +1460,8 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
         contentWrapper.appendChild(reasoningDiv);
     }
     
-    // 添加正文内容（如果有内容的话）
-    if (content || role === 'user') {
+    // 添加正文内容（只在有实际内容时添加）
+    if (content && content.trim() !== '') {
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
         // 用户消息只做简单转义，AI消息应用Markdown渲染
@@ -1553,12 +1559,10 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
         messageDiv.dataset.messageIndex = messageId;
     }
     
-    // 添加消息操作按钮（类似命令记录样式）
-    const actionsDiv = document.createElement('div');
-    actionsDiv.className = 'message-actions';
-    
+    // 添加消息操作按钮（只为用户消息添加）
     if (role === 'user') {
-        // 用户消息：编辑、撤销
+        const actionsDiv = document.createElement('div');
+        actionsDiv.className = 'message-actions';
         actionsDiv.innerHTML = `
             <span class="message-action-link" onclick="editMessage(this)" title="编辑">
                 <i class="fa-solid fa-edit"></i> 编辑
@@ -1567,12 +1571,8 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
                 <i class="fa-solid fa-undo"></i> 撤销
             </span>
         `;
-    } else {
-        // AI消息：无操作按钮
-        actionsDiv.innerHTML = '';
+        messageDiv.appendChild(actionsDiv);
     }
-    
-    messageDiv.appendChild(actionsDiv);
     
     return messageDiv;
 }
@@ -1583,6 +1583,15 @@ function updateMessageContent(messageElement, content) {
     if (!contentWrapper) return;
     
     let contentDiv = messageElement.querySelector('.message-content:last-of-type');
+    
+    // 如果内容为空，删除空的content div（如果存在）
+    if (!content || content.trim() === '') {
+        if (contentDiv && contentDiv.textContent.trim() === '') {
+            contentDiv.remove();
+        }
+        return;
+    }
+    
     if (!contentDiv) {
         // 如果没有content div，创建一个并追加到wrapper
         contentDiv = document.createElement('div');
