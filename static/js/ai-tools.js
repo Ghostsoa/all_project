@@ -521,15 +521,32 @@ class AIToolsManager {
             }
             
             // 2. 打开文件（调用 editor.js 的函数）
-            console.log('📂 打开文件:', file_path);
-            if (window.openFileEditor) {
-                await window.openFileEditor(file_path, server_id, sessionID);
-            } else if (window.openFile) {
-                await window.openFile(file_path, server_id, sessionID);
+            console.log('📂 准备打开文件:', { file_path, server_id, sessionID });
+            
+            // 本地文件
+            if (server_id === 'local' || sessionID === 'local') {
+                console.log('📂 打开本地文件');
+                if (window.openLocalFile) {
+                    await window.openLocalFile(file_path);
+                } else if (window.openFile) {
+                    await window.openFile(file_path);
+                } else {
+                    console.error('❌ 未找到本地文件打开函数');
+                    this.showToast('无法打开本地文件', 'error');
+                    return;
+                }
             } else {
-                console.error('❌ 未找到openFile函数');
-                this.showToast('无法打开文件', 'error');
-                return;
+                // 远程文件
+                console.log('📂 打开远程文件');
+                if (window.openFileEditor) {
+                    await window.openFileEditor(file_path, server_id, sessionID);
+                } else if (window.openFile) {
+                    await window.openFile(file_path, server_id, sessionID);
+                } else {
+                    console.error('❌ 未找到远程文件打开函数');
+                    this.showToast('无法打开远程文件', 'error');
+                    return;
+                }
             }
             
             // 3. 等待编辑器加载完成（给一点时间）
