@@ -616,7 +616,8 @@ class AIToolsManager {
                     options: {
                         isWholeLine: true,
                         className: 'diff-line-deleted',
-                        glyphMarginClassName: 'diff-glyph-deleted'
+                        glyphMarginClassName: 'diff-glyph-deleted',
+                        linesDecorationsClassName: 'diff-line-deleted-marker'
                     }
                 });
                 

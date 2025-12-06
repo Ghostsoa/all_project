@@ -288,6 +288,13 @@
     opacity: 1 !important;
 }
 
+/* 删除行的-号标记（显示在行装饰区） */
+.diff-line-deleted-marker::before {
+    content: '−';
+    color: #ef4444 !important;
+    font-weight: bold;
+}
+
 /* 删除行的Glyph */
 .diff-glyph-deleted {
     background-color: #ef4444;
