@@ -1090,11 +1090,19 @@ class AIToolsManager {
         const pendingCount = this.pendingEdits.size;
         const actionsBar = document.getElementById('pendingActionsBar');
         const infoDiv = document.querySelector('.pending-info');
+        const buttonsDiv = document.querySelector('.pending-buttons');
         
-        if (!actionsBar || !infoDiv) return;
+        if (!actionsBar || !infoDiv || !buttonsDiv) return;
+        
+        // 常驻显示
+        actionsBar.style.display = 'flex';
         
         if (pendingCount === 0) {
-            actionsBar.style.display = 'none';
+            // 没有变动时显示默认状态
+            infoDiv.innerHTML = `
+                <span class="pending-file-count">No pending changes</span>
+            `;
+            buttonsDiv.style.display = 'none';
             return;
         }
         
@@ -1133,7 +1141,7 @@ class AIToolsManager {
             ${totalDeleted > 0 ? `<span class="pending-stat-deleted">-${totalDeleted}</span>` : ''}
         `;
         
-        actionsBar.style.display = 'flex';
+        buttonsDiv.style.display = 'flex';
     }
 
     /**
