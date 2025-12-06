@@ -290,12 +290,11 @@
 
 /* Zone Widget 容器 */
 .diff-zone-widget {
-    background-color: rgba(30, 30, 30, 0.95);
-    border-left: 3px solid #eab308;
-    padding: 4px 0;
+    background-color: transparent;
+    padding: 0;
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    font-size: 13px;
-    line-height: 18px;
+    font-size: 14px;
+    line-height: 20px;
 }
 
 /* Zone Widget 中的每一行 */

@@ -571,6 +571,13 @@ class AIToolsManager {
     applyDiffDecorations(filePath, operations, toolCallId) {
         console.log('🎨 applyDiffDecorations:', { filePath, operations, toolCallId });
         
+        // 先清除旧的装饰（如果存在）
+        const existingEdit = this.pendingEdits.get(toolCallId);
+        if (existingEdit && existingEdit.zoneIds) {
+            console.log('🧹 清除已存在的Zone装饰');
+            this.clearDiffDecorations(toolCallId);
+        }
+        
         // 获取对应的编辑器实例
         console.log('🔍 查找编辑器实例，getEditorByPath存在:', !!window.getEditorByPath);
         let editor = window.getEditorByPath && window.getEditorByPath(filePath);
