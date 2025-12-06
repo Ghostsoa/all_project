@@ -50,16 +50,15 @@
 }
 
 /* ==================== 复杂工具（edit/write）==================== */
-/* 卡片样式 - 带边框，宽度90% */
+/* 卡片样式 - 占满宽度，灰色背景 */
 .tool-card {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    width: 90%;
-    max-width: 600px;
-    margin: 4px auto;
+    width: 100%;
+    margin: 4px 0;
     padding: 6px 12px;
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(128, 128, 128, 0.08);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 6px;
     cursor: pointer;
@@ -68,7 +67,7 @@
 }
 
 .tool-card:hover {
-    background: rgba(255, 255, 255, 0.04);
+    background: rgba(128, 128, 128, 0.12);
     border-color: rgba(255, 255, 255, 0.15);
 }
 
@@ -82,8 +81,8 @@
 }
 
 .tool-card-icon {
-    width: 16px;
-    height: 16px;
+    width: 14px;
+    height: 14px;
     display: flex;
     align-items: center;
     justify-content: center;
@@ -91,12 +90,12 @@
 }
 
 .tool-card-icon img {
-    width: 14px;
-    height: 14px;
+    width: 12px;
+    height: 12px;
 }
 
 .tool-card-icon i {
-    font-size: 14px;
+    font-size: 12px;
 }
 
 .tool-card-name {
@@ -136,7 +135,7 @@
 }
 
 .tool-card-loading:hover {
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(128, 128, 128, 0.08);
     border-color: rgba(255, 255, 255, 0.1);
 }
 
@@ -147,7 +146,7 @@
 }
 
 .tool-card-completed:hover {
-    background: rgba(255, 255, 255, 0.02);
+    background: rgba(128, 128, 128, 0.08);
     border-color: rgba(255, 255, 255, 0.1);
 }
 
