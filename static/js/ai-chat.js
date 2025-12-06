@@ -1218,7 +1218,8 @@ async function streamChat(sessionId, message, thinkingId) {
                     currentBlockText += content;  // 当前块的文本
                     
                     // 如果是第一条内容且有thinking，转换为正式消息
-                    if (isFirstContent && thinkingId) {
+                    // 🔧 但如果messageElement已存在（reasoning创建的），不要替换
+                    if (isFirstContent && thinkingId && !messageElement) {
                         messageElement = convertThinkingToMessage(thinkingId);
                         thinkingId = null;
                     }
@@ -1228,6 +1229,12 @@ async function streamChat(sessionId, message, thinkingId) {
                         const messagesContainer = document.getElementById('aiMessages');
                         messageElement = createMessageElement('assistant', '');
                         messagesContainer.appendChild(messageElement);
+                    }
+                    
+                    // 🔧 如果messageElement已存在但thinking还在，清理thinking
+                    if (thinkingId && messageElement) {
+                        removeThinking(thinkingId);
+                        thinkingId = null;
                     }
                     
                     // 如果没有currentContentDiv，创建一个
