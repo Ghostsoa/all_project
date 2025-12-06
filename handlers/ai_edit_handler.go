@@ -3,6 +3,7 @@ package handlers
 import (
 	"all_project/models"
 	"all_project/storage"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -51,8 +52,8 @@ func (h *AIEditHandler) ApplyEdit(c *gin.Context) {
 				conversationID = "default_current" // fallback
 			}
 
-			// 使用AcceptVersion获取要写入的内容、后续版本和被Accept的toolCallIDs
-			acceptedContent, remainingVersions, acceptedIDs, err := manager.AcceptVersion(conversationID, req.FilePath, req.ToolCallID)
+			// 使用AcceptVersion获取要写入的内容、后续版本和被Accept的版本列表
+			acceptedContent, remainingVersions, acceptedVersions, err := manager.AcceptVersion(conversationID, req.FilePath, req.ToolCallID)
 			if err != nil {
 				log.Printf("❌ Accept版本失败: %v", err)
 				c.JSON(http.StatusInternalServerError, gin.H{
@@ -62,25 +63,35 @@ func (h *AIEditHandler) ApplyEdit(c *gin.Context) {
 				return
 			}
 
-			acceptedToolCallIDs = acceptedIDs
+			// 提取所有被Accept的toolCallIDs
+			for _, v := range acceptedVersions {
+				acceptedToolCallIDs = append(acceptedToolCallIDs, v.ToolCallID)
+			}
 
-			if acceptedContent != "" {
-				// 1. 先备份当前磁盘文件到历史
+			if acceptedContent != "" && len(acceptedVersions) > 0 {
 				historyManager := models.GetFileHistoryManager()
-				if err := historyManager.BackupAndAddVersion(req.FilePath, "Accept前备份"); err != nil {
-					log.Printf("⚠️ 备份文件失败: %v（继续写入）", err)
-				} else {
-					log.Printf("📦 已备份文件到历史")
-				}
 
-				// 2. 写入Accept的版本到磁盘
-				if err := os.WriteFile(req.FilePath, []byte(acceptedContent), 0644); err != nil {
-					log.Printf("❌ 写入文件失败: %v", err)
-					c.JSON(http.StatusInternalServerError, gin.H{
-						"success": false,
-						"error":   "写入文件失败",
-					})
-					return
+				// 为每个被Accept的版本分别备份和写入
+				// 这样撤销时可以恢复到正确的中间状态
+				for i, version := range acceptedVersions {
+					// 1. 备份当前磁盘状态
+					description := fmt.Sprintf("Accept %s 前备份", version.ToolCallID)
+					if err := historyManager.BackupAndAddVersion(req.FilePath, description); err != nil {
+						log.Printf("⚠️ 备份文件失败 (%s): %v（继续写入）", version.ToolCallID, err)
+					} else {
+						log.Printf("📦 已备份文件到历史: %s", description)
+					}
+
+					// 2. 写入该版本到磁盘
+					if err := os.WriteFile(req.FilePath, []byte(version.Content), 0644); err != nil {
+						log.Printf("❌ 写入文件失败 (%s): %v", version.ToolCallID, err)
+						c.JSON(http.StatusInternalServerError, gin.H{
+							"success": false,
+							"error":   fmt.Sprintf("写入文件失败: %v", err),
+						})
+						return
+					}
+					log.Printf("✅ 已写入版本 %d/%d: %s", i+1, len(acceptedVersions), version.ToolCallID)
 				}
 
 				// 3. 如果有后续版本，恢复它们
@@ -88,9 +99,9 @@ func (h *AIEditHandler) ApplyEdit(c *gin.Context) {
 					if err := manager.RestoreVersions(conversationID, req.FilePath, remainingVersions); err != nil {
 						log.Printf("⚠️ 恢复后续版本失败: %v", err)
 					}
-					log.Printf("✅ Accept并写入文件: %s，保留 %d 个后续版本，连带Accept %d 个", req.FilePath, len(remainingVersions), len(acceptedToolCallIDs))
+					log.Printf("✅ Accept完成: %s，连带Accept %d 个版本，保留 %d 个后续版本", req.FilePath, len(acceptedToolCallIDs), len(remainingVersions))
 				} else {
-					log.Printf("✅ Accept并写入文件: %s，无后续版本，连带Accept %d 个", req.FilePath, len(acceptedToolCallIDs))
+					log.Printf("✅ Accept完成: %s，连带Accept %d 个版本，无后续版本", req.FilePath, len(acceptedToolCallIDs))
 				}
 			}
 		}

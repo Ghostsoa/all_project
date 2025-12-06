@@ -5,6 +5,7 @@ import (
 	"all_project/storage"
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"log"
 	"net/http"
 	"strconv"
@@ -236,8 +237,29 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 	// 2. 清理被删除消息的pending状态
 	pendingManager := models.GetPendingStateManager()
 
+	// 2. 收集需要恢复的文件（被删除的消息中有accepted的edit）
+	var needRestoreFiles = make(map[string]bool) // file_path -> true
+
 	for i := req.MessageIndex; i < len(messages); i++ {
 		msg := messages[i]
+
+		// 检查tool消息，找到accepted的edit
+		if msg.Role == "tool" && msg.ToolName == "file_operation" {
+			// 尝试解析Content字段（可能包含status信息）
+			// Content格式可能是JSON或纯文本，需要兼容处理
+			if len(msg.Content) > 0 && msg.Content[0] == '{' {
+				var toolResult struct {
+					Status   string `json:"status"`
+					FilePath string `json:"file_path"`
+				}
+				// 忽略解析错误，因为有些tool响应可能不是JSON
+				_ = json.Unmarshal([]byte(msg.Content), &toolResult)
+				if toolResult.Status == "accepted" && toolResult.FilePath != "" {
+					needRestoreFiles[toolResult.FilePath] = true
+					log.Printf("📝 发现被撤销的accepted edit: %s", toolResult.FilePath)
+				}
+			}
+		}
 
 		// 对于assistant消息，从ToolCalls中提取tool_call_id
 		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 {
@@ -261,10 +283,40 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 		return
 	}
 
-	// 注意：不恢复文件内容
-	// - 如果前面有accepted的版本，文件保持磁盘状态（已经是正确的）
-	// - 如果前面都是pending，文件保持磁盘原状，前端会根据剩余pending重新显示diff
-	// - 撤销只负责删除消息和清理pending state
+	// 4. 恢复被影响的文件（如果删除了accepted的edit，需要恢复到前一个状态）
+	// 统计每个文件有多少个accepted的edit被删除
+	fileAcceptedCount := make(map[string]int)
+	for i := req.MessageIndex; i < len(messages); i++ {
+		msg := messages[i]
+		if msg.Role == "tool" && msg.ToolName == "file_operation" {
+			if len(msg.Content) > 0 && msg.Content[0] == '{' {
+				var toolResult struct {
+					Status   string `json:"status"`
+					FilePath string `json:"file_path"`
+				}
+				_ = json.Unmarshal([]byte(msg.Content), &toolResult)
+				if toolResult.Status == "accepted" && toolResult.FilePath != "" {
+					fileAcceptedCount[toolResult.FilePath]++
+				}
+			}
+		}
+	}
+
+	// 对每个文件，根据被删除的accepted数量，多次恢复历史
+	if len(fileAcceptedCount) > 0 {
+		historyManager := models.GetFileHistoryManager()
+		for filePath, count := range fileAcceptedCount {
+			log.Printf("📝 文件 %s 需要恢复 %d 次", filePath, count)
+			for i := 0; i < count; i++ {
+				if err := historyManager.RestoreLatestVersion(filePath); err != nil {
+					log.Printf("⚠️ 恢复文件失败 (第%d次): %s, error: %v", i+1, filePath, err)
+					break
+				} else {
+					log.Printf("✅ 已恢复文件 (第%d/%d次): %s", i+1, count, filePath)
+				}
+			}
+		}
+	}
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "撤销成功"})
 }
