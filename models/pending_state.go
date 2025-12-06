@@ -2,6 +2,7 @@ package models
 
 import (
 	"encoding/json"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -141,14 +142,23 @@ func (m *PendingStateManager) RejectVersion(conversationID, filePath, toolCallID
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
+	log.Printf("🔍 RejectVersion 调用: conversationID=%s, filePath=%s, toolCallID=%s", conversationID, filePath, toolCallID)
+
 	conv, exists := m.states[conversationID]
 	if !exists {
+		log.Printf("⚠️ conversation不存在: %s", conversationID)
 		return nil
 	}
 
 	pendingFile, exists := conv.Files[filePath]
 	if !exists {
+		log.Printf("⚠️ 文件不存在于pending: %s", filePath)
 		return nil
+	}
+
+	log.Printf("📋 当前pending版本数: %d", len(pendingFile.Versions))
+	for i, v := range pendingFile.Versions {
+		log.Printf("  版本[%d]: toolCallID=%s, content前30字符=%s", i, v.ToolCallID, truncateString(v.Content, 30))
 	}
 
 	// 找到要拒绝的版本
@@ -161,11 +171,15 @@ func (m *PendingStateManager) RejectVersion(conversationID, filePath, toolCallID
 	}
 
 	if rejectIndex == -1 {
+		log.Printf("⚠️ 未找到toolCallID: %s", toolCallID)
 		return nil
 	}
 
+	log.Printf("✂️ 删除索引 %d 及之后的版本", rejectIndex)
 	// 删除这个版本及之后的所有版本（链式取消）
 	pendingFile.Versions = pendingFile.Versions[:rejectIndex]
+
+	log.Printf("📋 删除后剩余版本数: %d", len(pendingFile.Versions))
 
 	if len(pendingFile.Versions) == 0 {
 		// 没有版本了，删除整个文件
@@ -173,12 +187,21 @@ func (m *PendingStateManager) RejectVersion(conversationID, filePath, toolCallID
 		if len(conv.Files) == 0 {
 			delete(m.states, conversationID)
 		}
+		log.Printf("🗑️ pending已清空，删除文件: %s", filePath)
 	} else {
 		pendingFile.CurrentVersion = len(pendingFile.Versions) - 1
+		log.Printf("✅ 保留 %d 个版本", len(pendingFile.Versions))
 	}
 
 	conv.UpdatedAt = time.Now()
 	return m.Save()
+}
+
+func truncateString(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
 
 // AcceptVersion 接受某个版本（删除它及之前的，保留之后的）
