@@ -1366,25 +1366,24 @@ async function streamChat(sessionId, message, thinkingId) {
                         }
                     }
                     
-                    // 🔧 修复：在添加工具调用前，如果有思维链内容，先折叠它
-                    if (reasoningContent && messageElement) {
+                    // 🔧 修复：在添加工具调用前，如果有思维链div已创建，先折叠它
+                    if (messageElement) {
                         const existingReasoningDivs = messageElement.querySelectorAll('.message-reasoning');
                         console.log('🔍 Tool call到来，reasoning div数量:', existingReasoningDivs.length);
                         
                         if (existingReasoningDivs.length > 0) {
-                            // 已存在div，直接折叠
+                            // 已存在div，折叠并停止流光
                             updateReasoningContent(messageElement, reasoningContent, true, false);
+                            
+                            // 停止所有思维链header的流光
+                            const allReasoningHeaders = messageElement.querySelectorAll('.reasoning-header');
+                            allReasoningHeaders.forEach(header => {
+                                header.classList.remove('shimmer-text');
+                            });
                         } else {
-                            // div未创建，强制创建并折叠（不添加流光）
-                            console.log('⚠️ Reasoning内容存在但div未创建，强制创建并折叠');
-                            updateReasoningContent(messageElement, reasoningContent, true, false);
+                            // div未创建，说明reasoning还没来得及显示，直接忽略
+                            console.log('⚠️ Reasoning内容存在但div未创建，直接忽略（不创建幽灵div）');
                         }
-                        
-                        // 停止所有思维链header的流光
-                        const allReasoningHeaders = messageElement.querySelectorAll('.reasoning-header');
-                        allReasoningHeaders.forEach(header => {
-                            header.classList.remove('shimmer-text');
-                        });
                     }
                     
                     appendToolCall(messageElement, data);
