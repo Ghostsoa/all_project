@@ -129,80 +129,33 @@
     color: #ef4444;
 }
 
-/* 旧版横条容器（保留用于已完成的工具） */
-.tool-container {
-    background: rgba(255, 255, 255, 0.03);
-    border: 1px solid rgba(255, 255, 255, 0.08);
-    border-radius: 6px;
-    padding: 10px 12px;
-    margin: 8px 0;
-    transition: all 0.2s ease;
-    cursor: pointer;
+/* 加载中状态的卡片 */
+.tool-card-loading {
+    opacity: 0.8;
+    cursor: default;
 }
 
-.tool-container:hover {
-    background: rgba(255, 255, 255, 0.05);
-    border-color: rgba(255, 255, 255, 0.12);
+.tool-card-loading:hover {
+    background: rgba(255, 255, 255, 0.02);
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
-/* 工具头部 */
-.tool-header {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+/* 已完成状态的卡片 */
+.tool-card-completed {
+    opacity: 0.7;
+    cursor: default;
 }
 
-/* 文件图标 */
-.tool-file-icon {
-    width: 20px;
-    height: 20px;
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.tool-card-completed:hover {
+    background: rgba(255, 255, 255, 0.02);
+    border-color: rgba(255, 255, 255, 0.1);
 }
 
-.tool-file-icon img {
-    width: 16px;
-    height: 16px;
+.tool-card-status {
+    font-size: 14px;
+    font-weight: 600;
 }
 
-.tool-file-icon i {
-    font-size: 16px;
-    color: rgba(255, 255, 255, 0.6);
-}
-
-/* 文件信息 */
-.tool-file-info {
-    flex: 1;
-    min-width: 0;
-}
-
-.tool-file-name {
-    font-size: 13px;
-    color: rgba(255, 255, 255, 0.9);
-    font-weight: 500;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.tool-file-path {
-    font-size: 11px;
-    color: rgba(255, 255, 255, 0.4);
-    margin-top: 2px;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-/* 工具状态区域 */
-.tool-status {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    flex-shrink: 0;
-}
 
 /* 加载指示器 */
 .tool-spinner {
@@ -216,86 +169,6 @@
 
 @keyframes spin {
     to { transform: rotate(360deg); }
-}
-
-/* 工具状态标记 */
-.tool-status-badge {
-    padding: 3px 8px;
-    border-radius: 3px;
-    font-size: 11px;
-    font-weight: 500;
-}
-
-.tool-status-pending {
-    background: rgba(234, 179, 8, 0.15);
-    color: #eab308;
-}
-
-.tool-status-accepted {
-    background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
-}
-
-.tool-status-rejected {
-    background: rgba(239, 68, 68, 0.15);
-    color: #ef4444;
-}
-
-/* 操作类型标记 */
-.tool-type-badge {
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 10px;
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.5px;
-}
-
-.tool-type-edit {
-    background: rgba(59, 130, 246, 0.15);
-    color: #3b82f6;
-}
-
-.tool-type-write {
-    background: rgba(16, 185, 129, 0.15);
-    color: #10b981;
-}
-
-/* 折叠详情 */
-.tool-details {
-    margin-top: 10px;
-    padding-top: 10px;
-    border-top: 1px solid rgba(255, 255, 255, 0.05);
-    font-size: 12px;
-    color: rgba(255, 255, 255, 0.6);
-    max-height: 0;
-    overflow: hidden;
-    transition: max-height 0.3s ease;
-}
-
-.tool-details.expanded {
-    max-height: 500px;
-}
-
-/* 操作摘要 */
-.tool-summary {
-    padding: 8px 0;
-    line-height: 1.5;
-}
-
-.tool-summary-item {
-    display: flex;
-    gap: 6px;
-    margin: 4px 0;
-}
-
-.tool-summary-label {
-    color: rgba(255, 255, 255, 0.5);
-    min-width: 60px;
-}
-
-.tool-summary-value {
-    color: rgba(255, 255, 255, 0.8);
 }
 
 /* ==================== Monaco Diff 装饰样式 ==================== */

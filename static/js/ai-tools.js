@@ -112,25 +112,18 @@ class AIToolsManager {
         const fileName = file_path ? file_path.split('/').pop() : 'Unknown';
         const fileIcon = this.getFileIconHTML(fileName);
         
-        const statusText = status === 'accepted' ? '✓ Accepted' : '✗ Rejected';
-        const statusClass = status === 'accepted' ? 'tool-status-accepted' : 'tool-status-rejected';
-        const typeText = type === 'write' ? 'Create' : 'Edit';
+        const statusText = status === 'accepted' ? '✓' : '✗';
+        const statusColor = status === 'accepted' ? '#10b981' : '#ef4444';
         
         return `
             <div class="tool-call">
-                <div class="tool-container" data-tool-call-id="${toolCallId}">
-                    <div class="tool-header">
-                        <div class="tool-file-icon">
-                            ${fileIcon}
-                        </div>
-                        <div class="tool-file-info">
-                            <div class="tool-file-name">${fileName}</div>
-                            <div class="tool-file-path">${file_path || ''}</div>
-                        </div>
-                        <div class="tool-status">
-                            <span class="tool-type-badge tool-type-${type}">${typeText}</span>
-                            <span class="tool-status-badge ${statusClass}">${statusText}</span>
-                        </div>
+                <div class="tool-card tool-card-completed" data-tool-call-id="${toolCallId}">
+                    <div class="tool-card-left">
+                        <span class="tool-card-icon">${fileIcon}</span>
+                        <span class="tool-card-name">${fileName}</span>
+                    </div>
+                    <div class="tool-card-right">
+                        <span class="tool-card-status" style="color: ${statusColor}">${statusText}</span>
                     </div>
                 </div>
             </div>
@@ -403,26 +396,19 @@ class AIToolsManager {
                 </div>
             `;
         } else {
-            // edit/write 显示横条 + spinner
+            // edit/write 显示卡片 + spinner
             const fileName = file_path.split('/').pop();
             const fileIcon = this.getFileIconHTML(fileName);
-            const actionType = type === 'edit' ? 'Edit' : 'Create';
             
             return `
                 <div class="tool-call">
-                    <div class="tool-container">
-                        <div class="tool-header">
-                            <div class="tool-file-icon">
-                                ${fileIcon}
-                            </div>
-                            <div class="tool-file-info">
-                                <div class="tool-file-name">${fileName}</div>
-                                <div class="tool-file-path">${file_path}</div>
-                            </div>
-                            <div class="tool-status">
-                                <div class="tool-spinner"></div>
-                                <span class="tool-type-badge tool-type-${type}">${actionType}</span>
-                            </div>
+                    <div class="tool-card tool-card-loading">
+                        <div class="tool-card-left">
+                            <span class="tool-card-icon">${fileIcon}</span>
+                            <span class="tool-card-name">${fileName}</span>
+                        </div>
+                        <div class="tool-card-right">
+                            <div class="tool-spinner"></div>
                         </div>
                     </div>
                 </div>
