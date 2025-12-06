@@ -197,7 +197,6 @@ func (te *ToolExecutor) editFile(args FileOperationArgs, conversationID string, 
 		"type":         "edit",
 		"server_id":    args.ServerID,
 		"file_path":    args.FilePath,
-		"new_content":  newContent, // 完整的新文件内容，供前端确认后写入
 		"operations":   operations,
 		"tool_call_id": messageID,
 		"summary": fmt.Sprintf(
@@ -205,6 +204,8 @@ func (te *ToolExecutor) editFile(args FileOperationArgs, conversationID string, 
 			filepath.Base(args.FilePath),
 			len(operations),
 		),
+		// 注意：new_content已存储在pending state中，不需要在响应中包含
+		// 这样可以减少消息历史大小，避免AI看到完整文件内容
 	}
 
 	resultJSON, _ := json.Marshal(result)

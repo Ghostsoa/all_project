@@ -179,19 +179,19 @@ class AIToolsManager {
      * 渲染 edit 工具
      */
     renderEditTool(result, toolCallId) {
-        const { server_id, file_path, operations, new_content } = result;
+        const { server_id, file_path, operations } = result;
         const fileName = file_path.split('/').pop();
         const fileIcon = this.getFileIconHTML(fileName);
         
-        console.log('📝 renderEditTool:', { toolCallId, file_path, operations, new_content });
+        console.log('📝 renderEditTool:', { toolCallId, file_path, operations });
         
         // 保存到待处理列表（使用tool_call_id作为key）
+        // 注意：new_content存储在后端pending state中，Accept时后端会读取
         this.pendingEdits.set(toolCallId, {
             tool_call_id: toolCallId,
             server_id,
             file_path,
             operations,
-            new_content,
             status: 'pending',
             type: 'edit'
         });
@@ -767,6 +767,19 @@ class AIToolsManager {
         const editor = window.getEditorByPath && window.getEditorByPath(file_path);
         if (!editor) {
             console.log('⏭️ 文件未打开，跳过自动应用:', file_path);
+            return;
+        }
+        
+        // 检查这个edit是否是该文件的最后一个pending（只显示最后一个的累计diff）
+        let lastPendingToolCallId = null;
+        for (const [tid, e] of this.pendingEdits.entries()) {
+            if (e.file_path === file_path && e.status === 'pending' && e.type === 'edit') {
+                lastPendingToolCallId = tid;  // Map保持插入顺序，最后遍历到的就是最新的
+            }
+        }
+        
+        if (lastPendingToolCallId !== toolCallId) {
+            console.log('⏭️ 不是最后一个pending，跳过显示diff:', { current: toolCallId, latest: lastPendingToolCallId });
             return;
         }
         
