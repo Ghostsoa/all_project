@@ -696,13 +696,16 @@ class AIToolsManager {
                     
                     // 只有当有添加行时才创建Zone
                     if (linesHtml.length > 0) {
+                        // Zone应该紧贴在红色区域之后
+                        // 红色区域的最后一行是 start_line + lastIdx
                         const zoneWidget = {
                             domNode: domNode,
-                            afterLineNumber: start_line + lastIdx,
+                            afterLineNumber: start_line + lastIdx,  // 在红色最后一行之后
                             heightInLines: linesHtml.length,
                             suppressMouseDown: true
                         };
                         
+                        console.log(`📍 Zone插入位置: 第${start_line + lastIdx}行之后`);
                         zoneWidgets.push(zoneWidget);
                     }
                 }
