@@ -198,6 +198,11 @@ class AIToolsManager {
         
         console.log('💾 保存到pendingEdits:', this.pendingEdits.get(toolCallId));
         
+        // 自动检查并应用到已打开的编辑器
+        setTimeout(() => {
+            this.autoApplyToOpenEditor(toolCallId);
+        }, 100);
+        
         return `
             <div class="tool-call">
                 <div class="tool-container" data-tool-call-id="${toolCallId}" onclick="aiToolsManager.handleToolClick('${toolCallId}')">
@@ -735,6 +740,49 @@ class AIToolsManager {
             edit.zoneIds = zoneIds;
             edit.editorInstance = editor;
             console.log('✅ 装饰ID和Zone IDs已保存到edit对象');
+        }
+    }
+    
+    /**
+     * 自动应用到已打开的编辑器
+     * @param {string} toolCallId 
+     */
+    autoApplyToOpenEditor(toolCallId) {
+        const edit = this.pendingEdits.get(toolCallId);
+        if (!edit || edit.type !== 'edit') {
+            return;
+        }
+        
+        const { file_path, operations, server_id } = edit;
+        
+        // 检查当前服务器是否匹配
+        const currentServerId = this.getCurrentServerId();
+        if (server_id !== currentServerId) {
+            console.log('⏭️ 服务器不匹配，跳过自动应用:', { current: currentServerId, target: server_id });
+            return;
+        }
+        
+        // 检查文件是否已打开
+        const editor = window.getEditorByPath && window.getEditorByPath(file_path);
+        if (!editor) {
+            console.log('⏭️ 文件未打开，跳过自动应用:', file_path);
+            return;
+        }
+        
+        console.log('✨ 自动应用diff到已打开的编辑器:', file_path);
+        this.applyDiffDecorations(file_path, operations, toolCallId);
+    }
+    
+    /**
+     * 检查所有pending的编辑，自动应用到已打开的编辑器
+     * 用于历史记录加载后
+     */
+    checkAllPendingEdits() {
+        console.log('🔍 检查所有pending编辑:', this.pendingEdits.size, '个');
+        for (const [toolCallId, edit] of this.pendingEdits.entries()) {
+            if (edit.type === 'edit' && edit.status === 'pending') {
+                this.autoApplyToOpenEditor(toolCallId);
+            }
         }
     }
     
