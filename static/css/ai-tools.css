@@ -300,6 +300,7 @@
     background-color: transparent;
     padding: 0;
     margin: 0;
+    font-size: 12px;  /* 匹配编辑器字体大小 */
 }
 
 /* Zone Widget 中的每一行 */
@@ -308,9 +309,6 @@
     white-space: pre;
     padding: 0;
     margin: 0;
-    height: 18px;  /* 固定高度，与编辑器行高一致 */
-    line-height: 18px;
-    overflow: hidden;
 }
 
 /* 添加行（绿色） */
