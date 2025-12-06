@@ -1540,25 +1540,18 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
     actionsDiv.className = 'message-actions';
     
     if (role === 'user') {
-        // 用户消息：复制、编辑、撤销
+        // 用户消息：编辑、撤销
         actionsDiv.innerHTML = `
-            <span class="message-action-link" onclick="copyMessageContent(this)" title="复制">
-                <i class="fa-solid fa-copy"></i> 复制
-            </span>
             <span class="message-action-link" onclick="editMessage(this)" title="编辑">
                 <i class="fa-solid fa-edit"></i> 编辑
             </span>
-            <span class="message-action-link revoke" onclick="revokeMessage(this)" title="撤销此消息及之后的消息">
-                <i class="fa-solid fa-rotate-left"></i> 撤销
+            <span class="message-action-link" onclick="revokeMessage(this)" title="撤销">
+                <i class="fa-solid fa-undo"></i> 撤销
             </span>
         `;
     } else {
-        // AI消息：只有复制（不含思维链）
-        actionsDiv.innerHTML = `
-            <span class="message-action-link" onclick="copyMessageContent(this)" title="复制回复">
-                <i class="fa-solid fa-copy"></i> 复制
-            </span>
-        `;
+        // AI消息：无操作按钮
+        actionsDiv.innerHTML = '';
     }
     
     messageDiv.appendChild(actionsDiv);
@@ -2009,25 +2002,7 @@ function showAIPrompt(message, title = '输入', defaultValue = '') {
     });
 }
 
-// 复制消息内容（不含思维链）
-window.copyMessageContent = function(element) {
-    const messageDiv = element.closest('.ai-message');
-    if (!messageDiv) return;
-    
-    // 只复制正文内容，不包含思维链
-    const contentDiv = messageDiv.querySelector('.message-content');
-    if (!contentDiv) return;
-    
-    const content = contentDiv.textContent || contentDiv.innerText;
-    
-    // 复制到剪贴板
-    navigator.clipboard.writeText(content).then(() => {
-        showToast('已复制到剪贴板', 'success');
-    }).catch(err => {
-        console.error('复制失败:', err);
-        showToast('复制失败', 'error');
-    });
-};
+// 复制功能已删除
 
 // 编辑用户消息（就地编辑）
 window.editMessage = function(element) {

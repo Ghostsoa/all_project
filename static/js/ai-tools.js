@@ -143,14 +143,26 @@ class AIToolsManager {
      * 渲染 read 工具
      */
     renderReadTool(result) {
-        const { file_path, size } = result;
+        const { file_path, size, start_line, end_line, total_lines } = result;
         const fileName = file_path.split('/').pop();
+        
+        // 构建行号范围显示
+        let lineRange = '';
+        if (start_line && end_line) {
+            if (start_line === 1 && end_line === total_lines) {
+                // 读取整个文件
+                lineRange = ` (${total_lines} lines)`;
+            } else {
+                // 读取部分行
+                lineRange = ` <span style="color: rgba(255,255,255,0.5);">#L${start_line}-${end_line}</span>`;
+            }
+        }
         
         return `
             <div class="tool-call">
                 <div class="tool-simple completed">
                     <i class="fa-solid fa-book-open tool-simple-icon"></i>
-                    Read <strong>${fileName}</strong> (${this.formatSize(size)})
+                    Read <strong>${fileName}</strong>${lineRange}
                 </div>
             </div>
         `;

@@ -55,6 +55,10 @@ type FileOperationArgs struct {
 	Pattern  string   `json:"pattern,omitempty"`   // 文件名匹配模式（如 "*.config.js"）
 	MaxDepth int      `json:"max_depth,omitempty"` // 最大搜索深度
 	Excludes []string `json:"excludes,omitempty"`  // 排除模式（如 ["node_modules", ".git"]）
+
+	// read 专用（行范围读取）
+	Offset int `json:"offset,omitempty"` // 起始行号（1-indexed）
+	Limit  int `json:"limit,omitempty"`  // 读取行数
 }
 
 // Execute 执行工具调用
@@ -92,11 +96,12 @@ func (te *ToolExecutor) fileOperation(argsJSON string, conversationID string, me
 	}
 }
 
-// readFile 读取文件内容
+// readFile 读取文件内容（支持行范围读取）
 func (te *ToolExecutor) readFile(args FileOperationArgs, conversationID string) (string, error) {
 	manager := models.GetPendingStateManager()
 
-	log.Printf("📖 readFile调用: conversationID=%s, filePath=%s", conversationID, args.FilePath)
+	log.Printf("📖 readFile调用: conversationID=%s, filePath=%s, offset=%d, limit=%d",
+		conversationID, args.FilePath, args.Offset, args.Limit)
 
 	// 读取磁盘文件
 	fileContent, err := os.ReadFile(args.FilePath)
@@ -106,8 +111,58 @@ func (te *ToolExecutor) readFile(args FileOperationArgs, conversationID string) 
 	diskContent := string(fileContent)
 
 	// 获取pending内容（应用所有edits）
-	content := manager.GetCurrentContent(conversationID, args.FilePath, diskContent)
-	isPending := (content != diskContent)
+	fullContent := manager.GetCurrentContent(conversationID, args.FilePath, diskContent)
+	isPending := (fullContent != diskContent)
+
+	// 按行分割
+	lines := strings.Split(fullContent, "\n")
+	totalLines := len(lines)
+
+	// 处理行范围读取
+	var content string
+	var startLine, endLine int
+
+	if args.Offset > 0 || args.Limit > 0 {
+		// 行范围读取
+		startLine = args.Offset
+		if startLine < 1 {
+			startLine = 1
+		}
+		if startLine > totalLines {
+			return "", fmt.Errorf("起始行 %d 超出文件范围（共 %d 行）", startLine, totalLines)
+		}
+
+		// 默认最多读取1000行
+		limit := args.Limit
+		if limit <= 0 || limit > 1000 {
+			limit = 1000
+		}
+
+		endLine = startLine + limit - 1
+		if endLine > totalLines {
+			endLine = totalLines
+		}
+
+		// 提取指定行范围（1-indexed转0-indexed）
+		selectedLines := lines[startLine-1 : endLine]
+		content = strings.Join(selectedLines, "\n")
+
+		log.Printf("📄 读取行范围: %d-%d (共%d行)", startLine, endLine, endLine-startLine+1)
+	} else {
+		// 读取整个文件，但限制1000行
+		if totalLines > 1000 {
+			return "", fmt.Errorf(
+				"文件太大 (%d 行)，超过限制 (1000 行)。\n"+
+					"建议：使用 offset 和 limit 参数读取特定行范围，例如：\n"+
+					"  offset: 1, limit: 500  (读取第1-500行)\n"+
+					"  offset: 501, limit: 500  (读取第501-1000行)",
+				totalLines,
+			)
+		}
+		content = fullContent
+		startLine = 1
+		endLine = totalLines
+	}
 
 	if isPending {
 		log.Printf("✅ 返回pending内容，内容前50字符: %s", truncate(content, 50))
@@ -117,13 +172,16 @@ func (te *ToolExecutor) readFile(args FileOperationArgs, conversationID string) 
 
 	// 返回结果（JSON格式）
 	result := map[string]interface{}{
-		"success":    true,
-		"type":       "read",
-		"server_id":  args.ServerID,
-		"file_path":  args.FilePath,
-		"content":    content,
-		"size":       len(content),
-		"is_pending": isPending,
+		"success":     true,
+		"type":        "read",
+		"server_id":   args.ServerID,
+		"file_path":   args.FilePath,
+		"content":     content,
+		"size":        len(content),
+		"is_pending":  isPending,
+		"total_lines": totalLines,
+		"start_line":  startLine,
+		"end_line":    endLine,
 	}
 
 	resultJSON, _ := json.Marshal(result)
@@ -270,9 +328,15 @@ func (te *ToolExecutor) listDir(args FileOperationArgs) (string, error) {
 		return "", fmt.Errorf("读取目录失败: %v", err)
 	}
 
-	// 构建文件列表
+	// 构建文件列表（限制100项）
 	files := []map[string]interface{}{}
-	for _, entry := range entries {
+	totalCount := len(entries)
+	maxItems := 100
+
+	for i, entry := range entries {
+		if i >= maxItems {
+			break
+		}
 		info, _ := entry.Info()
 		fileInfo := map[string]interface{}{
 			"name":  entry.Name(),
@@ -283,13 +347,17 @@ func (te *ToolExecutor) listDir(args FileOperationArgs) (string, error) {
 		files = append(files, fileInfo)
 	}
 
+	truncated := totalCount > maxItems
+
 	result := map[string]interface{}{
 		"success":   true,
 		"type":      "list",
 		"server_id": args.ServerID,
 		"path":      args.FilePath,
 		"count":     len(files),
+		"total":     totalCount,
 		"files":     files,
+		"truncated": truncated,
 	}
 
 	resultJSON, _ := json.Marshal(result)
@@ -374,9 +442,9 @@ func (te *ToolExecutor) grepSearch(args FileOperationArgs) (string, error) {
 				hasMatch = true
 			}
 
-			// 限制单个文件的匹配数量（避免过多输出）
-			if len(matches) >= 1000 {
-				break
+			// 限制匹配数量（避免上下文溢出）
+			if len(matches) >= 50 {
+				return filepath.SkipAll // 停止搜索
 			}
 		}
 
@@ -391,6 +459,8 @@ func (te *ToolExecutor) grepSearch(args FileOperationArgs) (string, error) {
 		return "", fmt.Errorf("搜索失败: %v", err)
 	}
 
+	truncated := len(matches) >= 50
+
 	result := map[string]interface{}{
 		"success":     true,
 		"type":        "grep",
@@ -401,6 +471,7 @@ func (te *ToolExecutor) grepSearch(args FileOperationArgs) (string, error) {
 		"file_count":  fileCount,
 		"match_count": len(matches),
 		"matches":     matches,
+		"truncated":   truncated,
 	}
 
 	resultJSON, _ := json.Marshal(result)
@@ -470,8 +541,8 @@ func (te *ToolExecutor) findByName(args FileOperationArgs) (string, error) {
 			})
 		}
 
-		// 限制结果数量（避免过多）
-		if len(results) >= 500 {
+		// 限制结果数量（避免上下文溢出）
+		if len(results) >= 100 {
 			return filepath.SkipAll
 		}
 
@@ -482,6 +553,8 @@ func (te *ToolExecutor) findByName(args FileOperationArgs) (string, error) {
 		return "", fmt.Errorf("查找失败: %v", err)
 	}
 
+	truncated := len(results) >= 100
+
 	result := map[string]interface{}{
 		"success":   true,
 		"type":      "find",
@@ -490,6 +563,7 @@ func (te *ToolExecutor) findByName(args FileOperationArgs) (string, error) {
 		"path":      searchPath,
 		"count":     len(results),
 		"results":   results,
+		"truncated": truncated,
 	}
 
 	resultJSON, _ := json.Marshal(result)
@@ -684,6 +758,17 @@ func GetToolsDefinition() []map[string]interface{} {
 							},
 							"description": "【仅 type=find 时可选】排除的目录名（如 [\"node_modules\", \".git\"]）。",
 						},
+						"offset": map[string]interface{}{
+							"type": "integer",
+							"description": "【仅 type=read 时可选】起始行号（1-indexed）。\n" +
+								"与 limit 配合使用读取文件的指定行范围。",
+						},
+						"limit": map[string]interface{}{
+							"type": "integer",
+							"description": "【仅 type=read 时可选】读取行数（最大1000行）。\n" +
+								"与 offset 配合使用读取文件的指定行范围。\n" +
+								"例如：offset=1, limit=500 读取第1-500行。",
+						},
 					},
 					"required": []string{"type", "server_id"},
 				},
@@ -698,4 +783,24 @@ func truncate(s string, maxLen int) string {
 		return s
 	}
 	return s[:maxLen] + "..."
+}
+
+// formatFileSize 格式化文件大小
+func formatFileSize(size int64) string {
+	const (
+		KB = 1024
+		MB = KB * 1024
+		GB = MB * 1024
+	)
+
+	switch {
+	case size >= GB:
+		return fmt.Sprintf("%.2f GB", float64(size)/float64(GB))
+	case size >= MB:
+		return fmt.Sprintf("%.2f MB", float64(size)/float64(MB))
+	case size >= KB:
+		return fmt.Sprintf("%.2f KB", float64(size)/float64(KB))
+	default:
+		return fmt.Sprintf("%d B", size)
+	}
 }
