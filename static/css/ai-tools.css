@@ -298,9 +298,8 @@
 /* Zone Widget 容器 */
 .diff-zone-widget {
     background-color: transparent;
-    padding: 0 !important;
-    margin: 0 !important;
-    border: none !important;
+    padding: 0;
+    margin: 0;
 }
 
 /* Zone Widget 中的每一行 */

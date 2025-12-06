@@ -659,7 +659,7 @@ class AIToolsManager {
                     const firstIdx = group[0];
                     const lastIdx = group[group.length - 1];
                     
-                    // 标记这组的原始行为红色删除状态（不隐藏）
+                    // 整个组内的所有行都标记为红色删除（包括中间没变化的行）
                     for (let idx = firstIdx; idx <= lastIdx; idx++) {
                         if (idx < (end_line - start_line + 1)) {
                             const lineNum = start_line + idx;
@@ -696,16 +696,17 @@ class AIToolsManager {
                     
                     // 只有当有添加行时才创建Zone
                     if (linesHtml.length > 0) {
-                        // Zone应该紧贴在红色区域之后
-                        // 红色区域的最后一行是 start_line + lastIdx
+                        const zoneLineNumber = start_line + lastIdx;
+                        console.log(`🎯 组 ${groupIdx + 1}: firstIdx=${firstIdx}, lastIdx=${lastIdx}, start_line=${start_line}`);
+                        console.log(`   Zone将插入在第 ${zoneLineNumber} 行之后`);
+                        
                         const zoneWidget = {
                             domNode: domNode,
-                            afterLineNumber: start_line + lastIdx,  // 在红色最后一行之后
+                            afterLineNumber: zoneLineNumber,
                             heightInLines: linesHtml.length,
                             suppressMouseDown: true
                         };
                         
-                        console.log(`📍 Zone插入位置: 第${start_line + lastIdx}行之后`);
                         zoneWidgets.push(zoneWidget);
                     }
                 }
