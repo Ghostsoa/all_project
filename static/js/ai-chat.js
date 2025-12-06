@@ -1708,9 +1708,13 @@ function updateReasoningContent(messageElement, reasoning, autoCollapse = false,
             <div class="reasoning-content"></div>
         `;
         const contentWrapper = messageElement.querySelector('.message-content-wrapper');
+        console.log('🔍 contentWrapper存在:', !!contentWrapper, 'messageElement在DOM:', document.body.contains(messageElement));
         if (contentWrapper) {
             // 插入到最后（工具调用之后）
             contentWrapper.appendChild(reasoningDiv);
+            console.log('✅ appendChild完成，当前reasoning divs数量:', messageElement.querySelectorAll('.message-reasoning').length);
+        } else {
+            console.error('❌ 未找到contentWrapper，无法添加reasoning div');
         }
         
         // 第一次创建时添加流光
