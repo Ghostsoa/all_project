@@ -143,8 +143,8 @@ func (m *PendingStateManager) RemoveFile(conversationID, filePath string) error 
 	return m.Save()
 }
 
-// RejectVersion 拒绝某个版本（回滚）
-func (m *PendingStateManager) RejectVersion(conversationID, filePath, toolCallID string) error {
+// RejectVersion 拒绝某个版本（回滚），返回被删除的所有toolCallIDs
+func (m *PendingStateManager) RejectVersion(conversationID, filePath, toolCallID string) ([]string, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -153,13 +153,13 @@ func (m *PendingStateManager) RejectVersion(conversationID, filePath, toolCallID
 	conv, exists := m.states[conversationID]
 	if !exists {
 		log.Printf("⚠️ conversation不存在: %s", conversationID)
-		return nil
+		return nil, nil
 	}
 
 	pendingFile, exists := conv.Files[filePath]
 	if !exists {
 		log.Printf("⚠️ 文件不存在于pending: %s", filePath)
-		return nil
+		return nil, nil
 	}
 
 	log.Printf("📋 当前pending版本数: %d", len(pendingFile.Versions))
@@ -178,10 +178,16 @@ func (m *PendingStateManager) RejectVersion(conversationID, filePath, toolCallID
 
 	if rejectIndex == -1 {
 		log.Printf("⚠️ 未找到toolCallID: %s", toolCallID)
-		return nil
+		return nil, nil
 	}
 
-	log.Printf("✂️ 删除索引 %d 及之后的版本", rejectIndex)
+	// 收集被删除的toolCallIDs（链式删除）
+	var deletedToolCallIDs []string
+	for i := rejectIndex; i < len(pendingFile.Versions); i++ {
+		deletedToolCallIDs = append(deletedToolCallIDs, pendingFile.Versions[i].ToolCallID)
+	}
+
+	log.Printf("✂️ 删除索引 %d 及之后的版本，共 %d 个", rejectIndex, len(deletedToolCallIDs))
 	// 删除这个版本及之后的所有版本（链式取消）
 	pendingFile.Versions = pendingFile.Versions[:rejectIndex]
 
@@ -200,7 +206,7 @@ func (m *PendingStateManager) RejectVersion(conversationID, filePath, toolCallID
 	}
 
 	conv.UpdatedAt = time.Now()
-	return m.Save()
+	return deletedToolCallIDs, m.Save()
 }
 
 func truncateString(s string, maxLen int) string {
@@ -210,19 +216,19 @@ func truncateString(s string, maxLen int) string {
 	return s[:maxLen] + "..."
 }
 
-// AcceptVersion 接受某个版本（删除它及之前的，保留之后的）
-func (m *PendingStateManager) AcceptVersion(conversationID, filePath, toolCallID string) (string, []Version, error) {
+// AcceptVersion 接受某个版本（删除它及之前的，保留之后的），返回被Accept的所有toolCallIDs
+func (m *PendingStateManager) AcceptVersion(conversationID, filePath, toolCallID string) (string, []Version, []string, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	conv, exists := m.states[conversationID]
 	if !exists {
-		return "", nil, nil
+		return "", nil, nil, nil
 	}
 
 	pendingFile, exists := conv.Files[filePath]
 	if !exists {
-		return "", nil, nil
+		return "", nil, nil, nil
 	}
 
 	// 找到要接受的版本
@@ -235,7 +241,13 @@ func (m *PendingStateManager) AcceptVersion(conversationID, filePath, toolCallID
 	}
 
 	if acceptIndex == -1 {
-		return "", nil, nil
+		return "", nil, nil, nil
+	}
+
+	// 收集被Accept的toolCallIDs（0到acceptIndex，连带Accept）
+	var acceptedToolCallIDs []string
+	for i := 0; i <= acceptIndex; i++ {
+		acceptedToolCallIDs = append(acceptedToolCallIDs, pendingFile.Versions[i].ToolCallID)
 	}
 
 	// 获取这个版本的内容（用于写入磁盘）
@@ -256,7 +268,7 @@ func (m *PendingStateManager) AcceptVersion(conversationID, filePath, toolCallID
 	conv.UpdatedAt = time.Now()
 	m.Save()
 
-	return acceptedContent, remainingVersions, nil
+	return acceptedContent, remainingVersions, acceptedToolCallIDs, nil
 }
 
 // RestoreVersions 恢复版本列表（用于Accept后保留后续版本）

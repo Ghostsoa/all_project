@@ -44,14 +44,15 @@ func (h *AIEditHandler) ApplyEdit(c *gin.Context) {
 	// 处理Accept/Reject
 	if req.Status == "accepted" {
 		// Accept: 写入这个版本，删除它及之前的，保留后续的
+		var acceptedToolCallIDs []string
 		if req.FilePath != "" {
 			conversationID := req.ConversationID
 			if conversationID == "" {
 				conversationID = "default_current" // fallback
 			}
 
-			// 使用AcceptVersion获取要写入的内容和后续版本
-			acceptedContent, remainingVersions, err := manager.AcceptVersion(conversationID, req.FilePath, req.ToolCallID)
+			// 使用AcceptVersion获取要写入的内容、后续版本和被Accept的toolCallIDs
+			acceptedContent, remainingVersions, acceptedIDs, err := manager.AcceptVersion(conversationID, req.FilePath, req.ToolCallID)
 			if err != nil {
 				log.Printf("❌ Accept版本失败: %v", err)
 				c.JSON(http.StatusInternalServerError, gin.H{
@@ -60,6 +61,8 @@ func (h *AIEditHandler) ApplyEdit(c *gin.Context) {
 				})
 				return
 			}
+
+			acceptedToolCallIDs = acceptedIDs
 
 			if acceptedContent != "" {
 				// 1. 先备份当前磁盘文件到历史
@@ -85,23 +88,70 @@ func (h *AIEditHandler) ApplyEdit(c *gin.Context) {
 					if err := manager.RestoreVersions(conversationID, req.FilePath, remainingVersions); err != nil {
 						log.Printf("⚠️ 恢复后续版本失败: %v", err)
 					}
-					log.Printf("✅ Accept并写入文件: %s，保留 %d 个后续版本", req.FilePath, len(remainingVersions))
+					log.Printf("✅ Accept并写入文件: %s，保留 %d 个后续版本，连带Accept %d 个", req.FilePath, len(remainingVersions), len(acceptedToolCallIDs))
 				} else {
-					log.Printf("✅ Accept并写入文件: %s，无后续版本", req.FilePath)
+					log.Printf("✅ Accept并写入文件: %s，无后续版本，连带Accept %d 个", req.FilePath, len(acceptedToolCallIDs))
 				}
 			}
 		}
+
+		// 更新所有被连带Accept的消息状态
+		allToolCallIDs := acceptedToolCallIDs
+		if len(allToolCallIDs) == 0 {
+			allToolCallIDs = []string{req.ToolCallID}
+		}
+
+		for _, tcID := range allToolCallIDs {
+			if err := storage.UpdateToolMessageStatus(tcID, req.Status); err != nil {
+				log.Printf("❌ 更新tool消息状态失败 (%s): %v", tcID, err)
+			} else {
+				log.Printf("✅ 已更新消息状态: %s -> accepted", tcID)
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"success":           true,
+			"message":           "状态已更新",
+			"accepted_tool_ids": allToolCallIDs, // 返回所有被Accept的IDs给前端
+		})
+		return
 	} else if req.Status == "rejected" {
 		// Reject: 清除pending（链式取消）
+		var rejectedToolCallIDs []string
 		if req.FilePath != "" && req.ConversationID != "" {
-			if err := manager.RejectVersion(req.ConversationID, req.FilePath, req.ToolCallID); err != nil {
+			// 调用RejectVersion返回被删除的所有版本的toolCallIDs
+			deletedIDs, err := manager.RejectVersion(req.ConversationID, req.FilePath, req.ToolCallID)
+			if err != nil {
 				log.Printf("⚠️ 清除pending状态失败: %v", err)
+			} else {
+				rejectedToolCallIDs = deletedIDs
+				log.Printf("❌ Reject并清除pending: %s, 链式删除了 %d 个版本", req.FilePath, len(rejectedToolCallIDs))
 			}
-			log.Printf("❌ Reject并清除pending: %s", req.FilePath)
 		}
+
+		// 更新所有被链式Reject的消息状态
+		allToolCallIDs := rejectedToolCallIDs
+		if len(allToolCallIDs) == 0 {
+			allToolCallIDs = []string{req.ToolCallID}
+		}
+
+		for _, tcID := range allToolCallIDs {
+			if err := storage.UpdateToolMessageStatus(tcID, req.Status); err != nil {
+				log.Printf("❌ 更新tool消息状态失败 (%s): %v", tcID, err)
+			} else {
+				log.Printf("✅ 已更新消息状态: %s -> rejected", tcID)
+			}
+		}
+
+		c.JSON(http.StatusOK, gin.H{
+			"success":           true,
+			"message":           "状态已更新",
+			"rejected_tool_ids": allToolCallIDs, // 返回所有被Reject的IDs给前端
+		})
+		return
 	}
 
-	// 更新数据库中对应的tool消息状态
+	// Accept情况：只更新当前消息状态
 	if err := storage.UpdateToolMessageStatus(req.ToolCallID, req.Status); err != nil {
 		log.Printf("❌ 更新tool消息状态失败: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{

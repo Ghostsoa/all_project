@@ -3,6 +3,7 @@ package models
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"sync"
@@ -179,6 +180,32 @@ func (m *FileHistoryManager) GetVersionList(filePath string) []HistoryVersion {
 	}
 
 	return history.Versions
+}
+
+// RestoreLatestVersion 从历史恢复文件的最后一个版本
+func (m *FileHistoryManager) RestoreLatestVersion(filePath string) error {
+	m.mutex.RLock()
+	history, exists := m.histories[filePath]
+	m.mutex.RUnlock()
+
+	if !exists || len(history.Versions) == 0 {
+		return fmt.Errorf("文件没有历史版本: %s", filePath)
+	}
+
+	// 获取最后一个版本
+	latestVersionID := len(history.Versions)
+	content, err := m.ReconstructVersion(filePath, latestVersionID)
+	if err != nil {
+		return fmt.Errorf("重建版本失败: %v", err)
+	}
+
+	// 写入磁盘
+	if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
+		return fmt.Errorf("写入文件失败: %v", err)
+	}
+
+	log.Printf("✅ 已从历史恢复文件: %s (版本 %d)", filePath, latestVersionID)
+	return nil
 }
 
 // Save 保存到JSON文件

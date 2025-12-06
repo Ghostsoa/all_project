@@ -946,47 +946,17 @@ class AIToolsManager {
                 return;
             }
             
-            // 3. 更新 UI - 连带更新之前的所有pending
-            // 获取同文件的所有pending edits（按顺序）
-            const sameFileEdits = [];
-            for (const [tid, e] of this.pendingEdits.entries()) {
-                if (e.file_path === file_path && e.status === 'pending' && e.type === 'edit') {
-                    sameFileEdits.push({ toolCallId: tid, edit: e });
-                }
-            }
+            // 3. 更新 UI - 后端已经连带Accept了，获取所有被Accept的toolCallIDs
+            const acceptedToolIds = result.accepted_tool_ids || [toolCallId];
+            console.log('✅ 后端连带Accept成功，共 ' + acceptedToolIds.length + ' 个:', acceptedToolIds);
             
-            // 找到当前Accept的位置
-            const acceptIndex = sameFileEdits.findIndex(item => item.toolCallId === toolCallId);
-            
-            if (acceptIndex !== -1) {
-                // Accept当前的及之前的所有pending（0到acceptIndex）
-                for (let i = 0; i <= acceptIndex; i++) {
-                    const { toolCallId: tid } = sameFileEdits[i];
-                    console.log('✅ 连带Accept:', tid);
-                    
-                    // 调用后端API更新消息状态（除了主Accept已经调用过的）
-                    if (i < acceptIndex) {
-                        try {
-                            await fetch('/api/ai/edit/apply', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ 
-                                    tool_call_id: tid,
-                                    status: 'accepted',
-                                    file_path: file_path,
-                                    conversation_id: this.getCurrentSessionId()
-                                })
-                            });
-                        } catch (e) {
-                            console.warn('连带Accept后端更新失败:', tid, e);
-                        }
-                    }
-                    
-                    this.updateToolStatus(tid, 'accepted');
-                    this.clearDiffDecorations(tid);
-                    this.pendingEdits.delete(tid);
-                    this.appliedEdits.add(tid);
-                }
+            // 更新所有被Accept的edit的UI
+            for (const tid of acceptedToolIds) {
+                console.log('🎉 更新UI - Accept:', tid);
+                this.updateToolStatus(tid, 'accepted');
+                this.clearDiffDecorations(tid);
+                this.pendingEdits.delete(tid);
+                this.appliedEdits.add(tid);
             }
             
             // 4. 刷新编辑器内容（如果文件已打开）
@@ -1035,29 +1005,16 @@ class AIToolsManager {
                 const filePath = edit.file_path;
                 const serverId = edit.server_id;
                 
-                // 更新 UI
-                this.updateToolStatus(toolCallId, 'rejected');
+                // 后端已经链式Reject了，获取所有被Reject的toolCallIDs
+                const rejectedToolIds = result.rejected_tool_ids || [toolCallId];
+                console.log('✅ 后端链式Reject成功，共 ' + rejectedToolIds.length + ' 个:', rejectedToolIds);
                 
-                // 获取同文件的所有pending edits（按时间排序）
-                const sameFileEdits = [];
-                for (const [tid, e] of this.pendingEdits.entries()) {
-                    if (e.file_path === filePath && e.status === 'pending' && e.type === 'edit') {
-                        sameFileEdits.push({ toolCallId: tid, edit: e });
-                    }
-                }
-                
-                // 找到被reject的edit的位置
-                const rejectIndex = sameFileEdits.findIndex(item => item.toolCallId === toolCallId);
-                
-                if (rejectIndex !== -1) {
-                    // 删除这个及之后的所有pending（链式删除）
-                    for (let i = rejectIndex; i < sameFileEdits.length; i++) {
-                        const { toolCallId: tid } = sameFileEdits[i];
-                        console.log('🧹 链式删除pending:', tid);
-                        this.clearDiffDecorations(tid);
-                        this.pendingEdits.delete(tid);
-                        this.updateToolStatus(tid, 'rejected');
-                    }
+                // 更新所有被Reject的edit的UI
+                for (const tid of rejectedToolIds) {
+                    console.log('🧹 更新UI - Reject:', tid);
+                    this.updateToolStatus(tid, 'rejected');
+                    this.clearDiffDecorations(tid);
+                    this.pendingEdits.delete(tid);
                 }
                 
                 // 刷新编辑器内容为磁盘文件或显示剩余pending

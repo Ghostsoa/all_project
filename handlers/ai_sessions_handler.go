@@ -226,17 +226,19 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 		return
 	}
 
-	// 1. 先获取要删除的消息列表（用于清理pending状态）
+	// 1. 先获取要删除的消息列表（用于清理pending状态和恢复文件）
 	messages, err := storage.GetMessages(req.SessionID, 0) // limit=0表示获取所有消息
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 
-	// 2. 提取被删除消息中的tool_call_id（messageIndex及之后的）
+	// 2. 清理被删除消息的pending状态
 	pendingManager := models.GetPendingStateManager()
+
 	for i := req.MessageIndex; i < len(messages); i++ {
 		msg := messages[i]
+
 		// 对于assistant消息，从ToolCalls中提取tool_call_id
 		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 {
 			for _, toolCall := range msg.ToolCalls {
@@ -258,6 +260,11 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
+
+	// 注意：不恢复文件内容
+	// - 如果前面有accepted的版本，文件保持磁盘状态（已经是正确的）
+	// - 如果前面都是pending，文件保持磁盘原状，前端会根据剩余pending重新显示diff
+	// - 撤销只负责删除消息和清理pending state
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "撤销成功"})
 }
