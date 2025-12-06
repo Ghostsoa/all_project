@@ -49,6 +49,8 @@ class AIToolsManager {
      * @returns {string} HTML
      */
     renderToolResult(toolResult, toolName, toolCallId, toolCallArgs = null) {
+        console.log('🎨 renderToolResult:', { toolResult, toolName, toolCallId, success: toolResult.success });
+        
         if (toolName !== 'file_operation') {
             return this.renderGenericTool(toolResult, toolName);
         }
@@ -57,6 +59,7 @@ class AIToolsManager {
         
         // 如果工具执行失败，显示失败状态
         if (success === false) {
+            console.log('❌ 工具失败，渲染失败状态');
             return this.renderFailedTool(toolResult, toolName);
         }
         
@@ -92,9 +95,11 @@ class AIToolsManager {
     renderFailedTool(result, toolName) {
         const error = result.error || '未知错误';
         return `
-            <div class="tool-simple completed">
-                <span class="tool-simple-icon">❌</span>
-                <${toolName}: ✗ Failed> ${error}
+            <div class="tool-call">
+                <div class="tool-simple completed">
+                    <span class="tool-simple-icon">❌</span>
+                    &lt;${toolName}: ✗ Failed&gt; ${error}
+                </div>
             </div>
         `;
     }
@@ -686,14 +691,20 @@ class AIToolsManager {
      */
     async rejectEdit(toolCallId) {
         const edit = this.pendingEdits.get(toolCallId);
-        if (!edit) return;
+        if (!edit) {
+            console.error('未找到编辑信息:', toolCallId);
+            return;
+        }
 
         try {
             // 调用后端 API更新状态
-            const response = await fetch('/api/ai/edit/reject', {
+            const response = await fetch('/api/ai/edit/apply', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ preview_id: toolCallId })
+                body: JSON.stringify({ 
+                    tool_call_id: toolCallId,
+                    status: 'rejected'
+                })
             });
 
             const result = await response.json();
@@ -714,7 +725,7 @@ class AIToolsManager {
             }
         } catch (error) {
             console.error('拒绝编辑失败:', error);
-            this.showToast('操作失败', 'error');
+            this.showToast('操作失败: ' + error.message, 'error');
         }
     }
 
