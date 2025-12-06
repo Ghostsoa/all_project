@@ -626,14 +626,14 @@ class AIToolsManager {
                 
                 const zoneWidget = {
                     domNode: domNode,
-                    afterLineNumber: start_line - 1,  // 在目标行之前插入
+                    afterLineNumber: start_line,  // 在目标行之后插入
                     heightInLines: 2,
                     suppressMouseDown: true
                 };
                 
                 zoneWidgets.push(zoneWidget);
                 
-                // 隐藏原始行（让它看起来像被替换了）
+                // 完全隐藏原始行
                 decorations.push({
                     range: new monaco.Range(start_line, 1, start_line, model.getLineMaxColumn(start_line)),
                     options: {
