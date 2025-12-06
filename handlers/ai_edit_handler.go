@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"all_project/models"
+	"all_project/storage"
 	"fmt"
 	"log"
 	"net/http"
@@ -97,14 +98,33 @@ func (h *AIEditHandler) acceptAll(conversationID string, pendingManager *models.
 
 	log.Printf("📊 Accept All: %d轮对话，%d个文件", len(turns), len(allFiles))
 
-	// 3. 对每个文件：应用edits，生成快照，写入磁盘
+	// 3. 收集所有tool_call_id（用于更新消息status）
+	allToolCallIDs := make([]string, 0)
+	for _, turn := range turns {
+		for _, edits := range turn.FileEdits {
+			for _, edit := range edits {
+				allToolCallIDs = append(allToolCallIDs, edit.ToolCallID)
+			}
+		}
+	}
+	log.Printf("📋 收集到%d个tool_call_id", len(allToolCallIDs))
+
+	// 4. 对每个文件：应用edits，生成快照，写入磁盘
 	for filePath := range allFiles {
 		if err := h.acceptFileEdits(conversationID, filePath, turns, historyManager); err != nil {
 			return fmt.Errorf("处理文件失败 %s: %v", filePath, err)
 		}
 	}
 
-	// 4. 清空pending
+	// 5. 更新所有tool消息的status为accepted
+	for _, toolCallID := range allToolCallIDs {
+		if err := storage.UpdateToolMessageStatus(toolCallID, "accepted"); err != nil {
+			log.Printf("⚠️ 更新tool消息状态失败 (%s): %v", toolCallID, err)
+		}
+	}
+	log.Printf("✅ 已更新%d个tool消息状态为accepted", len(allToolCallIDs))
+
+	// 6. 清空pending
 	if err := pendingManager.ClearAll(conversationID); err != nil {
 		return fmt.Errorf("清空pending失败: %v", err)
 	}
@@ -166,12 +186,30 @@ func (h *AIEditHandler) rejectAll(conversationID string, pendingManager *models.
 
 	log.Printf("🗑️ Reject All: 删除Turn%d之后的快照", firstTurnIndex)
 
-	// 3. 删除第一轮之后的所有快照
+	// 3. 收集所有tool_call_id（用于更新消息status）
+	allToolCallIDs := make([]string, 0)
+	for _, turn := range turns {
+		for _, edits := range turn.FileEdits {
+			for _, edit := range edits {
+				allToolCallIDs = append(allToolCallIDs, edit.ToolCallID)
+			}
+		}
+	}
+
+	// 4. 删除第一轮之后的所有快照
 	if err := historyManager.RemoveSnapshotsAfter(conversationID, firstTurnIndex-1); err != nil {
 		return fmt.Errorf("删除快照失败: %v", err)
 	}
 
-	// 4. 清空pending
+	// 5. 更新所有tool消息的status为rejected
+	for _, toolCallID := range allToolCallIDs {
+		if err := storage.UpdateToolMessageStatus(toolCallID, "rejected"); err != nil {
+			log.Printf("⚠️ 更新tool消息状态失败 (%s): %v", toolCallID, err)
+		}
+	}
+	log.Printf("✅ 已更新%d个tool消息状态为rejected", len(allToolCallIDs))
+
+	// 6. 清空pending
 	if err := pendingManager.ClearAll(conversationID); err != nil {
 		return fmt.Errorf("清空pending失败: %v", err)
 	}
