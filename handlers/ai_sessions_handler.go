@@ -7,7 +7,6 @@ import (
 	"encoding/hex"
 	"log"
 	"net/http"
-	"os"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -256,7 +255,7 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 	}
 
 	// 1. 先获取要删除的消息列表（用于清理pending状态）
-	messages, err := storage.GetMessages(req.SessionID, 0) // limit=0表示获取所有消息
+	messages, err := storage.GetMessages(req.SessionID, 0)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
@@ -264,36 +263,25 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 
 	// 2. 清理被删除消息的pending状态
 	pendingManager := models.GetPendingStateManager()
-
 	for i := req.MessageIndex; i < len(messages); i++ {
 		msg := messages[i]
-
-		// 对于assistant消息，从ToolCalls中提取tool_call_id
 		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 {
 			for _, toolCall := range msg.ToolCalls {
-				// 提取tool_call的id
 				if toolCallID, ok := toolCall["id"].(string); ok && toolCallID != "" {
-					// 使用tool_call_id作为messageID清理pending
 					if err := pendingManager.RemoveVersionsByMessageID(req.SessionID, toolCallID); err != nil {
-						log.Printf("⚠️ 清理pending失败 (toolCallID: %s): %v", toolCallID, err)
-					} else {
-						log.Printf("🧹 已清理pending状态 (toolCallID: %s)", toolCallID)
+						log.Printf("⚠️ 清理pending失败: %v", err)
 					}
 				}
 			}
 		}
 	}
 
-	// 3. 从file_history查找该会话的所有版本（这些版本都需要恢复）
-	// 注意：不依赖消息历史，因为Accept后消息可能已被修改或删除
+	// 3. 从file_history查找从messageIndex开始的版本
 	historyManager := models.GetFileHistoryManager()
 	log.Printf("========================================")
-	log.Printf("🔍 从file_history查找会话 %s 的所有版本", req.SessionID)
-
-	// 获取该会话在file_history中的所有版本
-	sessionVersionsCount := historyManager.CountConversationVersions(req.SessionID)
-
-	log.Printf("📊 会话 %s 在file_history中有 %d 个版本", req.SessionID, len(sessionVersionsCount))
+	log.Printf("� 查找会话 %s 从索引 %d 开始的版本", req.SessionID, req.MessageIndex)
+	sessionVersionsCount := historyManager.CountConversationVersionsFromIndex(req.SessionID, req.MessageIndex)
+	log.Printf("📊 从索引 %d 开始有 %d 个文件被修改", req.MessageIndex, len(sessionVersionsCount))
 	for fp, cnt := range sessionVersionsCount {
 		log.Printf("   - %s: %d 个版本", fp, cnt)
 	}
@@ -305,45 +293,20 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 		return
 	}
 
-	// 5. 根据file_history中该会话的版本数，恢复文件
-	// 这是最可靠的方式，因为消息可能已被修改或删除
+	// 5. 根据file_history中的版本数恢复文件
 	if len(sessionVersionsCount) > 0 {
 		for filePath, count := range sessionVersionsCount {
 			log.Printf("========================================")
 			log.Printf("📝 开始恢复文件: %s", filePath)
-			log.Printf("📝 需要撤销 %d 个accepted edit，恢复 %d 次", count, count)
-
-			// 读取撤销前的文件内容
-			beforeContent, err := os.ReadFile(filePath)
-			if err != nil {
-				log.Printf("⚠️ 读取撤销前文件失败: %v", err)
-			} else {
-				log.Printf("🔍 撤销前文件内容 (%d字节):", len(beforeContent))
-				log.Printf("--- 开始 ---")
-				log.Printf("%s", string(beforeContent))
-				log.Printf("--- 结束 ---")
-			}
+			log.Printf("📝 需要恢复 %d 次", count)
 
 			for i := 0; i < count; i++ {
 				log.Printf("🔄 第 %d/%d 次恢复...", i+1, count)
-
-				// 使用RestoreAndRemoveLatestVersion，恢复后删除该版本
-				// 这样下一次恢复时会恢复前一个版本
 				if err := historyManager.RestoreAndRemoveLatestVersion(filePath); err != nil {
-					log.Printf("⚠️ 恢复文件失败 (第%d次): %s, error: %v", i+1, filePath, err)
+					log.Printf("⚠️ 恢复失败: %v", err)
 					break
 				}
-
-				// 读取恢复后的文件内容
-				afterContent, err := os.ReadFile(filePath)
-				if err != nil {
-					log.Printf("⚠️ 读取恢复后文件失败: %v", err)
-				} else {
-					log.Printf("✅ 第%d次恢复完成，当前文件内容 (%d字节):", i+1, len(afterContent))
-					log.Printf("--- 开始 ---")
-					log.Printf("%s", string(afterContent))
-					log.Printf("--- 结束 ---")
-				}
+				log.Printf("✅ 第%d次恢复完成", i+1)
 			}
 
 			log.Printf("========================================")

@@ -71,15 +71,23 @@ func (h *AIEditHandler) ApplyEdit(c *gin.Context) {
 			if acceptedContent != "" && len(acceptedVersions) > 0 {
 				historyManager := models.GetFileHistoryManager()
 
+				// 获取当前消息数量作为messageIndex
+				messages, err := storage.GetMessages(conversationID, 0)
+				if err != nil {
+					log.Printf("⚠️ 获取消息列表失败: %v", err)
+					messages = []storage.ChatMessage{} // 使用空列表
+				}
+				currentMessageIndex := len(messages)
+
 				// 为每个被Accept的版本分别备份和写入
 				// 这样撤销时可以恢复到正确的中间状态
 				for i, version := range acceptedVersions {
 					// 1. 备份当前磁盘状态
 					description := fmt.Sprintf("Accept %s 前备份", version.ToolCallID)
-					if err := historyManager.BackupAndAddVersion(req.FilePath, conversationID, description); err != nil {
+					if err := historyManager.BackupAndAddVersion(req.FilePath, conversationID, currentMessageIndex, description); err != nil {
 						log.Printf("⚠️ 备份文件失败 (%s): %v（继续写入）", version.ToolCallID, err)
 					} else {
-						log.Printf("📦 已备份文件到历史: %s", description)
+						log.Printf("📦 已备份文件到历史 (messageIndex=%d): %s", currentMessageIndex, description)
 					}
 
 					// 2. 写入该版本到磁盘

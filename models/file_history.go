@@ -14,6 +14,7 @@ import (
 type HistoryVersion struct {
 	ID             int       `json:"id"`
 	ConversationID string    `json:"conversation_id"` // 所属会话ID
+	MessageIndex   int       `json:"message_index"`   // 对应的消息索引（用于精确撤销）
 	IsSnapshot     bool      `json:"is_snapshot"`
 	Content        string    `json:"content,omitempty"`    // 完整内容（仅快照）
 	DiffPatch      string    `json:"diff_patch,omitempty"` // diff补丁（仅增量）
@@ -57,18 +58,18 @@ func GetFileHistoryManager() *FileHistoryManager {
 }
 
 // BackupAndAddVersion 备份当前文件并添加版本
-func (m *FileHistoryManager) BackupAndAddVersion(filePath, conversationID, description string) error {
+func (m *FileHistoryManager) BackupAndAddVersion(filePath, conversationID string, messageIndex int, description string) error {
 	// 读取当前磁盘文件
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("读取文件失败: %v", err)
 	}
 
-	return m.AddVersion(filePath, conversationID, string(content), description)
+	return m.AddVersion(filePath, conversationID, messageIndex, string(content), description)
 }
 
 // AddVersion 添加新版本
-func (m *FileHistoryManager) AddVersion(filePath, conversationID, content, description string) error {
+func (m *FileHistoryManager) AddVersion(filePath, conversationID string, messageIndex int, content, description string) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -90,6 +91,7 @@ func (m *FileHistoryManager) AddVersion(filePath, conversationID, content, descr
 		version := HistoryVersion{
 			ID:             versionID,
 			ConversationID: conversationID,
+			MessageIndex:   messageIndex,
 			IsSnapshot:     true,
 			Content:        content,
 			BaseVersion:    -1,
@@ -105,6 +107,7 @@ func (m *FileHistoryManager) AddVersion(filePath, conversationID, content, descr
 			version := HistoryVersion{
 				ID:             1,
 				ConversationID: conversationID,
+				MessageIndex:   messageIndex,
 				IsSnapshot:     true,
 				Content:        content,
 				BaseVersion:    -1,
@@ -124,6 +127,7 @@ func (m *FileHistoryManager) AddVersion(filePath, conversationID, content, descr
 			version := HistoryVersion{
 				ID:             versionID,
 				ConversationID: conversationID,
+				MessageIndex:   messageIndex,
 				IsSnapshot:     false,
 				DiffPatch:      diffPatch,
 				BaseVersion:    baseVersion.ID,
@@ -282,6 +286,30 @@ func (m *FileHistoryManager) CountConversationVersions(conversationID string) ma
 		count := 0
 		for _, version := range history.Versions {
 			if version.ConversationID == conversationID {
+				count++
+			}
+		}
+		if count > 0 {
+			counts[filePath] = count
+		}
+	}
+
+	return counts
+}
+
+// CountConversationVersionsFromIndex 统计指定会话从某个messageIndex开始的版本数
+func (m *FileHistoryManager) CountConversationVersionsFromIndex(conversationID string, fromMessageIndex int) map[string]int {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	counts := make(map[string]int)
+
+	// 遍历所有文件的历史
+	for filePath, history := range m.histories {
+		count := 0
+		for _, version := range history.Versions {
+			// 只统计该会话且messageIndex >= fromMessageIndex的版本
+			if version.ConversationID == conversationID && version.MessageIndex >= fromMessageIndex {
 				count++
 			}
 		}
