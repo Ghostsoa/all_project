@@ -300,9 +300,6 @@
     background-color: transparent;
     padding: 0;
     margin: 0;
-    font-family: inherit;
-    font-size: inherit;
-    line-height: inherit;
 }
 
 /* Zone Widget 中的每一行 */
@@ -311,9 +308,9 @@
     white-space: pre;
     padding: 0;
     margin: 0;
-    font-family: inherit;
-    font-size: inherit;
-    line-height: inherit;
+    font-size: 12px;
+    font-family: Consolas, 'Courier New', monospace;
+    line-height: 18px;
 }
 
 /* 添加行（绿色） */
