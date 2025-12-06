@@ -801,14 +801,22 @@ class AIToolsManager {
     getCurrentServerId() {
         // 检查是否是本地模式（sessionID为'local'表示本地）
         const sessionId = this.getCurrentSessionId();
+        console.log('🔍 getCurrentSessionId 返回:', sessionId);
+        
         if (sessionId === 'local') {
             return 'local';
         }
+        
         // 从全局函数获取远程服务器ID
         if (window.getCurrentServerID) {
-            return window.getCurrentServerID();
+            const serverId = window.getCurrentServerID();
+            console.log('🔍 window.getCurrentServerID 返回:', serverId);
+            return serverId;
         }
-        return '';
+        
+        // 如果什么都没有，假设是本地模式（临时解决方案）
+        console.warn('⚠️ 无法获取serverId，假设为local');
+        return 'local';
     }
 
     /**
