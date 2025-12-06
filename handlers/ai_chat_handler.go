@@ -147,8 +147,8 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 			"content": userContent,
 		})
 
-		// 工具调用循环（最多10轮）
-		maxIterations := 10
+		// 工具调用循环（最多20轮）
+		maxIterations := 20
 		for iteration := 0; iteration < maxIterations; iteration++ {
 			// 调用OpenAI API (流式，支持工具调用)
 			toolCalls, assistantContent, reasoningContent, err := h.streamChatWithTools(
@@ -212,6 +212,9 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 				"tool_calls": toolCalls,
 			})
 
+			// 🔧 检查是否已达到上限（第20轮，iteration=19）
+			reachedLimit := (iteration >= maxIterations-1)
+
 			// 执行工具并收集结果
 			for _, toolCall := range toolCalls {
 				tcMap, ok := toolCall.(map[string]interface{})
@@ -232,8 +235,21 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 					"arguments":    functionArgs,
 				})
 
-				// 执行工具（传递sessionID和messageID）
-				result := h.executeToolCall(functionName, functionArgs, req.SessionID, toolCallID)
+				var result string
+
+				// 🔧 如果已达到上限，不执行工具，直接返回错误
+				if reachedLimit {
+					log.Printf("⚠️ 已达到工具调用上限（20次），返回错误给模型: %s", functionName)
+					errorResult := map[string]interface{}{
+						"success": false,
+						"error":   "本轮工具调用已达到最大次数限制（20次）。请基于已有的工具执行结果给出最终答案，不要再调用任何工具。",
+					}
+					errorJSON, _ := json.Marshal(errorResult)
+					result = string(errorJSON)
+				} else {
+					// 正常执行工具（传递sessionID和messageID）
+					result = h.executeToolCall(functionName, functionArgs, req.SessionID, toolCallID)
+				}
 
 				// 如果是file_operation且类型为edit，解析结果并发送edit_preview
 				if functionName == "file_operation" {
@@ -283,14 +299,6 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 			}
 
 			// 继续下一轮对话（带着工具结果）
-		}
-
-		// 如果达到最大迭代次数
-		if maxIterations >= 10 {
-			ws.WriteJSON(map[string]interface{}{
-				"type":    "warning",
-				"message": "工具调用达到最大次数限制",
-			})
 		}
 	}
 }
@@ -447,7 +455,7 @@ func (h *AIChatHandler) streamChatWithTools(
 		"temperature": config.Temperature,
 		"max_tokens":  config.MaxTokens,
 		"top_p":       config.TopP,
-		"tools":       GetToolsDefinition(), // 添加工具定义
+		"tools":       GetToolsDefinition(config), // 添加工具定义（根据配置动态加载）
 	}
 
 	if config.FrequencyPenalty != 0 {

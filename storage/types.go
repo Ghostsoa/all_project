@@ -39,6 +39,7 @@ type AIConfig struct {
 	TopP             float64 `json:"top_p"`
 	FrequencyPenalty float64 `json:"frequency_penalty"`
 	PresencePenalty  float64 `json:"presence_penalty"`
+	CodeSearchModel  string  `json:"code_search_model"` // 智能代码搜索使用的模型ID
 }
 
 // ChatSession 对话会话

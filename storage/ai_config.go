@@ -29,6 +29,7 @@ func LoadAIConfigCache() error {
 			TopP:             1.0,
 			FrequencyPenalty: 0.0,
 			PresencePenalty:  0.0,
+			CodeSearchModel:  "", // 默认空，使用会话当前模型
 		}
 	}
 
@@ -51,6 +52,7 @@ func GetAIConfig() (*AIConfig, error) {
 			TopP:             1.0,
 			FrequencyPenalty: 0.0,
 			PresencePenalty:  0.0,
+			CodeSearchModel:  "", // 默认空，使用会话当前模型
 		}, nil
 	}
 
