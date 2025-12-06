@@ -1114,7 +1114,8 @@ async function streamChat(sessionId, message, thinkingId) {
         let assistantMessage = '';
         let reasoningContent = '';
         let messageElement = null;
-        let currentContentDiv = null;  // 当前的content div
+        let currentContentDiv = null;  // 当前正在更新的 content div
+        let currentBlockText = '';      // 当前块的文本（工具前后分开）
         
         // 收集上下文信息
         const terminalInfo = window.getTerminalBuffer(200);  // 终端200行
@@ -1191,7 +1192,8 @@ async function streamChat(sessionId, message, thinkingId) {
                 }
                 
                 if (data.type === 'content') {
-                    assistantMessage += data.content;
+                    assistantMessage += data.content;  // 保留累积总文本（用于判断isFirstContent）
+                    currentBlockText += data.content;  // 当前块的文本
                     
                     // 如果是第一条内容且有thinking，转换为正式消息
                     const isFirstContent = assistantMessage === data.content;
@@ -1207,19 +1209,16 @@ async function streamChat(sessionId, message, thinkingId) {
                         messagesContainer.appendChild(messageElement);
                     }
                     
-                    // 如果还没有currentContentDiv，获取或创建一个
+                    // 如果没有currentContentDiv，创建一个
                     if (!currentContentDiv) {
                         const contentWrapper = messageElement.querySelector('.message-content-wrapper');
-                        currentContentDiv = contentWrapper.querySelector('.message-content');
-                        if (!currentContentDiv) {
-                            currentContentDiv = document.createElement('div');
-                            currentContentDiv.className = 'message-content';
-                            contentWrapper.appendChild(currentContentDiv);
-                        }
+                        currentContentDiv = document.createElement('div');
+                        currentContentDiv.className = 'message-content';
+                        contentWrapper.appendChild(currentContentDiv);
                     }
                     
-                    // 只更新当前的content div
-                    currentContentDiv.innerHTML = formatMessageContent(assistantMessage);
+                    // 更新当前块的content div
+                    currentContentDiv.innerHTML = formatMessageContent(currentBlockText);
                     scrollToBottom();
                     
                     // 收到第一条正文内容时：1) 自动折叠思维链 2) 停止流光
@@ -1317,9 +1316,9 @@ async function streamChat(sessionId, message, thinkingId) {
                     
                     appendToolCall(messageElement, data);
                     
-                    // 重置内容累积，准备接收工具后的文本
-                    assistantMessage = '';
-                    currentContentDiv = null;  // 下次收到content时会创建新的div
+                    // 重置当前块，准备接收工具后的文本
+                    currentBlockText = '';
+                    currentContentDiv = null;  // 下次收到content会创建新的div
                     
                     scrollToBottom();
                     
@@ -1432,17 +1431,19 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
         contentWrapper.appendChild(reasoningDiv);
     }
     
-    // 先添加正文内容
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-    // 用户消息只做简单转义，AI消息应用Markdown渲染
-    if (role === 'user') {
-        contentDiv.innerHTML = escapeHtml(content).replace(/\n/g, '<br>');
-    } else {
-        contentDiv.innerHTML = formatMessageContent(content);
+    // 添加正文内容（如果有内容的话）
+    if (content || role === 'user') {
+        const contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        // 用户消息只做简单转义，AI消息应用Markdown渲染
+        if (role === 'user') {
+            contentDiv.innerHTML = escapeHtml(content).replace(/\n/g, '<br>');
+        } else {
+            contentDiv.innerHTML = formatMessageContent(content);
+        }
+        
+        contentWrapper.appendChild(contentDiv);
     }
-    
-    contentWrapper.appendChild(contentDiv);
     
     // 然后在正文后面渲染工具调用
     if (role === 'assistant' && fullMessage && fullMessage.tool_calls && fullMessage.tool_calls.length > 0) {
@@ -1553,10 +1554,18 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
 
 // 更新消息内容
 function updateMessageContent(messageElement, content) {
-    const contentDiv = messageElement.querySelector('.message-content');
-    if (contentDiv) {
-        contentDiv.innerHTML = formatMessageContent(content);
+    const contentWrapper = messageElement.querySelector('.message-content-wrapper');
+    if (!contentWrapper) return;
+    
+    let contentDiv = messageElement.querySelector('.message-content:last-of-type');
+    if (!contentDiv) {
+        // 如果没有content div，创建一个并追加到wrapper
+        contentDiv = document.createElement('div');
+        contentDiv.className = 'message-content';
+        contentWrapper.appendChild(contentDiv);
     }
+    
+    contentDiv.innerHTML = formatMessageContent(content);
 }
 
 // 更新思维链内容
