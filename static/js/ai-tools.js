@@ -456,7 +456,20 @@ class AIToolsManager {
         }
         
         if (files.length === 0) {
-            // 没有找到文件标签，显示简单提示
+            // 没有找到文件标签，显示原始内容或提示
+            if (resultText && resultText.trim().length > 0) {
+                return `
+                    <div class="tool-call">
+                        <div class="tool-simple completed">
+                            <i class="fa-solid fa-magnifying-glass-chart tool-simple-icon"></i>
+                            code_search (查看详情)
+                        </div>
+                        <div style="white-space: pre-wrap; font-family: monospace; font-size: 12px; color: rgba(255,255,255,0.7); padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; margin-top: 4px;">
+                            ${this.escapeHtml(resultText)}
+                        </div>
+                    </div>
+                `;
+            }
             return `
                 <div class="tool-call">
                     <div class="tool-simple completed">

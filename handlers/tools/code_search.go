@@ -187,46 +187,33 @@ func executeCodeSearchSubAgent(args CodeSearchArgs, config *storage.AIConfig, pa
 
 // buildCodeSearchSystemPrompt 构建系统提示词
 func buildCodeSearchSystemPrompt(searchFolder, searchQuery string) string {
-	return fmt.Sprintf(`你是一个专业的代码搜索助手，负责在代码库中找到与用户查询最相关的代码。
+	return fmt.Sprintf(`You are a specialized code search assistant.
 
-**搜索目标：**
-目录：%s
-查询：%s
+**CRITICAL: YOU MUST ONLY USE TOOL CALLS. DO NOT OUTPUT ANY TEXT OR MARKDOWN.**
 
-**你的任务：**
-1. 使用 search_files 工具进行多轮搜索，逐步定位最相关的代码
-2. 完成后使用 submit_results 工具提交最终结果
+Your task:
+1. Use the "search_files" tool to search code across multiple rounds
+2. Use the "submit_results" tool to submit your final findings
 
-**搜索策略（严格遵循）：**
-1. **广泛探索**（第1轮）
-   - 使用关键词进行grep搜索，了解代码库结构
-   - 并行搜索多个相关术语
-   - 识别关键文件和目录
+Search target:
+Directory: %s
+Query: %s
 
-2. **精炼搜索**（第2-3轮）
-   - 基于初步结果，缩小搜索范围
-   - 读取关键文件内容
-   - 搜索具体的函数名、类型定义
+Search strategy (5 rounds max):
+Round 1: Broad exploration - grep for keywords, identify key files
+Round 2-3: Focused search - read key files, search specific functions
+Round 4: Verification - confirm relevance, check dependencies  
+Round 5: MUST submit results using "submit_results" tool
 
-3. **验证补充**（第4轮）
-   - 确认相关性，补充缺失信息
-   - 查找依赖关系和调用链
+**RULES (CRITICAL):**
+- ⛔ DO NOT output any text, markdown, or JSON. ONLY use tool calls.
+- ✅ Use "search_files" tool with parallel operations
+- ✅ Use "submit_results" tool to finish (required)
+- ✅ Submit format: {"file_path": "/path/file.go", "start_line": 45, "end_line": 120}
+- ✅ If whole file is relevant: start_line=0, end_line=0
+- ⚠️ Round 5: MANDATORY submission
 
-4. **提交结果**（第5轮）
-   - 筛选出最相关的5-10个代码片段
-   - 按相关性排序
-   - 使用submit_results提交结果（文件路径+行号范围）
-
-**严格规则：**
-- ❌ 不要输出任何文本内容！只能调用工具！
-- ✅ 每轮可以并行调用多个search_files操作
-- ✅ 必须通过submit_results提交最终结果
-- ⚠️ submit_results必须提交文件路径和行号范围，系统会自动读取完整代码
-- ⚠️ 提交格式示例：{"file_path": "/path/to/file.go", "start_line": 45, "end_line": 120}
-- ⚠️ 如果整个文件都相关，设置 start_line=0, end_line=0
-- ⚠️ 最多5轮搜索，第5轮必须提交结果！
-
-现在开始搜索！`, searchFolder, searchQuery)
+BEGIN SEARCH NOW.`, searchFolder, searchQuery)
 }
 
 // executeSearchFiles 执行并行搜索
@@ -393,11 +380,11 @@ func callCodeSearchLLM(config *storage.AIConfig, messages []map[string]interface
 	if err != nil {
 		return nil, "", fmt.Errorf("获取Providers失败: %v", err)
 	}
-	
+
 	if len(providers) == 0 {
 		return nil, "", fmt.Errorf("没有配置任何Provider")
 	}
-	
+
 	// 查找包含该模型的Provider
 	var provider *storage.Provider
 	for _, p := range providers {
@@ -411,7 +398,7 @@ func callCodeSearchLLM(config *storage.AIConfig, messages []map[string]interface
 			break
 		}
 	}
-	
+
 	// 如果没找到，使用第一个Provider
 	if provider == nil {
 		log.Printf("⚠️ 未找到包含模型 %s 的Provider，使用第一个Provider", config.CodeSearchModel)
@@ -420,10 +407,11 @@ func callCodeSearchLLM(config *storage.AIConfig, messages []map[string]interface
 
 	// 构建请求体（非流式）
 	requestBody := map[string]interface{}{
-		"model":    config.CodeSearchModel,
-		"messages": messages,
-		"stream":   false, // 非流式
-		"tools":    GetCodeSearchToolsForSubAgent(),
+		"model":       config.CodeSearchModel,
+		"messages":    messages,
+		"stream":      false, // 非流式
+		"tools":       GetCodeSearchToolsForSubAgent(),
+		"tool_choice": "required", // 强制必须调用工具
 	}
 
 	// 添加可选参数
@@ -473,6 +461,9 @@ func callCodeSearchLLM(config *storage.AIConfig, messages []map[string]interface
 		return nil, "", fmt.Errorf("解析响应失败: %v", err)
 	}
 
+	// 🔍 调试：打印API响应
+	log.Printf("🔍 API响应: %s", string(body))
+
 	// 提取choices
 	choices, ok := apiResp["choices"].([]interface{})
 	if !ok || len(choices) == 0 {
@@ -495,6 +486,9 @@ func callCodeSearchLLM(config *storage.AIConfig, messages []map[string]interface
 	if tc, ok := message["tool_calls"].([]interface{}); ok {
 		toolCalls = tc
 	}
+
+	// 🔍 调试：打印提取结果
+	log.Printf("🔍 提取结果: content=%s, toolCalls数量=%d", content, len(toolCalls))
 
 	return toolCalls, content, nil
 }

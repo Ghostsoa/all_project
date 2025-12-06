@@ -1538,7 +1538,13 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
             window.currentHistoryMessages.forEach(msg => {
                 if (msg.role === 'tool' && msg.tool_call_id) {
                     try {
-                        const result = typeof msg.content === 'string' ? JSON.parse(msg.content) : msg.content;
+                        // code_search返回纯文本（XML格式），不需要JSON.parse
+                        let result;
+                        if (msg.tool_name === 'code_search') {
+                            result = msg.content; // 直接使用原始文本
+                        } else {
+                            result = typeof msg.content === 'string' ? JSON.parse(msg.content) : msg.content;
+                        }
                         toolResults.set(msg.tool_call_id, { result, toolName: msg.tool_name });
                     } catch (e) {
                         console.error('解析tool结果失败:', e, '原始内容:', msg.content);
@@ -2362,7 +2368,12 @@ function updateToolResult(messageElement, data) {
     // 解析result（可能是JSON字符串）
     let resultObj;
     try {
-        resultObj = typeof result === 'string' ? JSON.parse(result) : result;
+        // code_search返回纯文本（XML格式），不需要JSON.parse
+        if (toolName === 'code_search') {
+            resultObj = result; // 直接使用原始文本
+        } else {
+            resultObj = typeof result === 'string' ? JSON.parse(result) : result;
+        }
     } catch (e) {
         resultObj = { success: false, error: '解析结果失败' };
     }
