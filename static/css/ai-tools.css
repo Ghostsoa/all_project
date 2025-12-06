@@ -300,7 +300,9 @@
     background-color: transparent;
     padding: 0;
     margin: 0;
-    font-size: 12px;  /* 匹配编辑器字体大小 */
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
 }
 
 /* Zone Widget 中的每一行 */
@@ -309,6 +311,9 @@
     white-space: pre;
     padding: 0;
     margin: 0;
+    font-family: inherit;
+    font-size: inherit;
+    line-height: inherit;
 }
 
 /* 添加行（绿色） */
