@@ -299,20 +299,21 @@
 
 /* Zone Widget 中的每一行 */
 .diff-zone-line {
-    padding: 2px 40px 2px 10px;
+    padding: 0 10px 0 55px;
     display: flex;
     align-items: center;
+    height: 20px;
 }
 
 /* 删除行（红色） */
 .diff-zone-deleted {
-    background-color: rgba(239, 68, 68, 0.15);
+    background-color: rgba(239, 68, 68, 0.2);
     color: #fca5a5;
 }
 
 /* 添加行（绿色） */
 .diff-zone-added {
-    background-color: rgba(16, 185, 129, 0.15);
+    background-color: rgba(16, 185, 129, 0.2);
     color: #6ee7b7;
 }
 
