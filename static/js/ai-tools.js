@@ -595,50 +595,52 @@ class AIToolsManager {
         
         console.log('📝 处理operations:', operations.length, '个操作');
         
-        // 收集需要添加的 content widget
-        const widgets = [];
-        
         operations.forEach((op, index) => {
             const { type, start_line, end_line, old_text, new_text } = op;
             console.log(`  操作 ${index + 1}:`, { type, start_line, end_line, old_text, new_text });
             
             if (type === 'replace') {
-                // 删除行（红色背景，显示旧内容）
+                const lineContent = model.getLineContent(start_line);
+                
+                // 修改行（黄色/蓝色背景）
                 decorations.push({
                     range: new monaco.Range(start_line, 1, start_line, model.getLineMaxColumn(start_line)),
                     options: {
                         isWholeLine: true,
-                        className: 'diff-line-deleted',
-                        glyphMarginClassName: 'diff-glyph-deleted',
+                        className: 'diff-line-modified',
+                        glyphMarginClassName: 'diff-glyph-modified',
                         minimap: {
-                            color: '#ef4444',
+                            color: '#3b82f6',
                             position: monaco.editor.MinimapPosition.Inline
                         },
-                        hoverMessage: { value: `**删除:** \`${old_text}\`` }
+                        hoverMessage: { 
+                            value: `**修改:**\n\n删除: \`${old_text}\`\n\n添加: \`${new_text}\`` 
+                        }
                     }
                 });
                 
-                // 添加行（绿色行，在删除行下面显示）
-                // 创建一个 content widget 来显示添加的内容
-                const widgetId = `diff-added-${toolCallId}-${index}`;
-                const widgetNode = document.createElement('div');
-                widgetNode.className = 'diff-added-line';
-                widgetNode.innerHTML = `<span class="diff-line-prefix">+</span> ${this.escapeHtml(new_text)}`;
+                // 在该行前面显示 "-" 和 "+" 标记
+                decorations.push({
+                    range: new monaco.Range(start_line, 1, start_line, 1),
+                    options: {
+                        before: {
+                            content: '- ',
+                            inlineClassName: 'diff-inline-deleted-marker',
+                            inlineClassNameAffectsLetterSpacing: true
+                        }
+                    }
+                });
                 
-                widgets.push({
-                    getId: () => widgetId,
-                    getDomNode: () => widgetNode,
-                    getPosition: () => ({
-                        position: { lineNumber: start_line + 1, column: 1 },
-                        preference: [monaco.editor.ContentWidgetPositionPreference.BELOW]
-                    })
+                decorations.push({
+                    range: new monaco.Range(start_line, model.getLineMaxColumn(start_line), start_line, model.getLineMaxColumn(start_line)),
+                    options: {
+                        after: {
+                            content: ` → ${new_text}`,
+                            inlineClassName: 'diff-inline-added'
+                        }
+                    }
                 });
             }
-        });
-        
-        // 添加 content widgets
-        widgets.forEach(widget => {
-            editor.addContentWidget(widget);
         });
 
         console.log('🎨 应用', decorations.length, '个装饰');
@@ -646,13 +648,12 @@ class AIToolsManager {
         const decorationIds = editor.deltaDecorations([], decorations);
         console.log('✅ 装饰已应用，ID:', decorationIds);
         
-        // 保存装饰ID和widgets到编辑信息中
+        // 保存装饰ID到编辑信息中
         const edit = this.pendingEdits.get(toolCallId);
         if (edit) {
             edit.decorationIds = decorationIds;
-            edit.contentWidgets = widgets;
             edit.editorInstance = editor;
-            console.log('✅ 装饰ID和widgets已保存到edit对象');
+            console.log('✅ 装饰ID已保存到edit对象');
         }
     }
     
@@ -867,19 +868,9 @@ class AIToolsManager {
      */
     clearDiffDecorations(toolCallId) {
         const edit = this.pendingEdits.get(toolCallId);
-        if (edit && edit.editorInstance) {
-            // 清除装饰
-            if (edit.decorationIds) {
-                edit.editorInstance.deltaDecorations(edit.decorationIds, []);
-                delete edit.decorationIds;
-            }
-            // 清除 content widgets
-            if (edit.contentWidgets) {
-                edit.contentWidgets.forEach(widget => {
-                    edit.editorInstance.removeContentWidget(widget);
-                });
-                delete edit.contentWidgets;
-            }
+        if (edit && edit.editorInstance && edit.decorationIds) {
+            edit.editorInstance.deltaDecorations(edit.decorationIds, []);
+            delete edit.decorationIds;
             delete edit.editorInstance;
         }
     }
