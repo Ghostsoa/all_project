@@ -749,12 +749,16 @@ class AIToolsManager {
      * @param {string} toolCallId 
      */
     autoApplyToOpenEditor(toolCallId) {
+        console.log('🔍 autoApplyToOpenEditor调用:', toolCallId);
+        
         const edit = this.pendingEdits.get(toolCallId);
         if (!edit || edit.type !== 'edit') {
+            console.log('❌ edit不存在或类型错误:', { edit, type: edit?.type });
             return;
         }
         
         const { file_path, operations, server_id } = edit;
+        console.log('📋 edit信息:', { file_path, operations: operations?.length, server_id });
         
         // 检查当前服务器是否匹配
         const currentServerId = this.getCurrentServerId();
@@ -772,14 +776,18 @@ class AIToolsManager {
         
         // 检查这个edit是否是该文件的最后一个pending（只显示最后一个的累计diff）
         let lastPendingToolCallId = null;
+        let pendingCount = 0;
         for (const [tid, e] of this.pendingEdits.entries()) {
             if (e.file_path === file_path && e.status === 'pending' && e.type === 'edit') {
                 lastPendingToolCallId = tid;  // Map保持插入顺序，最后遍历到的就是最新的
+                pendingCount++;
             }
         }
         
+        console.log('📊 该文件pending统计:', { 总数: pendingCount, 最后一个: lastPendingToolCallId, 当前: toolCallId });
+        
         if (lastPendingToolCallId !== toolCallId) {
-            console.log('⏭️ 不是最后一个pending，跳过显示diff:', { current: toolCallId, latest: lastPendingToolCallId });
+            console.log('⏭️ 不是最后一个pending，跳过显示diff');
             return;
         }
         
@@ -938,23 +946,36 @@ class AIToolsManager {
                 return;
             }
             
-            // 3. 更新 UI
-            this.updateToolStatus(toolCallId, 'accepted');
+            // 3. 更新 UI - 连带更新之前的所有pending
+            // 获取同文件的所有pending edits（按顺序）
+            const sameFileEdits = [];
+            for (const [tid, e] of this.pendingEdits.entries()) {
+                if (e.file_path === file_path && e.status === 'pending' && e.type === 'edit') {
+                    sameFileEdits.push({ toolCallId: tid, edit: e });
+                }
+            }
             
-            // 清除当前装饰
-            this.clearDiffDecorations(toolCallId);
+            // 找到当前Accept的位置
+            const acceptIndex = sameFileEdits.findIndex(item => item.toolCallId === toolCallId);
+            
+            if (acceptIndex !== -1) {
+                // Accept当前的及之前的所有pending（0到acceptIndex）
+                for (let i = 0; i <= acceptIndex; i++) {
+                    const { toolCallId: tid } = sameFileEdits[i];
+                    console.log('✅ 连带Accept:', tid);
+                    this.updateToolStatus(tid, 'accepted');
+                    this.clearDiffDecorations(tid);
+                    this.pendingEdits.delete(tid);
+                    this.appliedEdits.add(tid);
+                }
+            }
             
             // 4. 刷新编辑器内容（如果文件已打开）
             await this.refreshEditorContent(file_path, server_id);
             
-            // 移除待处理列表
-            this.pendingEdits.delete(toolCallId);
-            
             // 5. 重新计算并显示剩余pending的diff（基于新磁盘）
             await this.recomputeRemainingDiff(file_path);
             
-            // 标记为已应用
-            this.appliedEdits.add(toolCallId);
             this.saveAppliedEdits();
             
             this.showToast('已应用并写入文件', 'success');
