@@ -293,10 +293,6 @@
     padding: 8px 12px;
 }
 
-/* Pending Bar显示时，输入框上边框圆角为0，保留上边框作为分隔线 */
-.pending-actions-bar + .ai-input-container .input-box {
-    border-radius: 0 0 8px 8px;
-}
 
 .input-box:focus-within {
     border-color: rgba(59, 130, 246, 0.5);
