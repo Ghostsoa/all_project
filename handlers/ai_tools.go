@@ -23,6 +23,17 @@ func NewToolExecutor() *ToolExecutor {
 	return &ToolExecutor{}
 }
 
+// truncateLine 截断过长的行（限制2000字符，避免上下文溢出）
+func truncateLine(line string, maxLen int) string {
+	if maxLen <= 0 {
+		maxLen = 2000 // 默认2000字符
+	}
+	if len(line) <= maxLen {
+		return line
+	}
+	return line[:maxLen] + "... [截断，原长度: " + fmt.Sprintf("%d", len(line)) + " 字符]"
+}
+
 // Operation 编辑操作
 type Operation struct {
 	Type      string `json:"type"`       // "replace", "insert", "delete"
@@ -145,6 +156,10 @@ func (te *ToolExecutor) readFile(args FileOperationArgs, conversationID string) 
 
 		// 提取指定行范围（1-indexed转0-indexed）
 		selectedLines := lines[startLine-1 : endLine]
+		// 🔧 截断过长的行
+		for i, line := range selectedLines {
+			selectedLines[i] = truncateLine(line, 2000)
+		}
 		content = strings.Join(selectedLines, "\n")
 
 		log.Printf("📄 读取行范围: %d-%d (共%d行)", startLine, endLine, endLine-startLine+1)
@@ -159,7 +174,11 @@ func (te *ToolExecutor) readFile(args FileOperationArgs, conversationID string) 
 				totalLines,
 			)
 		}
-		content = fullContent
+		// 🔧 截断过长的行
+		for i, line := range lines {
+			lines[i] = truncateLine(line, 2000)
+		}
+		content = strings.Join(lines, "\n")
 		startLine = 1
 		endLine = totalLines
 	}
@@ -338,8 +357,13 @@ func (te *ToolExecutor) listDir(args FileOperationArgs) (string, error) {
 			break
 		}
 		info, _ := entry.Info()
+		// 🔧 截断文件名（避免极长文件名）
+		fileName := entry.Name()
+		if len(fileName) > 200 {
+			fileName = truncateLine(fileName, 200)
+		}
 		fileInfo := map[string]interface{}{
-			"name":  entry.Name(),
+			"name":  fileName,
 			"isDir": entry.IsDir(),
 			"size":  info.Size(),
 			"mtime": info.ModTime().Format("2006-01-02 15:04:05"),
@@ -445,7 +469,8 @@ func (te *ToolExecutor) grepSearch(args FileOperationArgs) (string, error) {
 				contextBefore := []string{}
 				for i := 2; i >= 1; i-- {
 					if lineNum-i >= 0 {
-						contextBefore = append(contextBefore, lines[lineNum-i])
+						// 🔧 截断上下文行
+						contextBefore = append(contextBefore, truncateLine(lines[lineNum-i], 500))
 					}
 				}
 
@@ -453,14 +478,15 @@ func (te *ToolExecutor) grepSearch(args FileOperationArgs) (string, error) {
 				contextAfter := []string{}
 				for i := 1; i <= 2; i++ {
 					if lineNum+i < len(lines) {
-						contextAfter = append(contextAfter, lines[lineNum+i])
+						// 🔧 截断上下文行
+						contextAfter = append(contextAfter, truncateLine(lines[lineNum+i], 500))
 					}
 				}
 
 				matches = append(matches, Match{
 					FilePath:      path,
-					Line:          lineNum + 1, // 1-indexed
-					Content:       strings.TrimSpace(line),
+					Line:          lineNum + 1,                                 // 1-indexed
+					Content:       truncateLine(strings.TrimSpace(line), 1000), // 🔧 截断匹配行
 					ContextBefore: contextBefore,
 					ContextAfter:  contextAfter,
 				})
@@ -564,8 +590,14 @@ func (te *ToolExecutor) findByName(args FileOperationArgs) (string, error) {
 				size = info.Size()
 			}
 
+			// 🔧 截断路径（避免极长路径）
+			truncatedPath := path
+			if len(path) > 500 {
+				truncatedPath = truncateLine(path, 500)
+			}
+
 			results = append(results, FileInfo{
-				Path:  path,
+				Path:  truncatedPath,
 				IsDir: d.IsDir(),
 				Size:  size,
 			})
@@ -715,7 +747,12 @@ func GetToolsDefinition() []map[string]interface{} {
 			"function": map[string]interface{}{
 				"name": "file_operation",
 				"description": "统一的文件操作工具，支持读取、写入、编辑、列出目录、搜索内容、查找文件。通过 type 参数指定操作类型。" +
-					"支持多服务器操作。所有操作都需要 server_id。",
+					"支持多服务器操作。所有操作都需要 server_id。\n" +
+					"⚠️ 截断机制：为避免上下文溢出，所有工具都会自动截断过长的内容：\n" +
+					"- read: 单行超过2000字符会被截断\n" +
+					"- grep: 匹配行超过1000字符、上下文行超过500字符会被截断，最多返回20条结果\n" +
+					"- find: 路径超过500字符会被截断，最多返回50个文件\n" +
+					"- list: 文件名超过200字符会被截断，最多返回100项",
 				"parameters": map[string]interface{}{
 					"type": "object",
 					"properties": map[string]interface{}{
@@ -759,7 +796,8 @@ func GetToolsDefinition() []map[string]interface{} {
 						"query": map[string]interface{}{
 							"type": "string",
 							"description": "【仅 type=grep 时需要】搜索内容或正则表达式。\n" +
-								"如果 is_regex=true，将作为正则表达式处理。",
+								"如果 is_regex=true，将作为正则表达式处理。\n" +
+								"每个匹配会返回匹配行及前后各2行上下文（上下文行限制500字符，匹配行限制1000字符）。",
 						},
 						"search_path": map[string]interface{}{
 							"type": "string",

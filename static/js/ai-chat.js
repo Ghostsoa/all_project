@@ -1197,11 +1197,31 @@ async function streamChat(sessionId, message, thinkingId) {
                 }
                 
                 if (data.type === 'content') {
-                    assistantMessage += data.content;  // 保留累积总文本（用于判断isFirstContent）
-                    currentBlockText += data.content;  // 当前块的文本
+                    let content = data.content;
+                    
+                    // 🔧 过滤：如果是第一条内容
+                    const isFirstContent = assistantMessage === '';
+                    if (isFirstContent) {
+                        // 1. 如果整个内容只有空白字符（\n、空格、tab等），跳过
+                        if (!content || content.trim() === '') {
+                            return; // 跳过纯空白内容
+                        }
+                        
+                        // 2. 去掉开头的\n（只去掉\n，保留有意义的空格）
+                        while (content.startsWith('\n')) {
+                            content = content.substring(1);
+                        }
+                        
+                        // 3. 再次检查，如果去掉\n后只剩空白，跳过
+                        if (!content || content.trim() === '') {
+                            return;
+                        }
+                    }
+                    
+                    assistantMessage += content;  // 保留累积总文本（用于判断isFirstContent）
+                    currentBlockText += content;  // 当前块的文本
                     
                     // 如果是第一条内容且有thinking，转换为正式消息
-                    const isFirstContent = assistantMessage === data.content;
                     if (isFirstContent && thinkingId) {
                         messageElement = convertThinkingToMessage(thinkingId);
                         thinkingId = null;
@@ -1248,11 +1268,32 @@ async function streamChat(sessionId, message, thinkingId) {
                     
                 } else if (data.type === 'reasoning') {
                     // 思维链内容
-                    const newReasoning = data.reasoning_content || data.content || '';
+                    let newReasoning = data.reasoning_content || data.content || '';
+                    
+                    // 🔧 过滤：如果是第一条reasoning
+                    const isFirstReasoning = reasoningContent === '';
+                    if (isFirstReasoning) {
+                        // 1. 如果整个内容只有空白字符（\n、空格、tab等），跳过
+                        if (!newReasoning || newReasoning.trim() === '') {
+                            return; // 跳过纯空白内容
+                        }
+                        
+                        // 2. 去掉开头的\n（只去掉\n，保留有意义的空格）
+                        while (newReasoning.startsWith('\n')) {
+                            newReasoning = newReasoning.substring(1);
+                        }
+                        
+                        // 3. 再次检查，如果去掉\n后只剩空白，跳过
+                        if (!newReasoning || newReasoning.trim() === '') {
+                            return;
+                        }
+                    }
+                    
                     if (newReasoning) {
                         reasoningContent += newReasoning;
                     } else {
                         console.warn('⚠️ 收到空的reasoning数据:', data);
+                        return; // 跳过空内容
                     }
                     
                     // 如果还没有消息元素，将thinking转换为正式消息
@@ -1335,12 +1376,6 @@ async function streamChat(sessionId, message, thinkingId) {
                         }
                         // 🔧 重置reasoningContent，让后续的reasoning创建新的思维链div
                         reasoningContent = '';
-                    }
-                    
-                    // 🔧 删除可能存在的空content div（在tool_call前如果没有收到content）
-                    if (messageElement && currentContentDiv && currentContentDiv.textContent.trim() === '') {
-                        currentContentDiv.remove();
-                        currentContentDiv = null;
                     }
                     
                     appendToolCall(messageElement, data);
@@ -1446,8 +1481,26 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'message-content-wrapper';  // 注意：这个类名在工具调用中也会使用
     
+    // 🔧 过滤reasoning：去掉开头\n和纯空白字符
+    let filteredReasoning = reasoning;
+    if (filteredReasoning) {
+        // 1. 如果整个内容只有空白字符，设为null
+        if (filteredReasoning.trim() === '') {
+            filteredReasoning = null;
+        } else {
+            // 2. 去掉开头的所有\n
+            while (filteredReasoning.startsWith('\n')) {
+                filteredReasoning = filteredReasoning.substring(1);
+            }
+            // 3. 再次检查是否为空
+            if (!filteredReasoning || filteredReasoning.trim() === '') {
+                filteredReasoning = null;
+            }
+        }
+    }
+    
     // 如果有思维链内容，先添加思维链（默认折叠）
-    if (reasoning) {
+    if (filteredReasoning) {
         const reasoningDiv = document.createElement('div');
         reasoningDiv.className = 'message-reasoning';
         reasoningDiv.innerHTML = `
@@ -1455,20 +1508,38 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
                 <span class="thought-text">Thought</span>
                 <i class="fa-solid fa-chevron-right reasoning-arrow"></i>
             </div>
-            <div class="reasoning-content collapsed">${formatMessageContent(reasoning)}</div>
+            <div class="reasoning-content collapsed">${formatMessageContent(filteredReasoning)}</div>
         `;
         contentWrapper.appendChild(reasoningDiv);
     }
     
-    // 添加正文内容（只在有实际内容时添加）
-    if (content && content.trim() !== '') {
+    // 🔧 过滤content：去掉开头\n和纯空白字符
+    let filteredContent = content;
+    if (filteredContent && role !== 'user') {
+        // 1. 如果整个内容只有空白字符，设为null
+        if (filteredContent.trim() === '') {
+            filteredContent = null;
+        } else {
+            // 2. 去掉开头的所有\n
+            while (filteredContent.startsWith('\n')) {
+                filteredContent = filteredContent.substring(1);
+            }
+            // 3. 再次检查是否为空
+            if (!filteredContent || filteredContent.trim() === '') {
+                filteredContent = null;
+            }
+        }
+    }
+    
+    // 添加正文内容（如果有内容的话）
+    if (filteredContent || role === 'user') {
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
         // 用户消息只做简单转义，AI消息应用Markdown渲染
         if (role === 'user') {
-            contentDiv.innerHTML = escapeHtml(content).replace(/\n/g, '<br>');
+            contentDiv.innerHTML = escapeHtml(filteredContent || '').replace(/\n/g, '<br>');
         } else {
-            contentDiv.innerHTML = formatMessageContent(content);
+            contentDiv.innerHTML = formatMessageContent(filteredContent || '');
         }
         
         contentWrapper.appendChild(contentDiv);
@@ -1559,10 +1630,12 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
         messageDiv.dataset.messageIndex = messageId;
     }
     
-    // 添加消息操作按钮（只为用户消息添加）
+    // 添加消息操作按钮（类似命令记录样式）
+    const actionsDiv = document.createElement('div');
+    actionsDiv.className = 'message-actions';
+    
     if (role === 'user') {
-        const actionsDiv = document.createElement('div');
-        actionsDiv.className = 'message-actions';
+        // 用户消息：编辑、撤销
         actionsDiv.innerHTML = `
             <span class="message-action-link" onclick="editMessage(this)" title="编辑">
                 <i class="fa-solid fa-edit"></i> 编辑
@@ -1571,8 +1644,12 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
                 <i class="fa-solid fa-undo"></i> 撤销
             </span>
         `;
-        messageDiv.appendChild(actionsDiv);
+    } else {
+        // AI消息：无操作按钮
+        actionsDiv.innerHTML = '';
     }
+    
+    messageDiv.appendChild(actionsDiv);
     
     return messageDiv;
 }
@@ -1583,15 +1660,6 @@ function updateMessageContent(messageElement, content) {
     if (!contentWrapper) return;
     
     let contentDiv = messageElement.querySelector('.message-content:last-of-type');
-    
-    // 如果内容为空，删除空的content div（如果存在）
-    if (!content || content.trim() === '') {
-        if (contentDiv && contentDiv.textContent.trim() === '') {
-            contentDiv.remove();
-        }
-        return;
-    }
-    
     if (!contentDiv) {
         // 如果没有content div，创建一个并追加到wrapper
         contentDiv = document.createElement('div');
