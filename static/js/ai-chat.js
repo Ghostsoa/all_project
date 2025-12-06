@@ -17,7 +17,7 @@ let isGenerating = false; // 是否正在生成
 
 // 分页相关
 let currentOffset = 0;
-const PAGE_SIZE = 20; // 每页20条消息
+const PAGE_SIZE = 100; // 每页100条消息
 let isLoadingMore = false;
 let hasMoreMessages = true;
 let totalMessages = 0;
@@ -1227,9 +1227,15 @@ async function streamChat(sessionId, message, thinkingId) {
                     scrollToBottom();
                     
                     // 收到第一条正文内容时：1) 自动折叠思维链 2) 停止流光
+                    // 但如果思维链已经在tool_call时折叠过了，就不需要再折叠
                     if (isFirstContent) {
                         if (reasoningContent) {
-                            updateReasoningContent(messageElement, reasoningContent, true, false);
+                            const reasoningDiv = messageElement.querySelector('.message-reasoning');
+                            const reasoningContentDiv = reasoningDiv ? reasoningDiv.querySelector('.reasoning-content') : null;
+                            // 只有当思维链还没折叠时才折叠
+                            if (reasoningContentDiv && !reasoningContentDiv.classList.contains('collapsed')) {
+                                updateReasoningContent(messageElement, reasoningContent, true, false);
+                            }
                         }
                         // 停止思维链header的流光
                         const reasoningHeader = messageElement.querySelector('.reasoning-header');
@@ -1317,6 +1323,18 @@ async function streamChat(sessionId, message, thinkingId) {
                             messageElement = createMessageElement('assistant', '');
                             messagesContainer.appendChild(messageElement);
                         }
+                    }
+                    
+                    // 🔧 修复：在添加工具调用前，如果有思维链内容，先折叠它
+                    if (reasoningContent && messageElement) {
+                        updateReasoningContent(messageElement, reasoningContent, true, false);
+                        // 停止思维链header的流光
+                        const reasoningHeader = messageElement.querySelector('.reasoning-header');
+                        if (reasoningHeader) {
+                            reasoningHeader.classList.remove('shimmer-text');
+                        }
+                        // 🔧 重置reasoningContent，让后续的reasoning创建新的思维链div
+                        reasoningContent = '';
                     }
                     
                     appendToolCall(messageElement, data);
@@ -1577,8 +1595,18 @@ function updateMessageContent(messageElement, content) {
 
 // 更新思维链内容
 function updateReasoningContent(messageElement, reasoning, autoCollapse = false, addShimmer = false) {
-    let reasoningDiv = messageElement.querySelector('.message-reasoning');
+    // 查找最后一个reasoning div
+    const allReasoningDivs = messageElement.querySelectorAll('.message-reasoning');
+    let reasoningDiv = allReasoningDivs.length > 0 ? allReasoningDivs[allReasoningDivs.length - 1] : null;
     let isNewDiv = false;
+    
+    // 如果已有reasoning div且已折叠（说明是工具调用前的旧思维链），创建新的
+    if (reasoningDiv) {
+        const reasoningContent = reasoningDiv.querySelector('.reasoning-content');
+        if (reasoningContent && reasoningContent.classList.contains('collapsed')) {
+            reasoningDiv = null; // 强制创建新div
+        }
+    }
     
     if (!reasoningDiv) {
         isNewDiv = true;
@@ -1593,7 +1621,8 @@ function updateReasoningContent(messageElement, reasoning, autoCollapse = false,
         `;
         const contentWrapper = messageElement.querySelector('.message-content-wrapper');
         if (contentWrapper) {
-            contentWrapper.insertBefore(reasoningDiv, contentWrapper.firstChild);
+            // 插入到最后（工具调用之后）
+            contentWrapper.appendChild(reasoningDiv);
         }
         
         // 第一次创建时添加流光

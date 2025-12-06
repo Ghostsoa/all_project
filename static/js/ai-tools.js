@@ -172,7 +172,7 @@ class AIToolsManager {
      * 渲染 list 工具
      */
     renderListTool(result) {
-        const { path, count, files = [] } = result;
+        const { path, count, files = [], truncated, truncated_msg } = result;
         const dirName = path.split('/').pop() || path;
         
         // 生成唯一ID用于折叠
@@ -195,6 +195,9 @@ class AIToolsManager {
             }).join('');
         }
         
+        // 截断提示
+        const truncatedWarning = truncated ? `<div class="tool-truncated-warning">${truncated_msg}</div>` : '';
+        
         return `
             <div class="tool-call">
                 <div class="tool-result-expandable">
@@ -207,6 +210,7 @@ class AIToolsManager {
                         <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
                     </div>
                     <div class="tool-result-content" id="${resultId}">
+                        ${truncatedWarning}
                         ${filesHTML || '<div class="grep-no-matches">Empty directory</div>'}
                     </div>
                 </div>
@@ -218,26 +222,49 @@ class AIToolsManager {
      * 渲染 grep 工具（内容搜索）
      */
     renderGrepTool(result) {
-        const { query, path, file_count, match_count, matches = [], is_regex } = result;
+        const { query, path, file_count, match_count, matches = [], is_regex, truncated, truncated_msg } = result;
         const searchType = is_regex ? 'Regex' : 'Text';
         
         // 生成唯一ID用于折叠
         const resultId = `grep-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         
-        // 渲染匹配列表
+        // 渲染匹配列表（带上下文）
         let matchesHTML = '';
         if (matches.length > 0) {
             matchesHTML = matches.map(match => {
                 const relativePath = match.file_path.replace(/\\/g, '/');
                 const displayPath = relativePath.length > 60 ? '...' + relativePath.slice(-57) : relativePath;
+                
+                // 渲染上下文
+                let contextHTML = '';
+                if (match.context_before && match.context_before.length > 0) {
+                    contextHTML += match.context_before.map((line, idx) => 
+                        `<div class="grep-context-line">${match.line - match.context_before.length + idx}: ${this.escapeHtml(line)}</div>`
+                    ).join('');
+                }
+                contextHTML += `<div class="grep-match-line-content">${match.line}: ${this.escapeHtml(match.content)}</div>`;
+                if (match.context_after && match.context_after.length > 0) {
+                    contextHTML += match.context_after.map((line, idx) => 
+                        `<div class="grep-context-line">${match.line + idx + 1}: ${this.escapeHtml(line)}</div>`
+                    ).join('');
+                }
+                
                 return `
                     <div class="grep-match-item">
-                        <span class="grep-match-path">${displayPath}</span>
-                        <span class="grep-match-line">#${match.line}</span>
+                        <div class="grep-match-header">
+                            <span class="grep-match-path">${displayPath}</span>
+                            <span class="grep-match-line">#${match.line}</span>
+                        </div>
+                        <div class="grep-match-context">
+                            ${contextHTML}
+                        </div>
                     </div>
                 `;
             }).join('');
         }
+        
+        // 截断提示
+        const truncatedWarning = truncated ? `<div class="tool-truncated-warning">${truncated_msg}</div>` : '';
         
         return `
             <div class="tool-call">
@@ -251,18 +278,25 @@ class AIToolsManager {
                         <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
                     </div>
                     <div class="tool-result-content" id="${resultId}">
+                        ${truncatedWarning}
                         ${matchesHTML || '<div class="grep-no-matches">No matches found</div>'}
                     </div>
                 </div>
             </div>
         `;
     }
+    
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
+    }
 
     /**
      * 渲染 find 工具（文件名查找）
      */
     renderFindTool(result) {
-        const { pattern, path, count, results = [] } = result;
+        const { pattern, path, count, results = [], truncated, truncated_msg } = result;
         
         // 生成唯一ID用于折叠
         const resultId = `find-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -286,6 +320,9 @@ class AIToolsManager {
             }).join('');
         }
         
+        // 截断提示
+        const truncatedWarning = truncated ? `<div class="tool-truncated-warning">${truncated_msg}</div>` : '';
+        
         return `
             <div class="tool-call">
                 <div class="tool-result-expandable">
@@ -298,6 +335,7 @@ class AIToolsManager {
                         <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
                     </div>
                     <div class="tool-result-content" id="${resultId}">
+                        ${truncatedWarning}
                         ${filesHTML || '<div class="grep-no-matches">No files found</div>'}
                     </div>
                 </div>

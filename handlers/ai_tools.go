@@ -348,16 +348,21 @@ func (te *ToolExecutor) listDir(args FileOperationArgs) (string, error) {
 	}
 
 	truncated := totalCount > maxItems
+	truncatedMsg := ""
+	if truncated {
+		truncatedMsg = fmt.Sprintf("目录内容已达到上限（显示前%d项，共%d项）。建议：使用find工具进行更精确的文件查找。", maxItems, totalCount)
+	}
 
 	result := map[string]interface{}{
-		"success":   true,
-		"type":      "list",
-		"server_id": args.ServerID,
-		"path":      args.FilePath,
-		"count":     len(files),
-		"total":     totalCount,
-		"files":     files,
-		"truncated": truncated,
+		"success":       true,
+		"type":          "list",
+		"server_id":     args.ServerID,
+		"path":          args.FilePath,
+		"count":         len(files),
+		"total":         totalCount,
+		"files":         files,
+		"truncated":     truncated,
+		"truncated_msg": truncatedMsg,
 	}
 
 	resultJSON, _ := json.Marshal(result)
@@ -382,9 +387,11 @@ func (te *ToolExecutor) grepSearch(args FileOperationArgs) (string, error) {
 	}
 
 	type Match struct {
-		FilePath string `json:"file_path"`
-		Line     int    `json:"line"`
-		Content  string `json:"content"`
+		FilePath      string   `json:"file_path"`
+		Line          int      `json:"line"`
+		Content       string   `json:"content"`
+		ContextBefore []string `json:"context_before,omitempty"` // 前2行
+		ContextAfter  []string `json:"context_after,omitempty"`  // 后2行
 	}
 
 	matches := []Match{}
@@ -434,16 +441,34 @@ func (te *ToolExecutor) grepSearch(args FileOperationArgs) (string, error) {
 			}
 
 			if matched {
+				// 收集上下文（前2行）
+				contextBefore := []string{}
+				for i := 2; i >= 1; i-- {
+					if lineNum-i >= 0 {
+						contextBefore = append(contextBefore, lines[lineNum-i])
+					}
+				}
+
+				// 收集上下文（后2行）
+				contextAfter := []string{}
+				for i := 1; i <= 2; i++ {
+					if lineNum+i < len(lines) {
+						contextAfter = append(contextAfter, lines[lineNum+i])
+					}
+				}
+
 				matches = append(matches, Match{
-					FilePath: path,
-					Line:     lineNum + 1, // 1-indexed
-					Content:  strings.TrimSpace(line),
+					FilePath:      path,
+					Line:          lineNum + 1, // 1-indexed
+					Content:       strings.TrimSpace(line),
+					ContextBefore: contextBefore,
+					ContextAfter:  contextAfter,
 				})
 				hasMatch = true
 			}
 
 			// 限制匹配数量（避免上下文溢出）
-			if len(matches) >= 50 {
+			if len(matches) >= 20 {
 				return filepath.SkipAll // 停止搜索
 			}
 		}
@@ -459,19 +484,24 @@ func (te *ToolExecutor) grepSearch(args FileOperationArgs) (string, error) {
 		return "", fmt.Errorf("搜索失败: %v", err)
 	}
 
-	truncated := len(matches) >= 50
+	truncated := len(matches) >= 20
+	truncatedMsg := ""
+	if truncated {
+		truncatedMsg = "搜索结果已达到上限（20条），已停止搜索。建议：缩小搜索范围或使用更具体的查询。"
+	}
 
 	result := map[string]interface{}{
-		"success":     true,
-		"type":        "grep",
-		"server_id":   args.ServerID,
-		"query":       args.Query,
-		"path":        searchPath,
-		"is_regex":    args.IsRegex,
-		"file_count":  fileCount,
-		"match_count": len(matches),
-		"matches":     matches,
-		"truncated":   truncated,
+		"success":       true,
+		"type":          "grep",
+		"server_id":     args.ServerID,
+		"query":         args.Query,
+		"path":          searchPath,
+		"is_regex":      args.IsRegex,
+		"file_count":    fileCount,
+		"match_count":   len(matches),
+		"matches":       matches,
+		"truncated":     truncated,
+		"truncated_msg": truncatedMsg,
 	}
 
 	resultJSON, _ := json.Marshal(result)
@@ -542,7 +572,7 @@ func (te *ToolExecutor) findByName(args FileOperationArgs) (string, error) {
 		}
 
 		// 限制结果数量（避免上下文溢出）
-		if len(results) >= 100 {
+		if len(results) >= 50 {
 			return filepath.SkipAll
 		}
 
@@ -553,17 +583,22 @@ func (te *ToolExecutor) findByName(args FileOperationArgs) (string, error) {
 		return "", fmt.Errorf("查找失败: %v", err)
 	}
 
-	truncated := len(results) >= 100
+	truncated := len(results) >= 50
+	truncatedMsg := ""
+	if truncated {
+		truncatedMsg = "查找结果已达到上限（50个文件），已停止搜索。建议：使用更具体的匹配模式或增加excludes排除项。"
+	}
 
 	result := map[string]interface{}{
-		"success":   true,
-		"type":      "find",
-		"server_id": args.ServerID,
-		"pattern":   args.Pattern,
-		"path":      searchPath,
-		"count":     len(results),
-		"results":   results,
-		"truncated": truncated,
+		"success":       true,
+		"type":          "find",
+		"server_id":     args.ServerID,
+		"pattern":       args.Pattern,
+		"path":          searchPath,
+		"count":         len(results),
+		"results":       results,
+		"truncated":     truncated,
+		"truncated_msg": truncatedMsg,
 	}
 
 	resultJSON, _ := json.Marshal(result)
