@@ -309,21 +309,28 @@ func (h *AIChatHandler) saveCurrentTurnSnapshot(sessionID string) {
 	}
 
 	// 获取当前轮次（统计用户消息数量）
-	messages, err := storage.GetMessages(sessionID, 0)
+	session, err := storage.GetSession(sessionID)
 	if err != nil {
-		log.Printf("⚠️ 获取消息失败，无法保存快照: %v", err)
+		log.Printf("⚠️ 获取会话失败，无法保存快照: %v", err)
 		return
 	}
 
+	// 直接使用session.Messages而不是重新读取
 	userMessageCount := 0
-	for _, msg := range messages {
+	for _, msg := range session.Messages {
 		if msg.Role == "user" {
 			userMessageCount++
 		}
 	}
-	currentTurn := userMessageCount - 1 // Turn从0开始
 
-	log.Printf("📸 保存Turn%d快照，涉及%d个文件", currentTurn, len(allFiles))
+	if userMessageCount == 0 {
+		log.Printf("⚠️ 没有用户消息，跳过快照保存")
+		return
+	}
+
+	currentTurn := userMessageCount - 1 // Turn从0开始（0, 1, 2...）
+
+	log.Printf("📸 保存Turn%d快照，涉及%d个文件（共%d个用户消息）", currentTurn, len(allFiles), userMessageCount)
 
 	// 对每个文件保存快照
 	for filePath := range allFiles {

@@ -146,19 +146,27 @@ func (te *ToolExecutor) writeFile(args FileOperationArgs) (string, error) {
 func (te *ToolExecutor) editFile(args FileOperationArgs, conversationID string, messageID string) (string, error) {
 	manager := models.GetPendingStateManager()
 
-	// 0. 获取当前用户消息数量作为messageIndex
-	messages, err := storage.GetMessages(conversationID, 0)
+	// 0. 获取当前用户消息数量作为messageIndex（Turn从0开始）
+	var messageIndex int
+	session, err := storage.GetSession(conversationID)
 	if err != nil {
-		log.Printf("⚠️ 获取消息列表失败: %v，使用默认messageIndex=0", err)
-		messages = []storage.ChatMessage{}
-	}
-
-	// 统计用户消息数量（只计算role="user"的消息）
-	messageIndex := 0
-	for _, msg := range messages {
-		if msg.Role == "user" {
-			messageIndex++
+		log.Printf("⚠️ 获取会话失败: %v，使用默认messageIndex=0", err)
+		messageIndex = 0
+	} else {
+		// 统计用户消息数量（只计算role="user"的消息）
+		userMessageCount := 0
+		for _, msg := range session.Messages {
+			if msg.Role == "user" {
+				userMessageCount++
+			}
 		}
+
+		// messageIndex = 用户消息数 - 1（Turn从0开始）
+		messageIndex = userMessageCount - 1
+		if messageIndex < 0 {
+			messageIndex = 0
+		}
+		log.Printf("📊 当前会话共%d个用户消息，messageIndex(Turn)=%d", userMessageCount, messageIndex)
 	}
 
 	// 1. 读取磁盘原始内容（用于计算累计diff）
