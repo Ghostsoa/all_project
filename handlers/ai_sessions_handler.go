@@ -5,7 +5,6 @@ import (
 	"all_project/storage"
 	"crypto/rand"
 	"encoding/hex"
-	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -256,7 +255,7 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 		return
 	}
 
-	// 1. 先获取要删除的消息列表（用于清理pending状态和恢复文件）
+	// 1. 先获取要删除的消息列表（用于清理pending状态）
 	messages, err := storage.GetMessages(req.SessionID, 0) // limit=0表示获取所有消息
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
@@ -266,29 +265,8 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 	// 2. 清理被删除消息的pending状态
 	pendingManager := models.GetPendingStateManager()
 
-	// 2. 收集需要恢复的文件（被删除的消息中有accepted的edit）
-	var needRestoreFiles = make(map[string]bool) // file_path -> true
-
 	for i := req.MessageIndex; i < len(messages); i++ {
 		msg := messages[i]
-
-		// 检查tool消息，找到accepted的edit
-		if msg.Role == "tool" && msg.ToolName == "file_operation" {
-			// 尝试解析Content字段（可能包含status信息）
-			// Content格式可能是JSON或纯文本，需要兼容处理
-			if len(msg.Content) > 0 && msg.Content[0] == '{' {
-				var toolResult struct {
-					Status   string `json:"status"`
-					FilePath string `json:"file_path"`
-				}
-				// 忽略解析错误，因为有些tool响应可能不是JSON
-				_ = json.Unmarshal([]byte(msg.Content), &toolResult)
-				if toolResult.Status == "accepted" && toolResult.FilePath != "" {
-					needRestoreFiles[toolResult.FilePath] = true
-					log.Printf("📝 发现被撤销的accepted edit: %s", toolResult.FilePath)
-				}
-			}
-		}
 
 		// 对于assistant消息，从ToolCalls中提取tool_call_id
 		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 {
@@ -306,35 +284,31 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 		}
 	}
 
-	// 3. 执行消息撤销
+	// 3. 从file_history查找该会话的所有版本（这些版本都需要恢复）
+	// 注意：不依赖消息历史，因为Accept后消息可能已被修改或删除
+	historyManager := models.GetFileHistoryManager()
+	log.Printf("========================================")
+	log.Printf("🔍 从file_history查找会话 %s 的所有版本", req.SessionID)
+
+	// 获取该会话在file_history中的所有版本
+	sessionVersionsCount := historyManager.CountConversationVersions(req.SessionID)
+
+	log.Printf("📊 会话 %s 在file_history中有 %d 个版本", req.SessionID, len(sessionVersionsCount))
+	for fp, cnt := range sessionVersionsCount {
+		log.Printf("   - %s: %d 个版本", fp, cnt)
+	}
+	log.Printf("========================================")
+
+	// 4. 执行消息撤销
 	if err := storage.RevokeMessagesFromIndex(req.SessionID, req.MessageIndex); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 
-	// 4. 恢复被影响的文件（如果删除了accepted的edit，需要恢复到前一个状态）
-	// 统计每个文件有多少个accepted的edit被删除
-	fileAcceptedCount := make(map[string]int)
-	for i := req.MessageIndex; i < len(messages); i++ {
-		msg := messages[i]
-		if msg.Role == "tool" && msg.ToolName == "file_operation" {
-			if len(msg.Content) > 0 && msg.Content[0] == '{' {
-				var toolResult struct {
-					Status   string `json:"status"`
-					FilePath string `json:"file_path"`
-				}
-				_ = json.Unmarshal([]byte(msg.Content), &toolResult)
-				if toolResult.Status == "accepted" && toolResult.FilePath != "" {
-					fileAcceptedCount[toolResult.FilePath]++
-				}
-			}
-		}
-	}
-
-	// 对每个文件，根据被删除的accepted数量，多次恢复历史
-	if len(fileAcceptedCount) > 0 {
-		historyManager := models.GetFileHistoryManager()
-		for filePath, count := range fileAcceptedCount {
+	// 5. 根据file_history中该会话的版本数，恢复文件
+	// 这是最可靠的方式，因为消息可能已被修改或删除
+	if len(sessionVersionsCount) > 0 {
+		for filePath, count := range sessionVersionsCount {
 			log.Printf("========================================")
 			log.Printf("📝 开始恢复文件: %s", filePath)
 			log.Printf("📝 需要撤销 %d 个accepted edit，恢复 %d 次", count, count)

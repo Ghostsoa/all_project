@@ -270,6 +270,29 @@ func (m *FileHistoryManager) RestoreAndRemoveLatestVersion(filePath string) erro
 	return m.saveLocked()
 }
 
+// CountConversationVersions 统计指定会话在每个文件中的版本数
+func (m *FileHistoryManager) CountConversationVersions(conversationID string) map[string]int {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	counts := make(map[string]int)
+
+	// 遍历所有文件的历史
+	for filePath, history := range m.histories {
+		count := 0
+		for _, version := range history.Versions {
+			if version.ConversationID == conversationID {
+				count++
+			}
+		}
+		if count > 0 {
+			counts[filePath] = count
+		}
+	}
+
+	return counts
+}
+
 // DeleteConversationHistory 删除指定会话的所有历史版本
 func (m *FileHistoryManager) DeleteConversationHistory(conversationID string) error {
 	m.mutex.Lock()
