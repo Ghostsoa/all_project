@@ -284,7 +284,7 @@
 
 /* 删除行（红色背景，原始行） */
 .diff-line-deleted {
-    background-color: rgba(239, 68, 68, 0.2) !important;
+    background-color: rgba(239, 68, 68, 0.3) !important;
     opacity: 1 !important;
 }
 
@@ -300,16 +300,11 @@
     background-color: transparent;
     padding: 0;
     margin: 0;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    font-size: 14px;
-    line-height: 20px;
 }
 
 /* Zone Widget 中的每一行 */
 .diff-zone-line {
     display: block;
-    min-height: 20px;
-    line-height: 20px;
     white-space: pre;
     padding: 0;
     margin: 0;
@@ -317,6 +312,6 @@
 
 /* 添加行（绿色） */
 .diff-zone-added {
-    background-color: rgba(16, 185, 129, 0.2);
+    background-color: rgba(16, 185, 129, 0.3);
     color: #6ee7b7;
 }
