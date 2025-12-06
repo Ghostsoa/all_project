@@ -11,10 +11,11 @@ import (
 
 // Version 文件的一个修改版本
 type Version struct {
-	ToolCallID string    `json:"tool_call_id"`
-	MessageID  string    `json:"message_id"` // 关联的消息ID
-	Content    string    `json:"content"`
-	Timestamp  time.Time `json:"timestamp"`
+	ToolCallID   string    `json:"tool_call_id"`
+	MessageID    string    `json:"message_id"`    // 关联的消息ID
+	MessageIndex int       `json:"message_index"` // 创建时的消息索引
+	Content      string    `json:"content"`
+	Timestamp    time.Time `json:"timestamp"`
 }
 
 // PendingFile 一个文件的pending状态
@@ -82,7 +83,7 @@ func (m *PendingStateManager) GetCurrentContent(conversationID, filePath string)
 }
 
 // AddVersion 添加新版本
-func (m *PendingStateManager) AddVersion(conversationID, filePath, toolCallID, content, messageID string) error {
+func (m *PendingStateManager) AddVersion(conversationID, filePath, toolCallID, content, messageID string, messageIndex int) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -108,10 +109,11 @@ func (m *PendingStateManager) AddVersion(conversationID, filePath, toolCallID, c
 
 	// 添加新版本
 	newVersion := Version{
-		ToolCallID: toolCallID,
-		MessageID:  messageID,
-		Content:    content,
-		Timestamp:  time.Now(),
+		ToolCallID:   toolCallID,
+		MessageID:    messageID,
+		MessageIndex: messageIndex,
+		Content:      content,
+		Timestamp:    time.Now(),
 	}
 
 	pendingFile.Versions = append(pendingFile.Versions, newVersion)

@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"all_project/models"
+	"all_project/storage"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -142,6 +143,14 @@ func (te *ToolExecutor) writeFile(args FileOperationArgs) (string, error) {
 func (te *ToolExecutor) editFile(args FileOperationArgs, conversationID string, messageID string) (string, error) {
 	manager := models.GetPendingStateManager()
 
+	// 0. 获取当前消息数量作为messageIndex
+	messages, err := storage.GetMessages(conversationID, 0)
+	if err != nil {
+		log.Printf("⚠️ 获取消息列表失败: %v，使用默认messageIndex=0", err)
+		messages = []storage.ChatMessage{}
+	}
+	messageIndex := len(messages)
+
 	// 1. 读取磁盘原始内容（用于计算累计diff）
 	diskContent, err := os.ReadFile(args.FilePath)
 	if err != nil {
@@ -183,11 +192,12 @@ func (te *ToolExecutor) editFile(args FileOperationArgs, conversationID string, 
 	// 6. 计算差异操作（重要：显示从磁盘到最终pending的累计变化）
 	operations := te.computeFullDiff(diskContentStr, newContent)
 
-	// 6. 保存到pending状态
+	// 7. 保存到pending状态（记录messageIndex）
 	// 直接使用messageID作为toolCallID（与前端保持一致）
-	if err := manager.AddVersion(conversationID, args.FilePath, messageID, newContent, messageID); err != nil {
+	if err := manager.AddVersion(conversationID, args.FilePath, messageID, newContent, messageID, messageIndex); err != nil {
 		return "", fmt.Errorf("保存pending状态失败: %v", err)
 	}
+	log.Printf("📦 已保存pending版本 (messageIndex=%d): %s", messageIndex, messageID)
 
 	// 7. 返回pending状态（前端负责显示和确认）
 	result := map[string]interface{}{
