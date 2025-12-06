@@ -179,11 +179,11 @@ class AIToolsManager {
      * 渲染 edit 工具
      */
     renderEditTool(result, toolCallId) {
-        const { server_id, file_path, operations } = result;
+        const { server_id, file_path, operations, lines_deleted = 0, lines_added = 0 } = result;
         const fileName = file_path.split('/').pop();
         const fileIcon = this.getFileIconHTML(fileName);
         
-        console.log('📝 renderEditTool:', { toolCallId, file_path, operations });
+        console.log('📝 renderEditTool:', { toolCallId, file_path, operations, lines_deleted, lines_added });
         
         // 保存到待处理列表（使用tool_call_id作为key）
         // 注意：new_content存储在后端pending state中，Accept时后端会读取
@@ -203,6 +203,9 @@ class AIToolsManager {
             this.autoApplyToOpenEditor(toolCallId);
         }, 100);
         
+        // 更新Pending Actions Bar
+        this.updatePendingActionsBar();
+        
         return `
             <div class="tool-call">
                 <div class="tool-container" data-tool-call-id="${toolCallId}" onclick="aiToolsManager.handleToolClick('${toolCallId}')">
@@ -216,17 +219,11 @@ class AIToolsManager {
                         </div>
                         <div class="tool-status">
                             <span class="tool-type-badge tool-type-edit">Edit</span>
-                            <span class="tool-status-badge tool-status-pending">Pending</span>
-                            <div class="tool-actions" onclick="event.stopPropagation()">
-                                <button class="tool-btn tool-btn-accept" onclick="aiToolsManager.acceptEdit('${toolCallId}')">
-                                    <i class="fa-solid fa-check"></i>
-                                    Accept
-                                </button>
-                                <button class="tool-btn tool-btn-reject" onclick="aiToolsManager.rejectEdit('${toolCallId}')">
-                                    <i class="fa-solid fa-xmark"></i>
-                                    Reject
-                                </button>
-                            </div>
+                            <span class="tool-status-badge tool-status-pending">
+                                ${lines_deleted > 0 ? `-${lines_deleted}` : ''}
+                                ${lines_deleted > 0 && lines_added > 0 ? ' ' : ''}
+                                ${lines_added > 0 ? `+${lines_added}` : ''}
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -238,7 +235,7 @@ class AIToolsManager {
      * 渲染 write 工具
      */
     renderWriteTool(result, toolCallId) {
-        const { server_id, file_path, size, content } = result;
+        const { server_id, file_path, size, content, total_lines = 0 } = result;
         const fileName = file_path.split('/').pop();
         const fileIcon = this.getFileIconHTML(fileName);
         
@@ -252,6 +249,9 @@ class AIToolsManager {
             type: 'write'
         });
         
+        // 更新Pending Actions Bar
+        this.updatePendingActionsBar();
+        
         return `
             <div class="tool-call">
                 <div class="tool-container" data-tool-call-id="${toolCallId}" onclick="aiToolsManager.handleToolClick('${toolCallId}')">
@@ -264,18 +264,8 @@ class AIToolsManager {
                             <div class="tool-file-path">${file_path}</div>
                         </div>
                         <div class="tool-status">
-                            <span class="tool-type-badge tool-type-write">Create</span>
-                            <span class="tool-status-badge tool-status-pending">Pending</span>
-                            <div class="tool-actions" onclick="event.stopPropagation()">
-                                <button class="tool-btn tool-btn-accept" onclick="aiToolsManager.acceptEdit('${toolCallId}')">
-                                    <i class="fa-solid fa-check"></i>
-                                    Accept
-                                </button>
-                                <button class="tool-btn tool-btn-reject" onclick="aiToolsManager.rejectEdit('${toolCallId}')">
-                                    <i class="fa-solid fa-xmark"></i>
-                                    Reject
-                                </button>
-                            </div>
+                            <span class="tool-type-badge tool-type-write">New</span>
+                            <span class="tool-status-badge tool-status-pending">+${total_lines}</span>
                         </div>
                     </div>
                 </div>
@@ -1397,6 +1387,128 @@ class AIToolsManager {
      */
     saveAppliedEdits() {
         localStorage.setItem('appliedEdits', JSON.stringify([...this.appliedEdits]));
+    }
+
+    /**
+     * 更新Pending Actions Bar
+     */
+    updatePendingActionsBar() {
+        const pendingCount = this.pendingEdits.size;
+        const actionsBar = document.getElementById('pendingActionsBar');
+        const countSpan = document.getElementById('pendingCount');
+        
+        if (actionsBar && countSpan) {
+            countSpan.textContent = pendingCount;
+            actionsBar.style.display = pendingCount > 0 ? 'flex' : 'none';
+        }
+    }
+
+    /**
+     * Accept All - 确认所有pending修改
+     */
+    async acceptAll() {
+        const pendingCount = this.pendingEdits.size;
+        if (pendingCount === 0) {
+            this.showToast('没有待确认的修改', 'info');
+            return;
+        }
+
+        try {
+            // 调用后端Accept All API
+            const response = await fetch('/api/ai/edit/apply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    status: 'accepted',
+                    conversation_id: this.getCurrentSessionId()
+                })
+            });
+
+            const result = await response.json();
+            
+            if (!result.success) {
+                this.showToast('Accept All失败: ' + (result.error || '未知错误'), 'error');
+                return;
+            }
+            
+            // 清空所有pending edits
+            const affectedFiles = new Set();
+            for (const [toolCallId, edit] of this.pendingEdits.entries()) {
+                this.updateToolStatus(toolCallId, 'accepted');
+                this.clearDiffDecorations(toolCallId);
+                this.appliedEdits.add(toolCallId);
+                affectedFiles.add(edit.file_path);
+            }
+            
+            this.pendingEdits.clear();
+            this.saveAppliedEdits();
+            
+            // 更新Pending Actions Bar
+            this.updatePendingActionsBar();
+            
+            // 刷新所有受影响文件的编辑器
+            for (const filePath of affectedFiles) {
+                await this.refreshEditorContent(filePath, 'local');
+            }
+            
+            this.showToast(`已确认所有修改 (${pendingCount}个)`, 'success');
+        } catch (error) {
+            console.error('Accept All失败:', error);
+            this.showToast('Accept All失败: ' + error.message, 'error');
+        }
+    }
+
+    /**
+     * Reject All - 取消所有pending修改
+     */
+    async rejectAll() {
+        const pendingCount = this.pendingEdits.size;
+        if (pendingCount === 0) {
+            this.showToast('没有待确认的修改', 'info');
+            return;
+        }
+
+        try {
+            // 调用后端Reject All API
+            const response = await fetch('/api/ai/edit/apply', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ 
+                    status: 'rejected',
+                    conversation_id: this.getCurrentSessionId()
+                })
+            });
+
+            const result = await response.json();
+            
+            if (!result.success) {
+                this.showToast('Reject All失败: ' + (result.error || '未知错误'), 'error');
+                return;
+            }
+            
+            // 清空所有pending edits
+            const affectedFiles = new Set();
+            for (const [toolCallId, edit] of this.pendingEdits.entries()) {
+                this.updateToolStatus(toolCallId, 'rejected');
+                this.clearDiffDecorations(toolCallId);
+                affectedFiles.add(edit.file_path);
+            }
+            
+            this.pendingEdits.clear();
+            
+            // 更新Pending Actions Bar
+            this.updatePendingActionsBar();
+            
+            // 刷新所有受影响文件的编辑器（恢复到磁盘状态）
+            for (const filePath of affectedFiles) {
+                await this.refreshEditorContent(filePath, 'local');
+            }
+            
+            this.showToast(`已取消所有修改 (${pendingCount}个)`, 'success');
+        } catch (error) {
+            console.error('Reject All失败:', error);
+            this.showToast('Reject All失败: ' + error.message, 'error');
+        }
     }
 }
 

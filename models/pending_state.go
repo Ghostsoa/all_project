@@ -5,336 +5,220 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 )
 
-// Version 文件的一个修改版本
-type Version struct {
-	ToolCallID   string    `json:"tool_call_id"`
-	MessageID    string    `json:"message_id"`    // 关联的消息ID
-	MessageIndex int       `json:"message_index"` // 创建时的消息索引
-	Content      string    `json:"content"`
-	Timestamp    time.Time `json:"timestamp"`
+// EditOperation 单次编辑操作
+type EditOperation struct {
+	ToolCallID string `json:"tool_call_id"`
+	MessageID  string `json:"message_id"`
+	OldString  string `json:"old_string"`
+	NewString  string `json:"new_string"`
 }
 
-// PendingFile 一个文件的pending状态
-type PendingFile struct {
-	Versions       []Version `json:"versions"`
-	CurrentVersion int       `json:"current_version"`
+// TurnEdits 一轮对话的编辑
+type TurnEdits struct {
+	UserMessageIndex int                        `json:"user_message_index"` // 用户消息索引
+	FileEdits        map[string][]EditOperation `json:"file_edits"`         // {文件路径: [edit操作]}
+	Timestamp        time.Time                  `json:"timestamp"`
 }
 
-// ConversationState 一个会话的状态
-type ConversationState struct {
-	Files     map[string]*PendingFile `json:"files"`
-	UpdatedAt time.Time               `json:"updated_at"`
+// ConversationPending 一个会话的pending状态
+type ConversationPending struct {
+	ConversationID string      `json:"conversation_id"`
+	Turns          []TurnEdits `json:"turns"` // 按轮次存储
+	UpdatedAt      time.Time   `json:"updated_at"`
 }
 
-// PendingStateManager 状态管理器
+// PendingStateManager 管理pending状态
 type PendingStateManager struct {
-	states   map[string]*ConversationState
-	mutex    sync.RWMutex
-	filepath string
+	states  map[string]*ConversationPending // key=conversationID
+	mutex   sync.RWMutex
+	dataDir string
 }
 
-var globalManager *PendingStateManager
-var once sync.Once
+var pendingStateManagerInstance *PendingStateManager
+var pendingStateOnce sync.Once
 
-// GetPendingStateManager 获取全局状态管理器
+// GetPendingStateManager 获取单例
 func GetPendingStateManager() *PendingStateManager {
-	once.Do(func() {
-		stateDir := ".pending_states"
-		os.MkdirAll(stateDir, 0755)
-
-		globalManager = &PendingStateManager{
-			states:   make(map[string]*ConversationState),
-			filepath: filepath.Join(stateDir, "pending_states.json"),
+	pendingStateOnce.Do(func() {
+		manager := &PendingStateManager{
+			states:  make(map[string]*ConversationPending),
+			dataDir: ".pending_states",
 		}
-
-		// 启动时加载
-		globalManager.Load()
+		os.MkdirAll(manager.dataDir, 0755)
+		if err := manager.Load(); err != nil {
+			log.Printf("加载pending状态失败: %v", err)
+		}
+		pendingStateManagerInstance = manager
 	})
-	return globalManager
+	return pendingStateManagerInstance
 }
 
-// GetCurrentContent 获取文件的当前pending内容
-func (m *PendingStateManager) GetCurrentContent(conversationID, filePath string) (string, bool) {
+// AddEdit 添加一个编辑操作到当前轮次
+func (m *PendingStateManager) AddEdit(conversationID, filePath string, userMessageIndex int, edit EditOperation) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	// 获取或创建会话pending
+	conv, exists := m.states[conversationID]
+	if !exists {
+		conv = &ConversationPending{
+			ConversationID: conversationID,
+			Turns:          []TurnEdits{},
+			UpdatedAt:      time.Now(),
+		}
+		m.states[conversationID] = conv
+	}
+
+	// 查找或创建当前轮次
+	var currentTurn *TurnEdits
+	for i := range conv.Turns {
+		if conv.Turns[i].UserMessageIndex == userMessageIndex {
+			currentTurn = &conv.Turns[i]
+			break
+		}
+	}
+
+	if currentTurn == nil {
+		// 创建新轮次
+		newTurn := TurnEdits{
+			UserMessageIndex: userMessageIndex,
+			FileEdits:        make(map[string][]EditOperation),
+			Timestamp:        time.Now(),
+		}
+		conv.Turns = append(conv.Turns, newTurn)
+		currentTurn = &conv.Turns[len(conv.Turns)-1]
+	}
+
+	// 添加edit到该轮次
+	currentTurn.FileEdits[filePath] = append(currentTurn.FileEdits[filePath], edit)
+	conv.UpdatedAt = time.Now()
+
+	log.Printf("📝 添加edit到Turn%d: %s (共%d个edit)", userMessageIndex, filePath, len(currentTurn.FileEdits[filePath]))
+
+	return m.saveLocked()
+}
+
+// GetCurrentContent 获取文件的当前pending内容（应用所有轮次的edits）
+func (m *PendingStateManager) GetCurrentContent(conversationID, filePath string, diskContent string) string {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	log.Printf("🔍 GetCurrentContent: conversationID=%s, filePath=%s", conversationID, filePath)
-
 	conv, exists := m.states[conversationID]
-	if !exists {
-		log.Printf("❌ conversation不存在")
-		return "", false
+	if !exists || len(conv.Turns) == 0 {
+		return diskContent
 	}
 
-	pendingFile, exists := conv.Files[filePath]
-	if !exists || len(pendingFile.Versions) == 0 {
-		log.Printf("❌ 文件无pending或版本为空")
-		return "", false
-	}
-
-	log.Printf("📋 找到pending版本数: %d, CurrentVersion=%d", len(pendingFile.Versions), pendingFile.CurrentVersion)
-	currentVersion := pendingFile.Versions[pendingFile.CurrentVersion]
-	log.Printf("✅ 返回pending内容，前50字符: %s", truncateString(currentVersion.Content, 50))
-	return currentVersion.Content, true
-}
-
-// AddVersion 添加新版本
-func (m *PendingStateManager) AddVersion(conversationID, filePath, toolCallID, content, messageID string, messageIndex int) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	// 获取或创建conversation状态
-	conv, exists := m.states[conversationID]
-	if !exists {
-		conv = &ConversationState{
-			Files:     make(map[string]*PendingFile),
-			UpdatedAt: time.Now(),
+	// 从磁盘内容开始，逐轮应用edits
+	content := diskContent
+	for _, turn := range conv.Turns {
+		if edits, ok := turn.FileEdits[filePath]; ok {
+			for _, edit := range edits {
+				content = strings.Replace(content, edit.OldString, edit.NewString, 1)
+			}
 		}
-		m.states[conversationID] = conv
 	}
 
-	// 获取或创建文件pending状态
-	pendingFile, exists := conv.Files[filePath]
-	if !exists {
-		pendingFile = &PendingFile{
-			Versions:       []Version{},
-			CurrentVersion: -1,
-		}
-		conv.Files[filePath] = pendingFile
-	}
-
-	// 添加新版本
-	newVersion := Version{
-		ToolCallID:   toolCallID,
-		MessageID:    messageID,
-		MessageIndex: messageIndex,
-		Content:      content,
-		Timestamp:    time.Now(),
-	}
-
-	pendingFile.Versions = append(pendingFile.Versions, newVersion)
-	pendingFile.CurrentVersion = len(pendingFile.Versions) - 1
-	conv.UpdatedAt = time.Now()
-
-	// 保存到文件
-	return m.Save()
+	return content
 }
 
-// RemoveFile 清除文件的所有pending状态（Accept后）
-func (m *PendingStateManager) RemoveFile(conversationID, filePath string) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+// GetAllPendingFiles 获取所有有pending的文件
+func (m *PendingStateManager) GetAllPendingFiles(conversationID string) map[string]bool {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
 
+	files := make(map[string]bool)
 	conv, exists := m.states[conversationID]
 	if !exists {
-		return nil
+		return files
 	}
 
-	delete(conv.Files, filePath)
-	conv.UpdatedAt = time.Now()
-
-	// 如果conversation没有文件了，删除整个conversation
-	if len(conv.Files) == 0 {
-		delete(m.states, conversationID)
+	for _, turn := range conv.Turns {
+		for filePath := range turn.FileEdits {
+			files[filePath] = true
+		}
 	}
 
-	return m.Save()
+	return files
 }
 
-// RemoveConversation 删除整个会话的pending状态
-func (m *PendingStateManager) RemoveConversation(conversationID string) error {
+// ClearAll 清空会话的所有pending
+func (m *PendingStateManager) ClearAll(conversationID string) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
-
-	_, exists := m.states[conversationID]
-	if !exists {
-		return nil
-	}
 
 	delete(m.states, conversationID)
-	log.Printf("🗑️ 已删除会话的pending状态: %s", conversationID)
+	log.Printf("🧹 清空会话pending: %s", conversationID)
 
-	return m.Save()
+	return m.saveLocked()
 }
 
-// RejectVersion 拒绝某个版本（回滚），返回被删除的所有toolCallIDs
-func (m *PendingStateManager) RejectVersion(conversationID, filePath, toolCallID string) ([]string, error) {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	log.Printf("🔍 RejectVersion 调用: conversationID=%s, filePath=%s, toolCallID=%s", conversationID, filePath, toolCallID)
-
-	conv, exists := m.states[conversationID]
-	if !exists {
-		log.Printf("⚠️ conversation不存在: %s", conversationID)
-		return nil, nil
-	}
-
-	pendingFile, exists := conv.Files[filePath]
-	if !exists {
-		log.Printf("⚠️ 文件不存在于pending: %s", filePath)
-		return nil, nil
-	}
-
-	log.Printf("📋 当前pending版本数: %d", len(pendingFile.Versions))
-	for i, v := range pendingFile.Versions {
-		log.Printf("  版本[%d]: toolCallID=%s, content前30字符=%s", i, v.ToolCallID, truncateString(v.Content, 30))
-	}
-
-	// 找到要拒绝的版本
-	rejectIndex := -1
-	for i, v := range pendingFile.Versions {
-		if v.ToolCallID == toolCallID {
-			rejectIndex = i
-			break
-		}
-	}
-
-	if rejectIndex == -1 {
-		log.Printf("⚠️ 未找到toolCallID: %s", toolCallID)
-		return nil, nil
-	}
-
-	// 收集被删除的toolCallIDs（链式删除）
-	var deletedToolCallIDs []string
-	for i := rejectIndex; i < len(pendingFile.Versions); i++ {
-		deletedToolCallIDs = append(deletedToolCallIDs, pendingFile.Versions[i].ToolCallID)
-	}
-
-	log.Printf("✂️ 删除索引 %d 及之后的版本，共 %d 个", rejectIndex, len(deletedToolCallIDs))
-	// 删除这个版本及之后的所有版本（链式取消）
-	pendingFile.Versions = pendingFile.Versions[:rejectIndex]
-
-	log.Printf("📋 删除后剩余版本数: %d", len(pendingFile.Versions))
-
-	if len(pendingFile.Versions) == 0 {
-		// 没有版本了，删除整个文件
-		delete(conv.Files, filePath)
-		if len(conv.Files) == 0 {
-			delete(m.states, conversationID)
-		}
-		log.Printf("🗑️ pending已清空，删除文件: %s", filePath)
-	} else {
-		pendingFile.CurrentVersion = len(pendingFile.Versions) - 1
-		log.Printf("✅ 保留 %d 个版本", len(pendingFile.Versions))
-	}
-
-	conv.UpdatedAt = time.Now()
-	return deletedToolCallIDs, m.Save()
-}
-
-func truncateString(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen] + "..."
-}
-
-// AcceptVersion 接受某个版本（删除它及之前的，保留之后的），返回被Accept的所有版本信息
-func (m *PendingStateManager) AcceptVersion(conversationID, filePath, toolCallID string) (string, []Version, []Version, error) {
+// RemoveTurnsFrom 删除从指定messageIndex开始的所有轮次
+func (m *PendingStateManager) RemoveTurnsFrom(conversationID string, fromMessageIndex int) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	conv, exists := m.states[conversationID]
 	if !exists {
-		return "", nil, nil, nil
-	}
-
-	pendingFile, exists := conv.Files[filePath]
-	if !exists {
-		return "", nil, nil, nil
-	}
-
-	// 找到要接受的版本
-	acceptIndex := -1
-	for i, v := range pendingFile.Versions {
-		if v.ToolCallID == toolCallID {
-			acceptIndex = i
-			break
-		}
-	}
-
-	if acceptIndex == -1 {
-		return "", nil, nil, nil
-	}
-
-	// 收集被Accept的所有版本（0到acceptIndex，连带Accept）
-	var acceptedVersions []Version
-	for i := 0; i <= acceptIndex; i++ {
-		acceptedVersions = append(acceptedVersions, pendingFile.Versions[i])
-	}
-
-	// 获取最后一个版本的内容（用于写入磁盘）
-	acceptedContent := pendingFile.Versions[acceptIndex].Content
-
-	// 获取后续版本（需要保留的）
-	var remainingVersions []Version
-	if acceptIndex < len(pendingFile.Versions)-1 {
-		remainingVersions = pendingFile.Versions[acceptIndex+1:]
-	}
-
-	// 清除整个文件的pending
-	delete(conv.Files, filePath)
-	if len(conv.Files) == 0 {
-		delete(m.states, conversationID)
-	}
-
-	conv.UpdatedAt = time.Now()
-	m.Save()
-
-	return acceptedContent, remainingVersions, acceptedVersions, nil
-}
-
-// RestoreVersions 恢复版本列表（用于Accept后保留后续版本）
-func (m *PendingStateManager) RestoreVersions(conversationID, filePath string, versions []Version) error {
-	if len(versions) == 0 {
 		return nil
 	}
 
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	// 获取或创建conversation状态
-	conv, exists := m.states[conversationID]
-	if !exists {
-		conv = &ConversationState{
-			Files:     make(map[string]*PendingFile),
-			UpdatedAt: time.Now(),
+	// 保留 < fromMessageIndex 的轮次
+	newTurns := []TurnEdits{}
+	for _, turn := range conv.Turns {
+		if turn.UserMessageIndex < fromMessageIndex {
+			newTurns = append(newTurns, turn)
 		}
-		m.states[conversationID] = conv
 	}
 
-	// 创建新的pending file
-	pendingFile := &PendingFile{
-		Versions:       versions,
-		CurrentVersion: len(versions) - 1,
-	}
-	conv.Files[filePath] = pendingFile
+	conv.Turns = newTurns
 	conv.UpdatedAt = time.Now()
 
-	return m.Save()
+	log.Printf("🗑️ 删除从Turn%d开始的轮次，剩余%d轮", fromMessageIndex, len(newTurns))
+
+	return m.saveLocked()
 }
 
-// Save 保存到JSON文件
+// GetTurns 获取所有轮次（用于计算快照）
+func (m *PendingStateManager) GetTurns(conversationID string) []TurnEdits {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	conv, exists := m.states[conversationID]
+	if !exists {
+		return []TurnEdits{}
+	}
+
+	return conv.Turns
+}
+
+// Save 保存到文件
 func (m *PendingStateManager) Save() error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+	return m.saveLocked()
+}
+
+func (m *PendingStateManager) saveLocked() error {
+	filePath := filepath.Join(m.dataDir, "pending_states.json")
 	data, err := json.MarshalIndent(m.states, "", "  ")
 	if err != nil {
 		return err
 	}
-
-	return os.WriteFile(m.filepath, data, 0644)
+	return os.WriteFile(filePath, data, 0644)
 }
 
-// Load 从JSON文件加载
+// Load 从文件加载
 func (m *PendingStateManager) Load() error {
-	data, err := os.ReadFile(m.filepath)
+	filePath := filepath.Join(m.dataDir, "pending_states.json")
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil // 文件不存在是正常的
+			return nil
 		}
 		return err
 	}
@@ -343,65 +227,4 @@ func (m *PendingStateManager) Load() error {
 	defer m.mutex.Unlock()
 
 	return json.Unmarshal(data, &m.states)
-}
-
-// RemoveVersionsByMessageID 删除消息时自动清理相关的pending版本
-func (m *PendingStateManager) RemoveVersionsByMessageID(conversationID, messageID string) error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	conv, exists := m.states[conversationID]
-	if !exists {
-		return nil
-	}
-
-	// 遍历所有文件
-	for filePath, pendingFile := range conv.Files {
-		// 找到要删除的版本索引
-		deleteIndex := -1
-		for i, v := range pendingFile.Versions {
-			if v.MessageID == messageID {
-				deleteIndex = i
-				break
-			}
-		}
-
-		if deleteIndex != -1 {
-			// 删除这个版本及之后的所有版本（链式）
-			pendingFile.Versions = pendingFile.Versions[:deleteIndex]
-
-			if len(pendingFile.Versions) == 0 {
-				// 没有版本了，删除整个文件
-				delete(conv.Files, filePath)
-			} else {
-				pendingFile.CurrentVersion = len(pendingFile.Versions) - 1
-			}
-		}
-	}
-
-	// 如果conversation没有文件了，删除整个conversation
-	if len(conv.Files) == 0 {
-		delete(m.states, conversationID)
-	}
-
-	conv.UpdatedAt = time.Now()
-	return m.Save()
-}
-
-// GetVersionHistory 获取文件的版本历史
-func (m *PendingStateManager) GetVersionHistory(conversationID, filePath string) []Version {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
-	conv, exists := m.states[conversationID]
-	if !exists {
-		return nil
-	}
-
-	pendingFile, exists := conv.Files[filePath]
-	if !exists {
-		return nil
-	}
-
-	return pendingFile.Versions
 }

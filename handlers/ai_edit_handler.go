@@ -2,19 +2,17 @@ package handlers
 
 import (
 	"all_project/models"
-	"all_project/storage"
 	"fmt"
 	"log"
 	"net/http"
 	"os"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 )
 
 // AIEditHandler 处理AI编辑的确认/拒绝
-type AIEditHandler struct {
-	// 不需要存储任何状态，只是返回成功/失败
-}
+type AIEditHandler struct{}
 
 // NewAIEditHandler 创建编辑处理器
 func NewAIEditHandler() *AIEditHandler {
@@ -23,13 +21,13 @@ func NewAIEditHandler() *AIEditHandler {
 
 // ApplyEditRequest 应用编辑请求
 type ApplyEditRequest struct {
-	ToolCallID     string `json:"tool_call_id"`
-	Status         string `json:"status"` // "accepted" or "rejected"
-	FilePath       string `json:"file_path"`
+	ToolCallID     string `json:"tool_call_id"` // 兼容旧API，实际不使用
+	Status         string `json:"status"`       // "accepted" or "rejected"
+	FilePath       string `json:"file_path"`    // 兼容旧API，实际不使用
 	ConversationID string `json:"conversation_id"`
 }
 
-// ApplyEdit 应用编辑（用户确认） - 更新数据库中tool消息的状态
+// ApplyEdit Accept All 或 Reject All
 func (h *AIEditHandler) ApplyEdit(c *gin.Context) {
 	var req ApplyEditRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -40,144 +38,146 @@ func (h *AIEditHandler) ApplyEdit(c *gin.Context) {
 		return
 	}
 
-	manager := models.GetPendingStateManager()
+	pendingManager := models.GetPendingStateManager()
+	historyManager := models.GetFileHistoryManager()
 
-	// 处理Accept/Reject
 	if req.Status == "accepted" {
-		// Accept: 写入这个版本，删除它及之前的，保留后续的
-		var acceptedToolCallIDs []string
-		if req.FilePath != "" {
-			conversationID := req.ConversationID
-			if conversationID == "" {
-				conversationID = "default_current" // fallback
-			}
-
-			// 使用AcceptVersion获取要写入的内容、后续版本和被Accept的版本列表
-			acceptedContent, remainingVersions, acceptedVersions, err := manager.AcceptVersion(conversationID, req.FilePath, req.ToolCallID)
-			if err != nil {
-				log.Printf("❌ Accept版本失败: %v", err)
-				c.JSON(http.StatusInternalServerError, gin.H{
-					"success": false,
-					"error":   "Accept失败",
-				})
-				return
-			}
-
-			// 提取所有被Accept的toolCallIDs
-			for _, v := range acceptedVersions {
-				acceptedToolCallIDs = append(acceptedToolCallIDs, v.ToolCallID)
-			}
-
-			if acceptedContent != "" && len(acceptedVersions) > 0 {
-				historyManager := models.GetFileHistoryManager()
-
-				// 为每个被Accept的版本分别备份和写入
-				// 使用版本创建时的messageIndex，而不是当前的messageIndex
-				// 这样可以精确标记每个版本对应的消息
-				for i, version := range acceptedVersions {
-					// 1. 备份当前磁盘状态（使用该版本创建时的messageIndex）
-					description := fmt.Sprintf("Accept %s 前备份", version.ToolCallID)
-					if err := historyManager.BackupAndAddVersion(req.FilePath, conversationID, version.MessageIndex, description); err != nil {
-						log.Printf("⚠️ 备份文件失败 (%s): %v（继续写入）", version.ToolCallID, err)
-					} else {
-						log.Printf("📦 已备份文件到历史 (messageIndex=%d): %s", version.MessageIndex, description)
-					}
-
-					// 2. 写入该版本到磁盘
-					if err := os.WriteFile(req.FilePath, []byte(version.Content), 0644); err != nil {
-						log.Printf("❌ 写入文件失败 (%s): %v", version.ToolCallID, err)
-						c.JSON(http.StatusInternalServerError, gin.H{
-							"success": false,
-							"error":   fmt.Sprintf("写入文件失败: %v", err),
-						})
-						return
-					}
-					log.Printf("✅ 已写入版本 %d/%d: %s", i+1, len(acceptedVersions), version.ToolCallID)
-				}
-
-				// 3. 如果有后续版本，恢复它们
-				if len(remainingVersions) > 0 {
-					if err := manager.RestoreVersions(conversationID, req.FilePath, remainingVersions); err != nil {
-						log.Printf("⚠️ 恢复后续版本失败: %v", err)
-					}
-					log.Printf("✅ Accept完成: %s，连带Accept %d 个版本，保留 %d 个后续版本", req.FilePath, len(acceptedToolCallIDs), len(remainingVersions))
-				} else {
-					log.Printf("✅ Accept完成: %s，连带Accept %d 个版本，无后续版本", req.FilePath, len(acceptedToolCallIDs))
-				}
-			}
+		// Accept All: 应用所有pending，保存快照，写入磁盘
+		if err := h.acceptAll(req.ConversationID, pendingManager, historyManager); err != nil {
+			log.Printf("❌ Accept All失败: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   fmt.Sprintf("Accept失败: %v", err),
+			})
+			return
 		}
 
-		// 更新所有被连带Accept的消息状态
-		allToolCallIDs := acceptedToolCallIDs
-		if len(allToolCallIDs) == 0 {
-			allToolCallIDs = []string{req.ToolCallID}
-		}
-
-		for _, tcID := range allToolCallIDs {
-			if err := storage.UpdateToolMessageStatus(tcID, req.Status); err != nil {
-				log.Printf("❌ 更新tool消息状态失败 (%s): %v", tcID, err)
-			} else {
-				log.Printf("✅ 已更新消息状态: %s -> accepted", tcID)
-			}
-		}
-
+		log.Printf("✅ Accept All成功: %s", req.ConversationID)
 		c.JSON(http.StatusOK, gin.H{
-			"success":           true,
-			"message":           "状态已更新",
-			"accepted_tool_ids": allToolCallIDs, // 返回所有被Accept的IDs给前端
+			"success": true,
+			"message": "已确认所有修改",
 		})
-		return
+
 	} else if req.Status == "rejected" {
-		// Reject: 清除pending（链式取消）
-		var rejectedToolCallIDs []string
-		if req.FilePath != "" && req.ConversationID != "" {
-			// 调用RejectVersion返回被删除的所有版本的toolCallIDs
-			deletedIDs, err := manager.RejectVersion(req.ConversationID, req.FilePath, req.ToolCallID)
-			if err != nil {
-				log.Printf("⚠️ 清除pending状态失败: %v", err)
-			} else {
-				rejectedToolCallIDs = deletedIDs
-				log.Printf("❌ Reject并清除pending: %s, 链式删除了 %d 个版本", req.FilePath, len(rejectedToolCallIDs))
-			}
+		// Reject All: 清空pending，删除未确认的快照
+		if err := h.rejectAll(req.ConversationID, pendingManager, historyManager); err != nil {
+			log.Printf("❌ Reject All失败: %v", err)
+			c.JSON(http.StatusInternalServerError, gin.H{
+				"success": false,
+				"error":   fmt.Sprintf("Reject失败: %v", err),
+			})
+			return
 		}
 
-		// 更新所有被链式Reject的消息状态
-		allToolCallIDs := rejectedToolCallIDs
-		if len(allToolCallIDs) == 0 {
-			allToolCallIDs = []string{req.ToolCallID}
-		}
-
-		for _, tcID := range allToolCallIDs {
-			if err := storage.UpdateToolMessageStatus(tcID, req.Status); err != nil {
-				log.Printf("❌ 更新tool消息状态失败 (%s): %v", tcID, err)
-			} else {
-				log.Printf("✅ 已更新消息状态: %s -> rejected", tcID)
-			}
-		}
-
+		log.Printf("✅ Reject All成功: %s", req.ConversationID)
 		c.JSON(http.StatusOK, gin.H{
-			"success":           true,
-			"message":           "状态已更新",
-			"rejected_tool_ids": allToolCallIDs, // 返回所有被Reject的IDs给前端
+			"success": true,
+			"message": "已取消所有修改",
 		})
-		return
-	}
 
-	// Accept情况：只更新当前消息状态
-	if err := storage.UpdateToolMessageStatus(req.ToolCallID, req.Status); err != nil {
-		log.Printf("❌ 更新tool消息状态失败: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{
+	} else {
+		c.JSON(http.StatusBadRequest, gin.H{
 			"success": false,
-			"error":   "更新状态失败",
+			"error":   "Invalid status",
 		})
-		return
 	}
-
-	log.Printf("✅ 用户确认编辑: %s -> %s", req.ToolCallID, req.Status)
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "状态已更新",
-	})
 }
 
-// 注：文件历史自动备份（Accept时），回退通过消息撤销自动实现
+// acceptAll 确认所有pending修改
+func (h *AIEditHandler) acceptAll(conversationID string, pendingManager *models.PendingStateManager, historyManager *models.FileHistoryManager) error {
+	// 1. 获取所有轮次
+	turns := pendingManager.GetTurns(conversationID)
+	if len(turns) == 0 {
+		log.Printf("⚠️ 没有pending修改")
+		return nil
+	}
+
+	// 2. 获取所有涉及的文件
+	allFiles := pendingManager.GetAllPendingFiles(conversationID)
+
+	log.Printf("📊 Accept All: %d轮对话，%d个文件", len(turns), len(allFiles))
+
+	// 3. 对每个文件：应用edits，生成快照，写入磁盘
+	for filePath := range allFiles {
+		if err := h.acceptFileEdits(conversationID, filePath, turns, historyManager); err != nil {
+			return fmt.Errorf("处理文件失败 %s: %v", filePath, err)
+		}
+	}
+
+	// 4. 清空pending
+	if err := pendingManager.ClearAll(conversationID); err != nil {
+		return fmt.Errorf("清空pending失败: %v", err)
+	}
+
+	return nil
+}
+
+// acceptFileEdits 应用单个文件的所有edits
+func (h *AIEditHandler) acceptFileEdits(conversationID, filePath string, turns []models.TurnEdits, historyManager *models.FileHistoryManager) error {
+	// 读取磁盘内容
+	diskContent, err := os.ReadFile(filePath)
+	if err != nil {
+		return fmt.Errorf("读取文件失败: %v", err)
+	}
+
+	state := string(diskContent)
+	log.Printf("📝 处理文件: %s (初始: %d字节)", filePath, len(state))
+
+	// 逐轮应用edits并保存快照
+	for _, turn := range turns {
+		edits, hasEdits := turn.FileEdits[filePath]
+		if !hasEdits {
+			continue
+		}
+
+		// 保存该轮开始前的快照
+		if err := historyManager.AddSnapshot(conversationID, filePath, turn.UserMessageIndex, state); err != nil {
+			return fmt.Errorf("保存快照失败: %v", err)
+		}
+		log.Printf("📸 Turn%d快照: %d字节", turn.UserMessageIndex, len(state))
+
+		// 应用该轮的所有edits
+		for _, edit := range edits {
+			state = strings.Replace(state, edit.OldString, edit.NewString, 1)
+		}
+		log.Printf("✏️ Turn%d应用%d个edit: %d字节", turn.UserMessageIndex, len(edits), len(state))
+	}
+
+	// 写入最终状态到磁盘
+	if err := os.WriteFile(filePath, []byte(state), 0644); err != nil {
+		return fmt.Errorf("写入文件失败: %v", err)
+	}
+
+	log.Printf("💾 写入磁盘: %s (%d字节)", filePath, len(state))
+	return nil
+}
+
+// rejectAll 取消所有pending修改
+func (h *AIEditHandler) rejectAll(conversationID string, pendingManager *models.PendingStateManager, historyManager *models.FileHistoryManager) error {
+	// 1. 获取所有轮次
+	turns := pendingManager.GetTurns(conversationID)
+	if len(turns) == 0 {
+		log.Printf("⚠️ 没有pending修改")
+		return nil
+	}
+
+	// 2. 找到第一轮的messageIndex
+	firstTurnIndex := turns[0].UserMessageIndex
+
+	log.Printf("🗑️ Reject All: 删除Turn%d之后的快照", firstTurnIndex)
+
+	// 3. 删除第一轮之后的所有快照
+	if err := historyManager.RemoveSnapshotsAfter(conversationID, firstTurnIndex-1); err != nil {
+		return fmt.Errorf("删除快照失败: %v", err)
+	}
+
+	// 4. 清空pending
+	if err := pendingManager.ClearAll(conversationID); err != nil {
+		return fmt.Errorf("清空pending失败: %v", err)
+	}
+
+	// 注意：磁盘内容不变，因为pending从未写入磁盘
+	log.Printf("✅ Reject完成，磁盘保持不变")
+
+	return nil
+}

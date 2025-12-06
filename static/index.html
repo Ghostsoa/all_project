@@ -381,6 +381,24 @@
                     </div>
                 </div>
 
+                <!-- Pending编辑操作栏 -->
+                <div class="pending-actions-bar" id="pendingActionsBar" style="display: none;">
+                    <div class="pending-info">
+                        <i class="fa-solid fa-file-pen"></i>
+                        <span id="pendingCount">0</span> pending changes
+                    </div>
+                    <div class="pending-buttons">
+                        <button class="btn-reject-all" onclick="aiToolsManager.rejectAll()">
+                            <i class="fa-solid fa-xmark"></i>
+                            Reject All
+                        </button>
+                        <button class="btn-accept-all" onclick="aiToolsManager.acceptAll()">
+                            <i class="fa-solid fa-check"></i>
+                            Accept All
+                        </button>
+                    </div>
+                </div>
+
                 <!-- 输入区域 -->
                 <div class="ai-input-container">
                     <div class="input-box">

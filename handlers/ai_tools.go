@@ -81,23 +81,21 @@ func (te *ToolExecutor) readFile(args FileOperationArgs, conversationID string) 
 
 	log.Printf("📖 readFile调用: conversationID=%s, filePath=%s", conversationID, args.FilePath)
 
-	// 优先返回pending内容（如果存在）
-	var content string
-	var isPending bool
+	// 读取磁盘文件
+	fileContent, err := os.ReadFile(args.FilePath)
+	if err != nil {
+		return "", fmt.Errorf("读取文件失败: %v", err)
+	}
+	diskContent := string(fileContent)
 
-	if pendingContent, exists := manager.GetCurrentContent(conversationID, args.FilePath); exists {
-		content = pendingContent
-		isPending = true
-		log.Printf("✅ 从pending读取，内容前50字符: %s", truncate(content, 50))
+	// 获取pending内容（应用所有edits）
+	content := manager.GetCurrentContent(conversationID, args.FilePath, diskContent)
+	isPending := (content != diskContent)
+
+	if isPending {
+		log.Printf("✅ 返回pending内容，内容前50字符: %s", truncate(content, 50))
 	} else {
-		// 没有pending，读取实际文件
-		fileContent, err := os.ReadFile(args.FilePath)
-		if err != nil {
-			return "", fmt.Errorf("读取文件失败: %v", err)
-		}
-		content = string(fileContent)
-		isPending = false
-		log.Printf("📁 从磁盘读取，内容前50字符: %s", truncate(content, 50))
+		log.Printf("📁 返回磁盘内容，内容前50字符: %s", truncate(content, 50))
 	}
 
 	// 返回结果（JSON格式）
@@ -123,6 +121,10 @@ func (te *ToolExecutor) writeFile(args FileOperationArgs) (string, error) {
 		fileExists = true
 	}
 
+	// 计算写入的行数
+	lines := strings.Split(args.Content, "\n")
+	totalLines := len(lines)
+
 	// 只返回pending状态，不执行实际操作
 	result := map[string]interface{}{
 		"success":     true,
@@ -132,7 +134,8 @@ func (te *ToolExecutor) writeFile(args FileOperationArgs) (string, error) {
 		"server_id":   args.ServerID,
 		"file_path":   args.FilePath,
 		"file_exists": fileExists,
-		"message":     fmt.Sprintf("等待用户确认: %s", args.FilePath),
+		"total_lines": totalLines, // 写入的总行数
+		"message":     fmt.Sprintf("等待用户确认: %s (%d行)", args.FilePath, totalLines),
 	}
 
 	resultJSON, _ := json.Marshal(result)
@@ -158,15 +161,8 @@ func (te *ToolExecutor) editFile(args FileOperationArgs, conversationID string, 
 	}
 	diskContentStr := string(diskContent)
 
-	// 2. 读取当前编辑基础内容（优先pending，用于连续修改）
-	var baseContent string
-	if pendingContent, exists := manager.GetCurrentContent(conversationID, args.FilePath); exists {
-		// 使用pending内容作为修改基础
-		baseContent = pendingContent
-	} else {
-		// 使用磁盘内容
-		baseContent = diskContentStr
-	}
+	// 2. 读取当前编辑基础内容（应用所有pending edits）
+	baseContent := manager.GetCurrentContent(conversationID, args.FilePath, diskContentStr)
 
 	// 3. 检查 old_string 是否存在（在baseContent中）
 	if !strings.Contains(baseContent, args.OldString) {
@@ -189,30 +185,42 @@ func (te *ToolExecutor) editFile(args FileOperationArgs, conversationID string, 
 	// 5. 执行替换（基于baseContent）
 	newContent := strings.Replace(baseContent, args.OldString, args.NewString, 1)
 
-	// 6. 计算差异操作（重要：显示从磁盘到最终pending的累计变化）
+	// 6. 计算本次编辑的差异统计（baseContent → newContent）
+	linesDeleted, linesAdded := te.calculateLineDiff(baseContent, newContent)
+
+	// 7. 添加edit操作到pending
+	edit := models.EditOperation{
+		ToolCallID: messageID,
+		MessageID:  messageID,
+		OldString:  args.OldString,
+		NewString:  args.NewString,
+	}
+	if err := manager.AddEdit(conversationID, args.FilePath, messageIndex, edit); err != nil {
+		return "", fmt.Errorf("保存pending失败: %v", err)
+	}
+
+	// 8. 计算差异操作（从磁盘到最终pending的累计变化）
 	operations := te.computeFullDiff(diskContentStr, newContent)
 
-	// 7. 保存到pending状态（记录messageIndex）
-	// 直接使用messageID作为toolCallID（与前端保持一致）
-	if err := manager.AddVersion(conversationID, args.FilePath, messageID, newContent, messageID, messageIndex); err != nil {
-		return "", fmt.Errorf("保存pending状态失败: %v", err)
-	}
-	log.Printf("📦 已保存pending版本 (messageIndex=%d): %s", messageIndex, messageID)
+	log.Printf("📦 已添加edit到Turn%d: %s (删除%d行, 新增%d行)", messageIndex, args.FilePath, linesDeleted, linesAdded)
 
-	// 7. 返回pending状态（前端负责显示和确认）
+	// 9. 返回pending状态（前端负责显示和确认）
 	result := map[string]interface{}{
-		"success":      true,
-		"status":       "pending",
-		"action":       "edit",
-		"type":         "edit",
-		"server_id":    args.ServerID,
-		"file_path":    args.FilePath,
-		"operations":   operations,
-		"tool_call_id": messageID,
+		"success":       true,
+		"status":        "pending",
+		"action":        "edit",
+		"type":          "edit",
+		"server_id":     args.ServerID,
+		"file_path":     args.FilePath,
+		"operations":    operations,
+		"tool_call_id":  messageID,
+		"lines_deleted": linesDeleted, // 本次编辑删除的行数
+		"lines_added":   linesAdded,   // 本次编辑新增的行数
 		"summary": fmt.Sprintf(
-			"等待用户确认: %s (%d 行修改)",
+			"等待用户确认: %s (-%d行, +%d行)",
 			filepath.Base(args.FilePath),
-			len(operations),
+			linesDeleted,
+			linesAdded,
 		),
 		// 注意：new_content已存储在pending state中，不需要在响应中包含
 		// 这样可以减少消息历史大小，避免AI看到完整文件内容
@@ -318,6 +326,41 @@ func (te *ToolExecutor) computeFullDiff(oldContent, newContent string) []Operati
 	}
 
 	return operations
+}
+
+// calculateLineDiff 计算本次编辑的行数差异（oldString → newString）
+func (te *ToolExecutor) calculateLineDiff(oldContent, newContent string) (linesDeleted, linesAdded int) {
+	// 计算被替换部分（oldString）的行数
+	oldLines := strings.Split(oldContent, "\n")
+	newLines := strings.Split(newContent, "\n")
+
+	// 找出差异部分
+	oldLen := len(oldLines)
+	newLen := len(newLines)
+
+	// 找到第一个不同的行
+	firstDiff := 0
+	for firstDiff < oldLen && firstDiff < newLen && oldLines[firstDiff] == newLines[firstDiff] {
+		firstDiff++
+	}
+
+	// 找到最后一个不同的行（从后往前）
+	lastDiffOld := oldLen - 1
+	lastDiffNew := newLen - 1
+	for lastDiffOld >= firstDiff && lastDiffNew >= firstDiff && oldLines[lastDiffOld] == newLines[lastDiffNew] {
+		lastDiffOld--
+		lastDiffNew--
+	}
+
+	// 计算删除和新增的行数
+	if firstDiff <= lastDiffOld {
+		linesDeleted = lastDiffOld - firstDiff + 1
+	}
+	if firstDiff <= lastDiffNew {
+		linesAdded = lastDiffNew - firstDiff + 1
+	}
+
+	return linesDeleted, linesAdded
 }
 
 // 前端确认后，直接调用文件API执行写入，不需要后端保存预览
