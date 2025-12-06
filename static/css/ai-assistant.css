@@ -618,7 +618,6 @@
 
 /* ========== 消息样式 ========== */
 .ai-message {
-    margin-bottom: 16px;
     animation: fadeIn 0.3s ease;
     max-width: 100%;
 }
@@ -856,7 +855,6 @@
 
 /* 思维链样式 */
 .message-reasoning {
-    margin-bottom: 8px;
     max-width: 100%;
 }
 
