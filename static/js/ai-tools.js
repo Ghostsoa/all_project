@@ -799,12 +799,16 @@ class AIToolsManager {
      * 获取当前服务器 ID
      */
     getCurrentServerId() {
-        // 检查是否是本地模式
-        if (window.state?.isLocalMode || window.isLocalTerminal) {
+        // 检查是否是本地模式（sessionID为'local'表示本地）
+        const sessionId = this.getCurrentSessionId();
+        if (sessionId === 'local') {
             return 'local';
         }
-        // 从全局状态获取远程服务器ID
-        return window.state?.currentServer || '';
+        // 从全局函数获取远程服务器ID
+        if (window.getCurrentServerID) {
+            return window.getCurrentServerID();
+        }
+        return '';
     }
 
     /**
