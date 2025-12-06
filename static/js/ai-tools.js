@@ -661,17 +661,16 @@ class AIToolsManager {
                     
                     // 整个组内的所有行都标记为红色删除（包括中间没变化的行）
                     for (let idx = firstIdx; idx <= lastIdx; idx++) {
-                        if (idx < (end_line - start_line + 1)) {
-                            const lineNum = start_line + idx;
-                            decorations.push({
-                                range: new monaco.Range(lineNum, 1, lineNum, model.getLineMaxColumn(lineNum)),
-                                options: {
-                                    isWholeLine: true,
-                                    className: 'diff-line-deleted',
-                                    glyphMarginClassName: 'diff-glyph-deleted'
-                                }
-                            });
-                        }
+                        const lineNum = start_line + idx;
+                        console.log(`  🔴 标记第 ${lineNum} 行为红色删除`);
+                        decorations.push({
+                            range: new monaco.Range(lineNum, 1, lineNum, model.getLineMaxColumn(lineNum)),
+                            options: {
+                                isWholeLine: true,
+                                className: 'diff-line-deleted',
+                                glyphMarginClassName: 'diff-glyph-deleted'
+                            }
+                        });
                     }
                     
                     // 创建Zone只显示绿色添加行
