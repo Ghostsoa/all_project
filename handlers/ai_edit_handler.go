@@ -198,12 +198,9 @@ func (h *AIEditHandler) rejectAll(conversationID string, pendingManager *models.
 		return nil
 	}
 
-	// 2. 找到第一轮的messageIndex
-	firstTurnIndex := turns[0].UserMessageIndex
+	log.Printf("🗑️ Reject All: 删除%d个pending轮次的临时快照", len(turns))
 
-	log.Printf("🗑️ Reject All: 删除Turn%d之后的快照", firstTurnIndex)
-
-	// 3. 收集所有tool_call_id（用于更新消息status）
+	// 2. 收集所有tool_call_id（用于更新消息status）
 	allToolCallIDs := make([]string, 0)
 	for _, turn := range turns {
 		for _, edits := range turn.FileEdits {
@@ -213,9 +210,16 @@ func (h *AIEditHandler) rejectAll(conversationID string, pendingManager *models.
 		}
 	}
 
-	// 4. 删除第一轮之后的所有快照
-	if err := historyManager.RemoveSnapshotsAfter(conversationID, firstTurnIndex-1); err != nil {
-		return fmt.Errorf("删除快照失败: %v", err)
+	// 3. 删除每个pending Turn的临时快照（Turn N+1）
+	// 注意：不删除已Accept的快照（Turn N）
+	for _, turn := range turns {
+		turnIndex := turn.UserMessageIndex
+		// 只删除Turn N+1的快照（这是pending的最终状态，还没Accept）
+		if err := historyManager.RemoveSnapshot(conversationID, turnIndex+1); err != nil {
+			log.Printf("⚠️ 删除Turn%d快照失败: %v", turnIndex+1, err)
+		} else {
+			log.Printf("🗑️ 删除Turn%d的临时快照", turnIndex+1)
+		}
 	}
 
 	// 5. 更新所有tool消息的status为rejected

@@ -224,6 +224,49 @@ func (m *FileHistoryManager) RemoveSnapshotsAfter(conversationID string, initial
 	return m.saveLocked()
 }
 
+// RemoveSnapshot 删除指定Turn的快照（所有文件）
+func (m *FileHistoryManager) RemoveSnapshot(conversationID string, turnIndex int) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	conv, exists := m.histories[conversationID]
+	if !exists {
+		return nil
+	}
+
+	deletedCount := 0
+	// 遍历所有文件
+	for filePath, fileHist := range conv.Files {
+		// 删除指定Turn的快照
+		newSnapshots := []TurnSnapshot{}
+		for _, snapshot := range fileHist.Snapshots {
+			if snapshot.UserMessageIndex != turnIndex {
+				newSnapshots = append(newSnapshots, snapshot)
+			} else {
+				deletedCount++
+			}
+		}
+
+		fileHist.Snapshots = newSnapshots
+
+		// 如果没有快照了，删除该文件历史
+		if len(newSnapshots) == 0 {
+			delete(conv.Files, filePath)
+		}
+	}
+
+	// 如果所有文件都没有快照了，删除整个会话历史
+	if len(conv.Files) == 0 {
+		delete(m.histories, conversationID)
+	}
+
+	if deletedCount > 0 {
+		log.Printf("🗑️ 删除Turn%d的%d个快照", turnIndex, deletedCount)
+	}
+
+	return m.saveLocked()
+}
+
 // ClearConversation 清空会话的所有历史
 func (m *FileHistoryManager) ClearConversation(conversationID string) error {
 	m.mutex.Lock()
