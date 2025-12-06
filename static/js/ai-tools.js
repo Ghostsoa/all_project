@@ -866,63 +866,63 @@ class AIToolsManager {
         }
 
         try {
-            // 1. 先执行实际的文件写入
-            const { file_path, server_id, content, new_content, type } = edit;
-            const writeContent = type === 'edit' ? new_content : content;
+            const { file_path, server_id, content, type } = edit;
             
-            let writeResponse;
-            
-            if (server_id === 'local') {
-                // 本地文件
-                writeResponse = await fetch('/api/local/files/save', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        path: file_path,
-                        content: writeContent
-                    })
-                });
-            } else {
-                // 远程文件：获取session_id
-                const sessionId = this.getSessionIdByServerId(server_id);
-                if (!sessionId) {
-                    this.showToast('无法获取会话ID', 'error');
-                    return;
+            // write类型：前端直接写入文件
+            if (type === 'write') {
+                let writeResponse;
+                
+                if (server_id === 'local') {
+                    writeResponse = await fetch('/api/local/files/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            path: file_path,
+                            content: content
+                        })
+                    });
+                } else {
+                    const sessionId = this.getSessionIdByServerId(server_id);
+                    if (!sessionId) {
+                        this.showToast('无法获取会话ID', 'error');
+                        return;
+                    }
+                    
+                    writeResponse = await fetch('/api/files/save', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            session_id: sessionId,
+                            path: file_path,
+                            content: content
+                        })
+                    });
                 }
                 
-                writeResponse = await fetch('/api/files/save', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        session_id: sessionId,
-                        path: file_path,
-                        content: writeContent
-                    })
-                });
+                const writeResult = await writeResponse.json();
+                if (!writeResult.success) {
+                    this.showToast('文件写入失败: ' + (writeResult.error || '未知错误'), 'error');
+                    return;
+                }
             }
             
-            const writeResult = await writeResponse.json();
-            
-            if (!writeResult.success) {
-                this.showToast('文件写入失败: ' + (writeResult.error || '未知错误'), 'error');
-                return;
-            }
-            
-            // 2. 写入成功后，调用API更新数据库中的tool消息状态
-            const updateResponse = await fetch('/api/ai/edit/apply', {
+            // 调用后端API更新状态，edit类型会由后端写入文件
+            const response = await fetch('/api/ai/edit/apply', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     tool_call_id: toolCallId,
-                    status: 'accepted'
+                    status: 'accepted',
+                    file_path: file_path,
+                    conversation_id: this.getCurrentSessionId()
                 })
             });
 
-            const updateResult = await updateResponse.json();
+            const result = await response.json();
             
-            if (!updateResult.success) {
-                console.warn('更新状态失败:', updateResult.error);
-                // 文件已写入，状态更新失败不影响
+            if (!result.success) {
+                this.showToast('Accept失败: ' + (result.error || '未知错误'), 'error');
+                return;
             }
             
             // 3. 更新 UI
@@ -969,7 +969,9 @@ class AIToolsManager {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ 
                     tool_call_id: toolCallId,
-                    status: 'rejected'
+                    status: 'rejected',
+                    file_path: edit.file_path,
+                    conversation_id: this.getCurrentSessionId()
                 })
             });
 
@@ -983,13 +985,29 @@ class AIToolsManager {
                 // 更新 UI
                 this.updateToolStatus(toolCallId, 'rejected');
                 
-                // 清除装饰
-                this.clearDiffDecorations(toolCallId);
+                // 获取同文件的所有pending edits（按时间排序）
+                const sameFileEdits = [];
+                for (const [tid, e] of this.pendingEdits.entries()) {
+                    if (e.file_path === filePath && e.status === 'pending' && e.type === 'edit') {
+                        sameFileEdits.push({ toolCallId: tid, edit: e });
+                    }
+                }
                 
-                // 移除待处理列表
-                this.pendingEdits.delete(toolCallId);
+                // 找到被reject的edit的位置
+                const rejectIndex = sameFileEdits.findIndex(item => item.toolCallId === toolCallId);
                 
-                // 刷新编辑器内容为磁盘文件（如果没有剩余pending）
+                if (rejectIndex !== -1) {
+                    // 删除这个及之后的所有pending（链式删除）
+                    for (let i = rejectIndex; i < sameFileEdits.length; i++) {
+                        const { toolCallId: tid } = sameFileEdits[i];
+                        console.log('🧹 链式删除pending:', tid);
+                        this.clearDiffDecorations(tid);
+                        this.pendingEdits.delete(tid);
+                        this.updateToolStatus(tid, 'rejected');
+                    }
+                }
+                
+                // 刷新编辑器内容为磁盘文件或显示剩余pending
                 const hasRemainingPending = Array.from(this.pendingEdits.values()).some(
                     e => e.file_path === filePath && e.status === 'pending' && e.type === 'edit'
                 );
