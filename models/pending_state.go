@@ -61,17 +61,23 @@ func (m *PendingStateManager) GetCurrentContent(conversationID, filePath string)
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
+	log.Printf("🔍 GetCurrentContent: conversationID=%s, filePath=%s", conversationID, filePath)
+
 	conv, exists := m.states[conversationID]
 	if !exists {
+		log.Printf("❌ conversation不存在")
 		return "", false
 	}
 
 	pendingFile, exists := conv.Files[filePath]
 	if !exists || len(pendingFile.Versions) == 0 {
+		log.Printf("❌ 文件无pending或版本为空")
 		return "", false
 	}
 
+	log.Printf("📋 找到pending版本数: %d, CurrentVersion=%d", len(pendingFile.Versions), pendingFile.CurrentVersion)
 	currentVersion := pendingFile.Versions[pendingFile.CurrentVersion]
+	log.Printf("✅ 返回pending内容，前50字符: %s", truncateString(currentVersion.Content, 50))
 	return currentVersion.Content, true
 }
 

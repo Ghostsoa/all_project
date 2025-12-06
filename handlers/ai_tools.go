@@ -4,6 +4,7 @@ import (
 	"all_project/models"
 	"encoding/json"
 	"fmt"
+	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -77,6 +78,8 @@ func (te *ToolExecutor) fileOperation(argsJSON string, conversationID string, me
 func (te *ToolExecutor) readFile(args FileOperationArgs, conversationID string) (string, error) {
 	manager := models.GetPendingStateManager()
 
+	log.Printf("📖 readFile调用: conversationID=%s, filePath=%s", conversationID, args.FilePath)
+
 	// 优先返回pending内容（如果存在）
 	var content string
 	var isPending bool
@@ -84,6 +87,7 @@ func (te *ToolExecutor) readFile(args FileOperationArgs, conversationID string) 
 	if pendingContent, exists := manager.GetCurrentContent(conversationID, args.FilePath); exists {
 		content = pendingContent
 		isPending = true
+		log.Printf("✅ 从pending读取，内容前50字符: %s", truncate(content, 50))
 	} else {
 		// 没有pending，读取实际文件
 		fileContent, err := os.ReadFile(args.FilePath)
@@ -92,6 +96,7 @@ func (te *ToolExecutor) readFile(args FileOperationArgs, conversationID string) 
 		}
 		content = string(fileContent)
 		isPending = false
+		log.Printf("📁 从磁盘读取，内容前50字符: %s", truncate(content, 50))
 	}
 
 	// 返回结果（JSON格式）
@@ -362,4 +367,12 @@ func GetToolsDefinition() []map[string]interface{} {
 			},
 		},
 	}
+}
+
+// truncate 截断字符串
+func truncate(s string, maxLen int) string {
+	if len(s) <= maxLen {
+		return s
+	}
+	return s[:maxLen] + "..."
 }
