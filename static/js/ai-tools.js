@@ -680,19 +680,30 @@ class AIToolsManager {
                     domNode.style.lineHeight = `${lineHeight}px`;
                     
                     const linesHtml = [];
+                    const deletedLines = [];
+                    const addedLines = [];
+                    
+                    // 先收集所有删除和添加的行
                     for (const idx of group) {
                         const oldLine = oldLines[idx] || '';
                         const newLine = newLines[idx] || '';
                         
-                        if (oldLine && newLine) {
-                            const { oldHtml, newHtml } = this.computeCharDiff(oldLine, newLine);
-                            linesHtml.push(`<div class="diff-zone-line diff-zone-deleted">${oldHtml}</div>`);
-                            linesHtml.push(`<div class="diff-zone-line diff-zone-added">${newHtml}</div>`);
-                        } else if (oldLine) {
-                            linesHtml.push(`<div class="diff-zone-line diff-zone-deleted">${this.escapeHtml(oldLine)}</div>`);
-                        } else if (newLine) {
-                            linesHtml.push(`<div class="diff-zone-line diff-zone-added">${this.escapeHtml(newLine)}</div>`);
+                        if (oldLine) {
+                            deletedLines.push(oldLine);
                         }
+                        if (newLine) {
+                            addedLines.push(newLine);
+                        }
+                    }
+                    
+                    // 先显示所有红色删除行
+                    for (const line of deletedLines) {
+                        linesHtml.push(`<div class="diff-zone-line diff-zone-deleted">${this.escapeHtml(line)}</div>`);
+                    }
+                    
+                    // 再显示所有绿色添加行
+                    for (const line of addedLines) {
+                        linesHtml.push(`<div class="diff-zone-line diff-zone-added">${this.escapeHtml(line)}</div>`);
                     }
                     
                     domNode.innerHTML = linesHtml.join('');

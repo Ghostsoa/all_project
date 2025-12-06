@@ -284,9 +284,11 @@
 
 /* 隐藏被Zone替换的原始行 */
 .diff-line-hidden-for-zone {
+    display: none !important;
     opacity: 0 !important;
     height: 0 !important;
     line-height: 0 !important;
+    visibility: hidden !important;
 }
 
 /* Zone Widget 容器 */
