@@ -460,6 +460,9 @@ class AIToolsManager {
         console.log('🖱️ handleToolClick:', toolCallId);
         const edit = this.pendingEdits.get(toolCallId);
         console.log('📦 从pendingEdits获取:', edit);
+        if (edit && edit.operations) {
+            console.log('📋 operations详情:', edit.operations);
+        }
         if (!edit) {
             console.error('❌ 未找到编辑信息:', toolCallId);
             return;
@@ -469,11 +472,14 @@ class AIToolsManager {
         
         // 检查当前服务器
         const currentServerId = this.getCurrentServerId();
+        console.log('🖥️ 服务器检查:', { current: currentServerId, target: server_id });
         
         if (server_id === currentServerId) {
+            console.log('✅ 服务器匹配，准备打开文件');
             // 同一服务器：打开文件并显示 diff
             await this.openFileWithDiff(edit, toolCallId);
         } else {
+            console.log('❌ 服务器不匹配');
             // 不同服务器：提示用户
             this.showServerMismatchNotification(server_id, currentServerId);
         }
