@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"all_project/models"
 	"encoding/json"
 	"fmt"
 	"os"
@@ -42,16 +43,16 @@ type FileOperationArgs struct {
 }
 
 // Execute 执行工具调用
-func (te *ToolExecutor) Execute(toolName string, argsJSON string) (string, error) {
+func (te *ToolExecutor) Execute(toolName string, argsJSON string, conversationID string, messageID string) (string, error) {
 	if toolName != "file_operation" {
 		return "", fmt.Errorf("未知工具: %s", toolName)
 	}
 
-	return te.fileOperation(argsJSON)
+	return te.fileOperation(argsJSON, conversationID, messageID)
 }
 
 // fileOperation 统一的文件操作入口
-func (te *ToolExecutor) fileOperation(argsJSON string) (string, error) {
+func (te *ToolExecutor) fileOperation(argsJSON string, conversationID string, messageID string) (string, error) {
 	var args FileOperationArgs
 	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
 		return "", fmt.Errorf("解析参数失败: %v", err)
@@ -60,11 +61,11 @@ func (te *ToolExecutor) fileOperation(argsJSON string) (string, error) {
 	// 根据操作类型分发
 	switch args.Type {
 	case "read":
-		return te.readFile(args)
+		return te.readFile(args, conversationID)
 	case "write":
 		return te.writeFile(args)
 	case "edit":
-		return te.editFile(args)
+		return te.editFile(args, conversationID, messageID)
 	case "list":
 		return te.listDir(args)
 	default:
@@ -73,21 +74,35 @@ func (te *ToolExecutor) fileOperation(argsJSON string) (string, error) {
 }
 
 // readFile 读取文件内容
-func (te *ToolExecutor) readFile(args FileOperationArgs) (string, error) {
-	// 读取文件
-	content, err := os.ReadFile(args.FilePath)
-	if err != nil {
-		return "", fmt.Errorf("读取文件失败: %v", err)
+func (te *ToolExecutor) readFile(args FileOperationArgs, conversationID string) (string, error) {
+	manager := models.GetPendingStateManager()
+
+	// 优先返回pending内容（如果存在）
+	var content string
+	var isPending bool
+
+	if pendingContent, exists := manager.GetCurrentContent(conversationID, args.FilePath); exists {
+		content = pendingContent
+		isPending = true
+	} else {
+		// 没有pending，读取实际文件
+		fileContent, err := os.ReadFile(args.FilePath)
+		if err != nil {
+			return "", fmt.Errorf("读取文件失败: %v", err)
+		}
+		content = string(fileContent)
+		isPending = false
 	}
 
 	// 返回结果（JSON格式）
 	result := map[string]interface{}{
-		"success":   true,
-		"type":      "read",
-		"server_id": args.ServerID,
-		"file_path": args.FilePath,
-		"content":   string(content),
-		"size":      len(content),
+		"success":    true,
+		"type":       "read",
+		"server_id":  args.ServerID,
+		"file_path":  args.FilePath,
+		"content":    content,
+		"size":       len(content),
+		"is_pending": isPending,
 	}
 
 	resultJSON, _ := json.Marshal(result)
@@ -119,26 +134,36 @@ func (te *ToolExecutor) writeFile(args FileOperationArgs) (string, error) {
 }
 
 // editFile 精确编辑文件（搜索替换）
-func (te *ToolExecutor) editFile(args FileOperationArgs) (string, error) {
+func (te *ToolExecutor) editFile(args FileOperationArgs, conversationID string, messageID string) (string, error) {
+	manager := models.GetPendingStateManager()
 
-	// 1. 读取当前文件内容
-	currentContent, err := os.ReadFile(args.FilePath)
+	// 1. 读取磁盘原始内容（用于计算累计diff）
+	diskContent, err := os.ReadFile(args.FilePath)
 	if err != nil {
 		return "", fmt.Errorf("读取文件失败: %v", err)
 	}
+	diskContentStr := string(diskContent)
 
-	content := string(currentContent)
+	// 2. 读取当前编辑基础内容（优先pending，用于连续修改）
+	var baseContent string
+	if pendingContent, exists := manager.GetCurrentContent(conversationID, args.FilePath); exists {
+		// 使用pending内容作为修改基础
+		baseContent = pendingContent
+	} else {
+		// 使用磁盘内容
+		baseContent = diskContentStr
+	}
 
-	// 2. 检查 old_string 是否存在
-	if !strings.Contains(content, args.OldString) {
+	// 3. 检查 old_string 是否存在（在baseContent中）
+	if !strings.Contains(baseContent, args.OldString) {
 		return "", fmt.Errorf(
 			"找不到要替换的内容。请确保 old_string 完全匹配（包括空格、缩进、换行）。\n" +
 				"提示: 使用 read_file 先查看文件内容，然后复制确切的内容作为 old_string。",
 		)
 	}
 
-	// 3. 检查是否有多个匹配
-	count := strings.Count(content, args.OldString)
+	// 4. 检查是否有多个匹配
+	count := strings.Count(baseContent, args.OldString)
 	if count > 1 {
 		return "", fmt.Errorf(
 			"找到 %d 个匹配项，无法确定要替换哪一个。\n"+
@@ -147,22 +172,31 @@ func (te *ToolExecutor) editFile(args FileOperationArgs) (string, error) {
 		)
 	}
 
-	// 4. 执行替换
-	newContent := strings.Replace(content, args.OldString, args.NewString, 1)
+	// 5. 执行替换（基于baseContent）
+	newContent := strings.Replace(baseContent, args.OldString, args.NewString, 1)
 
-	// 5. 计算差异操作
-	operations := te.computeOperations(content, newContent, args.OldString, args.NewString)
+	// 6. 计算差异操作（重要：显示从磁盘到最终pending的累计变化）
+	operations := te.computeFullDiff(diskContentStr, newContent)
 
-	// 6. 返回pending状态（前端负责显示和确认）
+	// 6. 保存到pending状态
+	// toolCallID使用 messageID + 文件路径的组合来保证唯一性
+	toolCallID := fmt.Sprintf("%s_%s", messageID, filepath.Base(args.FilePath))
+
+	if err := manager.AddVersion(conversationID, args.FilePath, toolCallID, newContent, messageID); err != nil {
+		return "", fmt.Errorf("保存pending状态失败: %v", err)
+	}
+
+	// 7. 返回pending状态（前端负责显示和确认）
 	result := map[string]interface{}{
-		"success":     true,
-		"status":      "pending",
-		"action":      "edit",
-		"type":        "edit",
-		"server_id":   args.ServerID,
-		"file_path":   args.FilePath,
-		"new_content": newContent, // 完整的新文件内容，供前端确认后写入
-		"operations":  operations,
+		"success":      true,
+		"status":       "pending",
+		"action":       "edit",
+		"type":         "edit",
+		"server_id":    args.ServerID,
+		"file_path":    args.FilePath,
+		"new_content":  newContent, // 完整的新文件内容，供前端确认后写入
+		"operations":   operations,
+		"tool_call_id": toolCallID,
 		"summary": fmt.Sprintf(
 			"等待用户确认: %s (%d 行修改)",
 			filepath.Base(args.FilePath),
@@ -208,36 +242,61 @@ func (te *ToolExecutor) listDir(args FileOperationArgs) (string, error) {
 	return string(resultJSON), nil
 }
 
-// computeOperations 计算编辑操作（找出修改的具体行）
-func (te *ToolExecutor) computeOperations(oldContent, newContent, oldStr, newStr string) []Operation {
+// computeFullDiff 计算完整文件的差异（显示累计变化）
+func (te *ToolExecutor) computeFullDiff(oldContent, newContent string) []Operation {
 	oldLines := strings.Split(oldContent, "\n")
-	oldStrLines := strings.Split(oldStr, "\n")
+	newLines := strings.Split(newContent, "\n")
 
 	operations := []Operation{}
 
-	// 查找 oldStr 在原文件中的起始行
-	for i := 0; i <= len(oldLines)-len(oldStrLines); i++ {
-		match := true
-		for j := 0; j < len(oldStrLines); j++ {
-			if i+j >= len(oldLines) || oldLines[i+j] != oldStrLines[j] {
-				match = false
-				break
-			}
+	// 简单的逐行对比，找出所有不同的行
+	maxLines := len(oldLines)
+	if len(newLines) > maxLines {
+		maxLines = len(newLines)
+	}
+
+	// 找出连续的变化块
+	i := 0
+	for i < maxLines {
+		// 跳过相同的行
+		for i < len(oldLines) && i < len(newLines) && oldLines[i] == newLines[i] {
+			i++
 		}
 
-		if match {
-			// 找到匹配位置
-			startLine := i + 1 // 1-indexed
-			endLine := i + len(oldStrLines)
+		if i >= maxLines {
+			break
+		}
 
+		// 找到变化的起始
+		startLine := i + 1 // 1-indexed
+		oldBlock := []string{}
+		newBlock := []string{}
+
+		// 收集连续变化的行
+		for i < len(oldLines) && i < len(newLines) && oldLines[i] != newLines[i] {
+			oldBlock = append(oldBlock, oldLines[i])
+			newBlock = append(newBlock, newLines[i])
+			i++
+		}
+
+		// 处理剩余的行（删除或添加）
+		for i < len(oldLines) {
+			oldBlock = append(oldBlock, oldLines[i])
+			i++
+		}
+		for i < len(newLines) {
+			newBlock = append(newBlock, newLines[i])
+			i++
+		}
+
+		if len(oldBlock) > 0 || len(newBlock) > 0 {
 			operations = append(operations, Operation{
 				Type:      "replace",
 				StartLine: startLine,
-				EndLine:   endLine,
-				OldText:   oldStr,
-				NewText:   newStr,
+				EndLine:   startLine + len(oldBlock) - 1,
+				OldText:   strings.Join(oldBlock, "\n"),
+				NewText:   strings.Join(newBlock, "\n"),
 			})
-			break
 		}
 	}
 

@@ -227,8 +227,8 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 					"arguments":    functionArgs,
 				})
 
-				// 执行工具
-				result := h.executeToolCall(functionName, functionArgs)
+				// 执行工具（传递sessionID和messageID）
+				result := h.executeToolCall(functionName, functionArgs, req.SessionID, toolCallID)
 
 				// 如果是file_operation且类型为edit，解析结果并发送edit_preview
 				if functionName == "file_operation" {
@@ -527,11 +527,11 @@ func (h *AIChatHandler) streamChatWithTools(
 }
 
 // executeToolCall 执行工具调用
-func (h *AIChatHandler) executeToolCall(toolName, argsJSON string) string {
-	log.Printf("🔧 执行工具: %s, 参数: %s", toolName, argsJSON)
+func (h *AIChatHandler) executeToolCall(toolName, argsJSON string, conversationID string, messageID string) string {
+	log.Printf("🔧 执行工具: %s, conversationID: %s, messageID: %s", toolName, conversationID, messageID)
 
 	// 使用统一工具执行器
-	result, err := h.toolExecutor.Execute(toolName, argsJSON)
+	result, err := h.toolExecutor.Execute(toolName, argsJSON, conversationID, messageID)
 	if err != nil {
 		log.Printf("❌ 工具执行失败: %v", err)
 		// 返回错误信息给AI（使用json.Marshal正确转义）

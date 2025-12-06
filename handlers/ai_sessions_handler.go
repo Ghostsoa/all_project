@@ -1,9 +1,11 @@
 package handlers
 
 import (
+	"all_project/models"
 	"all_project/storage"
 	"crypto/rand"
 	"encoding/hex"
+	"log"
 	"net/http"
 	"strconv"
 
@@ -224,6 +226,34 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 		return
 	}
 
+	// 1. 先获取要删除的消息列表（用于清理pending状态）
+	messages, err := storage.GetMessages(req.SessionID, 0) // limit=0表示获取所有消息
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
+		return
+	}
+
+	// 2. 提取被删除消息中的tool_call_id（messageIndex及之后的）
+	pendingManager := models.GetPendingStateManager()
+	for i := req.MessageIndex; i < len(messages); i++ {
+		msg := messages[i]
+		// 对于assistant消息，从ToolCalls中提取tool_call_id
+		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 {
+			for _, toolCall := range msg.ToolCalls {
+				// 提取tool_call的id
+				if toolCallID, ok := toolCall["id"].(string); ok && toolCallID != "" {
+					// 使用tool_call_id作为messageID清理pending
+					if err := pendingManager.RemoveVersionsByMessageID(req.SessionID, toolCallID); err != nil {
+						log.Printf("⚠️ 清理pending失败 (toolCallID: %s): %v", toolCallID, err)
+					} else {
+						log.Printf("🧹 已清理pending状态 (toolCallID: %s)", toolCallID)
+					}
+				}
+			}
+		}
+	}
+
+	// 3. 执行消息撤销
 	if err := storage.RevokeMessagesFromIndex(req.SessionID, req.MessageIndex); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
