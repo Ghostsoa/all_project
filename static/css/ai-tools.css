@@ -295,19 +295,55 @@
     margin-left: 3px;
 }
 
-/* Inline 删除标记（红色"-"） */
-.diff-inline-deleted-marker {
-    color: #ef4444 !important;
-    font-weight: bold;
-    margin-right: 4px;
+/* Zone Widget 容器 */
+.diff-zone-widget {
+    background-color: rgba(30, 30, 30, 0.95);
+    border-left: 3px solid #eab308;
+    padding: 4px 0;
+    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
+    font-size: 13px;
+    line-height: 18px;
 }
 
-/* Inline 添加内容（绿色"→ xxx"） */
-.diff-inline-added {
-    color: #10b981 !important;
+/* Zone Widget 中的每一行 */
+.diff-zone-line {
+    padding: 2px 40px 2px 10px;
+    display: flex;
+    align-items: center;
+}
+
+/* 删除行（红色） */
+.diff-zone-deleted {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
+}
+
+/* 添加行（绿色） */
+.diff-zone-added {
     background-color: rgba(16, 185, 129, 0.15);
-    padding: 2px 6px;
-    border-radius: 3px;
-    margin-left: 8px;
-    font-style: italic;
+    color: #6ee7b7;
+}
+
+/* +/- 标记 */
+.diff-zone-marker {
+    display: inline-block;
+    width: 20px;
+    text-align: center;
+    font-weight: bold;
+    margin-right: 8px;
+}
+
+.diff-zone-deleted .diff-zone-marker {
+    color: #ef4444;
+}
+
+.diff-zone-added .diff-zone-marker {
+    color: #10b981;
+}
+
+/* 内容 */
+.diff-zone-content {
+    flex: 1;
+    white-space: pre;
+    overflow-x: auto;
 }

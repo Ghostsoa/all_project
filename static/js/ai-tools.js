@@ -595,51 +595,78 @@ class AIToolsManager {
         
         console.log('📝 处理operations:', operations.length, '个操作');
         
+        // 收集zone widgets
+        const zoneWidgets = [];
+        
         operations.forEach((op, index) => {
             const { type, start_line, end_line, old_text, new_text } = op;
             console.log(`  操作 ${index + 1}:`, { type, start_line, end_line, old_text, new_text });
             
             if (type === 'replace') {
-                // 修改行装饰（包含详细的diff信息）
+                // 修改行装饰
                 decorations.push({
                     range: new monaco.Range(start_line, 1, start_line, model.getLineMaxColumn(start_line)),
                     options: {
                         isWholeLine: true,
                         className: 'diff-line-modified',
                         glyphMarginClassName: 'diff-glyph-modified',
-                        glyphMarginHoverMessage: { 
-                            value: `**将会修改此行:**\n\n**旧:** \`${old_text}\`\n\n**新:** \`${new_text}\`` 
-                        },
-                        hoverMessage: [
-                            { value: `**📝 待修改:**` },
-                            { value: `\`\`\`diff\n- ${old_text}\n+ ${new_text}\n\`\`\`` }
-                        ],
                         minimap: {
                             color: '#eab308',
                             position: monaco.editor.MinimapPosition.Inline
                         }
                     }
                 });
+                
+                // 创建Zone Widget显示diff
+                const domNode = document.createElement('div');
+                domNode.className = 'diff-zone-widget';
+                domNode.innerHTML = `
+                    <div class="diff-zone-line diff-zone-deleted">
+                        <span class="diff-zone-marker">−</span>
+                        <span class="diff-zone-content">${this.escapeHtml(old_text)}</span>
+                    </div>
+                    <div class="diff-zone-line diff-zone-added">
+                        <span class="diff-zone-marker">+</span>
+                        <span class="diff-zone-content">${this.escapeHtml(new_text)}</span>
+                    </div>
+                `;
+                
+                const zoneWidget = {
+                    domNode: domNode,
+                    afterLineNumber: start_line,
+                    heightInLines: 2,
+                    suppressMouseDown: true
+                };
+                
+                zoneWidgets.push(zoneWidget);
             }
         });
 
         console.log('🎨 应用', decorations.length, '个装饰');
-        console.log('📋 装饰详情:', decorations);
         
-        // 应用装饰并保存ID（用于后续清除）
+        // 应用装饰
         const decorationIds = editor.deltaDecorations([], decorations);
         console.log('✅ 装饰已应用，ID:', decorationIds);
         
-        // 验证装饰是否正确应用
-        const appliedDecorations = editor.getModel().getAllDecorations();
-        console.log('🔍 编辑器中的所有装饰:', appliedDecorations.filter(d => decorationIds.includes(d.id)));
+        // 应用View Zones（在行下方插入diff显示）
+        const zoneIds = [];
+        if (zoneWidgets.length > 0) {
+            editor.changeViewZones((changeAccessor) => {
+                zoneWidgets.forEach(zone => {
+                    const id = changeAccessor.addZone(zone);
+                    zoneIds.push(id);
+                    console.log('✅ Zone Widget已添加，ID:', id);
+                });
+            });
+        }
         
-        // 保存装饰ID到编辑信息中
+        // 保存装饰ID和Zone IDs到编辑信息中
         const edit = this.pendingEdits.get(toolCallId);
         if (edit) {
             edit.decorationIds = decorationIds;
+            edit.zoneIds = zoneIds;
             edit.editorInstance = editor;
-            console.log('✅ 装饰ID已保存到edit对象');
+            console.log('✅ 装饰ID和Zone IDs已保存到edit对象');
         }
     }
     
@@ -857,9 +884,21 @@ class AIToolsManager {
      */
     clearDiffDecorations(toolCallId) {
         const edit = this.pendingEdits.get(toolCallId);
-        if (edit && edit.editorInstance && edit.decorationIds) {
-            edit.editorInstance.deltaDecorations(edit.decorationIds, []);
-            delete edit.decorationIds;
+        if (edit && edit.editorInstance) {
+            // 清除装饰
+            if (edit.decorationIds) {
+                edit.editorInstance.deltaDecorations(edit.decorationIds, []);
+                delete edit.decorationIds;
+            }
+            // 清除View Zones
+            if (edit.zoneIds && edit.zoneIds.length > 0) {
+                edit.editorInstance.changeViewZones((changeAccessor) => {
+                    edit.zoneIds.forEach(id => {
+                        changeAccessor.removeZone(id);
+                    });
+                });
+                delete edit.zoneIds;
+            }
             delete edit.editorInstance;
         }
     }
