@@ -512,7 +512,10 @@ class AIToolsManager {
             
             // 1. 获取当前 sessionID
             const sessionID = this.getCurrentSessionId();
+            console.log('🔑 获取到的sessionID:', sessionID);
+            
             if (!sessionID) {
+                console.error('❌ sessionID为空，无法打开文件');
                 this.showToast('无法获取当前会话ID', 'error');
                 return;
             }
@@ -843,7 +846,11 @@ class AIToolsManager {
         if (window.getCurrentSessionID) {
             return window.getCurrentSessionID();
         }
-        return null;
+        
+        // 如果无法获取，且serverId是local，返回'local'
+        // 这是临时解决方案，因为 filetree 的 getCurrentSessionID 没有暴露到 window
+        console.warn('⚠️ window.getCurrentSessionID 不存在，假设为本地模式');
+        return 'local';
     }
 
     /**
