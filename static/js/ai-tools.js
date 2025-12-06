@@ -1328,17 +1328,23 @@ class AIToolsManager {
      * 获取当前服务器 ID
      */
     getCurrentServerId() {
-        // 检查是否是本地模式（sessionID为'local'表示本地）
-        const sessionId = this.getCurrentSessionId();
-        if (sessionId === 'local') {
-            return 'local';
+        // 检查是否是本地模式（从filetree获取sessionID）
+        if (window.getCurrentSessionID) {
+            const sessionId = window.getCurrentSessionID();
+            console.log('🔍 filetree sessionID:', sessionId);
+            if (sessionId === 'local') {
+                return 'local';
+            }
         }
         
         // 从全局函数获取远程服务器ID
         if (window.getCurrentServerID) {
-            return window.getCurrentServerID();
+            const serverId = window.getCurrentServerID();
+            console.log('🔍 remote serverId:', serverId);
+            return serverId;
         }
         
+        console.log('❌ 无法获取serverId');
         return null;
     }
 
