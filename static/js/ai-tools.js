@@ -160,14 +160,43 @@ class AIToolsManager {
      * 渲染 list 工具
      */
     renderListTool(result) {
-        const { path, count } = result;
+        const { path, count, files = [] } = result;
         const dirName = path.split('/').pop() || path;
+        
+        // 生成唯一ID用于折叠
+        const resultId = `list-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        // 渲染文件列表
+        let filesHTML = '';
+        if (files.length > 0) {
+            filesHTML = files.map(file => {
+                const icon = file.isDir ? 'fa-folder' : 'fa-file';
+                const sizeText = file.isDir ? 'dir' : this.formatSize(file.size);
+                
+                return `
+                    <div class="find-file-item">
+                        <i class="fa-solid ${icon} find-file-icon"></i>
+                        <span class="find-file-path">${file.name}</span>
+                        <span class="find-file-size">${sizeText}</span>
+                    </div>
+                `;
+            }).join('');
+        }
         
         return `
             <div class="tool-call">
-                <div class="tool-simple completed">
-                    <i class="fa-solid fa-folder-open tool-simple-icon"></i>
-                    List <strong>${dirName}</strong> (${count} items)
+                <div class="tool-result-expandable">
+                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
+                        <i class="fa-solid fa-folder-open tool-result-icon"></i>
+                        <span class="tool-result-title">
+                            list "<strong>${dirName}</strong>"
+                        </span>
+                        <span class="tool-result-count">${count} items</span>
+                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
+                    </div>
+                    <div class="tool-result-content" id="${resultId}">
+                        ${filesHTML || '<div class="grep-no-matches">Empty directory</div>'}
+                    </div>
                 </div>
             </div>
         `;
