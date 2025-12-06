@@ -576,11 +576,12 @@ class AIToolsManager {
     applyDiffDecorations(filePath, operations, toolCallId) {
         console.log('🎨 applyDiffDecorations:', { filePath, operations, toolCallId });
         
-        // 先清除旧的装饰（如果存在）
-        const existingEdit = this.pendingEdits.get(toolCallId);
-        if (existingEdit && existingEdit.zoneIds) {
-            console.log('🧹 清除已存在的Zone装饰');
-            this.clearDiffDecorations(toolCallId);
+        // 先清除同一文件的所有pending装饰（避免叠加显示）
+        for (const [existingToolCallId, edit] of this.pendingEdits.entries()) {
+            if (edit.file_path === filePath && edit.status === 'pending' && edit.zoneIds) {
+                console.log('🧹 清除旧的diff装饰:', existingToolCallId);
+                this.clearDiffDecorations(existingToolCallId);
+            }
         }
         
         // 获取对应的编辑器实例
