@@ -625,16 +625,19 @@ class AIToolsManager {
                 // 计算新内容的行数
                 const newLines = new_text.split('\n');
                 const lineCount = newLines.length;
+                console.log(`📏 新内容有 ${lineCount} 行:`, newLines);
                 
                 // 创建Zone Widget显示绿色添加行
                 const domNode = document.createElement('div');
                 domNode.className = 'diff-zone-widget';
                 
                 // 为每一行创建一个div
-                const linesHtml = newLines.map(line => 
-                    `<div class="diff-zone-line diff-zone-added">${this.escapeHtml(line)}</div>`
-                ).join('');
+                const linesHtml = newLines.map((line, idx) => {
+                    console.log(`  行 ${idx + 1}: "${line}"`);
+                    return `<div class="diff-zone-line diff-zone-added">${this.escapeHtml(line)}</div>`;
+                }).join('');
                 domNode.innerHTML = linesHtml;
+                console.log('📦 Zone HTML:', domNode.innerHTML.substring(0, 200));
                 
                 const zoneWidget = {
                     domNode: domNode,

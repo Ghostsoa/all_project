@@ -299,7 +299,7 @@
 .diff-zone-widget {
     background-color: transparent;
     padding: 0;
-    margin-left: 0;
+    margin: 0;
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
     font-size: 14px;
     line-height: 20px;
@@ -308,9 +308,11 @@
 /* Zone Widget 中的每一行 */
 .diff-zone-line {
     display: block;
-    height: 20px;
+    min-height: 20px;
     line-height: 20px;
     white-space: pre;
+    padding: 0;
+    margin: 0;
 }
 
 /* 添加行（绿色） */
