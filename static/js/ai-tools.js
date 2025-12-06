@@ -644,9 +644,15 @@ class AIToolsManager {
         });
 
         console.log('🎨 应用', decorations.length, '个装饰');
+        console.log('📋 装饰详情:', decorations);
+        
         // 应用装饰并保存ID（用于后续清除）
         const decorationIds = editor.deltaDecorations([], decorations);
         console.log('✅ 装饰已应用，ID:', decorationIds);
+        
+        // 验证装饰是否正确应用
+        const appliedDecorations = editor.getModel().getAllDecorations();
+        console.log('🔍 编辑器中的所有装饰:', appliedDecorations.filter(d => decorationIds.includes(d.id)));
         
         // 保存装饰ID到编辑信息中
         const edit = this.pendingEdits.get(toolCallId);
@@ -829,10 +835,13 @@ class AIToolsManager {
             });
             
             if (edit.file_path === filePath && edit.server_id === serverId) {
-                console.log('✅ 找到匹配的pending edit，自动应用diff');
+                console.log('✅ 找到匹配的pending edit，延迟应用diff');
                 found = true;
-                // 自动显示 diff
-                this.applyDiffDecorations(filePath, edit.operations, toolCallId);
+                // 延迟应用 diff，等待编辑器完全初始化
+                setTimeout(() => {
+                    console.log('⏰ 延迟后应用diff');
+                    this.applyDiffDecorations(filePath, edit.operations, toolCallId);
+                }, 500);
             }
         }
         

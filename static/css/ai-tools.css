@@ -282,63 +282,27 @@
 
 /* ==================== Monaco Diff 装饰样式 ==================== */
 
-/* 删除的行（红色） */
-.diff-line-deleted {
-    background-color: rgba(239, 68, 68, 0.15);
-    border-left: 3px solid #ef4444;
-    text-decoration: line-through;
-    opacity: 0.7;
-}
-
-/* 删除行的 Glyph */
-.diff-glyph-deleted {
-    background-color: #ef4444;
-    width: 4px !important;
-    margin-left: 3px;
-}
-
-/* 添加的行（绿色，inline显示） */
-.diff-line-added-inline {
-    color: #10b981 !important;
-    background-color: rgba(16, 185, 129, 0.15);
-    padding: 2px 6px;
-    border-radius: 3px;
-    margin-left: 8px;
-    font-style: italic;
-}
-
-/* 添加的行（Content Widget） */
-.diff-added-line {
-    background-color: rgba(16, 185, 129, 0.15);
-    border-left: 3px solid #10b981;
-    padding: 2px 8px;
-    margin: 2px 0;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-    font-size: 13px;
-    color: #10b981;
-    line-height: 1.5;
-}
-
-.diff-line-prefix {
-    margin-right: 8px;
-    font-weight: bold;
-    color: #10b981;
-}
-
-/* 修改的行（蓝色） */
+/* 修改的行（黄色背景） */
 .diff-line-modified {
     background-color: rgba(234, 179, 8, 0.1);
     border-left: 3px solid #eab308;
 }
 
-/* Inline 删除标记 */
+/* Glyph 图标（行号旁边的标记） */
+.diff-glyph-modified {
+    background-color: #eab308;
+    width: 4px !important;
+    margin-left: 3px;
+}
+
+/* Inline 删除标记（红色"-"） */
 .diff-inline-deleted-marker {
     color: #ef4444 !important;
     font-weight: bold;
     margin-right: 4px;
 }
 
-/* Inline 添加内容 */
+/* Inline 添加内容（绿色"→ xxx"） */
 .diff-inline-added {
     color: #10b981 !important;
     background-color: rgba(16, 185, 129, 0.15);
@@ -346,11 +310,4 @@
     border-radius: 3px;
     margin-left: 8px;
     font-style: italic;
-}
-
-/* Glyph 图标（行号旁边的标记） */
-.diff-glyph-modified {
-    background-color: #3b82f6;
-    width: 4px !important;
-    margin-left: 3px;
 }
