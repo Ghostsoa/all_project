@@ -610,11 +610,42 @@ class AIToolsManager {
             console.log(`  操作 ${index + 1}:`, { type, start_line, end_line, old_text, new_text });
             
             if (type === 'replace') {
-                // 计算内容的行数
                 const oldLines = old_text.split('\n');
                 const newLines = new_text.split('\n');
-                const lineCount = Math.max(oldLines.length, newLines.length);
-                console.log(`📏 内容有 ${lineCount} 行`);
+                const maxLines = Math.max(oldLines.length, newLines.length);
+                
+                // 找出所有有变化的行的索引
+                const changedIndices = [];
+                for (let idx = 0; idx < maxLines; idx++) {
+                    const oldLine = oldLines[idx] || '';
+                    const newLine = newLines[idx] || '';
+                    if (oldLine !== newLine) {
+                        changedIndices.push(idx);
+                    }
+                }
+                
+                if (changedIndices.length === 0) {
+                    console.log('⚠️ 没有变化的行');
+                    return;
+                }
+                
+                // 把连续的变化行分组
+                const groups = [];
+                let currentGroup = [changedIndices[0]];
+                
+                for (let i = 1; i < changedIndices.length; i++) {
+                    if (changedIndices[i] === changedIndices[i-1] + 1) {
+                        // 连续
+                        currentGroup.push(changedIndices[i]);
+                    } else {
+                        // 不连续，开始新组
+                        groups.push(currentGroup);
+                        currentGroup = [changedIndices[i]];
+                    }
+                }
+                groups.push(currentGroup);
+                
+                console.log(`� 找到 ${groups.length} 组变化:`, groups);
                 
                 // 获取编辑器的字体配置
                 const editorOptions = editor.getOptions();
@@ -622,70 +653,60 @@ class AIToolsManager {
                 const fontFamily = editorOptions.get(monaco.editor.EditorOption.fontFamily);
                 const lineHeight = editorOptions.get(monaco.editor.EditorOption.lineHeight);
                 
-                console.log('🎨 编辑器字体配置:', { fontSize, fontFamily, lineHeight });
-                
-                // 创建Zone Widget显示绿色添加行
-                const domNode = document.createElement('div');
-                domNode.className = 'diff-zone-widget';
-                
-                // 动态设置字体样式
-                domNode.style.fontSize = `${fontSize}px`;
-                domNode.style.fontFamily = fontFamily;
-                domNode.style.lineHeight = `${lineHeight}px`;
-                
-                // 为每一行创建红色删除和绿色添加的配对
-                const linesHtml = [];
-                const maxLines = Math.max(oldLines.length, newLines.length);
-                
-                for (let idx = 0; idx < maxLines; idx++) {
-                    const oldLine = oldLines[idx] || '';
-                    const newLine = newLines[idx] || '';
+                // 为每组创建一个Zone
+                groups.forEach((group, groupIdx) => {
+                    const firstIdx = group[0];
+                    const lastIdx = group[group.length - 1];
                     
-                    if (oldLine && newLine) {
-                        // 有旧有新，计算diff
-                        const diff = this.computeCharDiff(oldLine, newLine);
-                        if (diff.hasChanges) {
-                            // 只有真正有变化才显示
-                            linesHtml.push(`<div class="diff-zone-line diff-zone-deleted">${diff.oldHtml}</div>`);
-                            linesHtml.push(`<div class="diff-zone-line diff-zone-added">${diff.newHtml}</div>`);
+                    // 隐藏这组的原始行
+                    for (let idx = firstIdx; idx <= lastIdx; idx++) {
+                        if (idx < (end_line - start_line + 1)) {
+                            const lineNum = start_line + idx;
+                            decorations.push({
+                                range: new monaco.Range(lineNum, 1, lineNum, model.getLineMaxColumn(lineNum)),
+                                options: {
+                                    isWholeLine: true,
+                                    className: 'diff-line-hidden-for-zone'
+                                }
+                            });
                         }
-                        // 完全相同的行不显示
-                    } else if (oldLine) {
-                        // 只有旧行，纯删除
-                        linesHtml.push(`<div class="diff-zone-line diff-zone-deleted">${this.escapeHtml(oldLine)}</div>`);
-                    } else if (newLine) {
-                        // 只有新行，纯添加
-                        linesHtml.push(`<div class="diff-zone-line diff-zone-added">${this.escapeHtml(newLine)}</div>`);
                     }
-                }
-                
-                // 只有真正有变化才创建Zone并隐藏原始行
-                if (linesHtml.length > 0) {
+                    
+                    // 创建Zone显示这组的diff
+                    const domNode = document.createElement('div');
+                    domNode.className = 'diff-zone-widget';
+                    domNode.style.fontSize = `${fontSize}px`;
+                    domNode.style.fontFamily = fontFamily;
+                    domNode.style.lineHeight = `${lineHeight}px`;
+                    
+                    const linesHtml = [];
+                    for (const idx of group) {
+                        const oldLine = oldLines[idx] || '';
+                        const newLine = newLines[idx] || '';
+                        
+                        if (oldLine && newLine) {
+                            const { oldHtml, newHtml } = this.computeCharDiff(oldLine, newLine);
+                            linesHtml.push(`<div class="diff-zone-line diff-zone-deleted">${oldHtml}</div>`);
+                            linesHtml.push(`<div class="diff-zone-line diff-zone-added">${newHtml}</div>`);
+                        } else if (oldLine) {
+                            linesHtml.push(`<div class="diff-zone-line diff-zone-deleted">${this.escapeHtml(oldLine)}</div>`);
+                        } else if (newLine) {
+                            linesHtml.push(`<div class="diff-zone-line diff-zone-added">${this.escapeHtml(newLine)}</div>`);
+                        }
+                    }
+                    
                     domNode.innerHTML = linesHtml.join('');
-                    console.log('📦 Zone包含', linesHtml.length, '行变化');
+                    console.log(`📦 组 ${groupIdx + 1} 包含 ${linesHtml.length} 行HTML`);
                     
                     const zoneWidget = {
                         domNode: domNode,
-                        afterLineNumber: start_line - 1,  // 在删除区域之前插入Zone
-                        heightInLines: linesHtml.length,   // Zone实际HTML行数
+                        afterLineNumber: start_line + firstIdx - 1,
+                        heightInLines: linesHtml.length,
                         suppressMouseDown: true
                     };
                     
                     zoneWidgets.push(zoneWidget);
-                    
-                    // 隐藏原始行
-                    for (let line = start_line; line <= end_line; line++) {
-                        decorations.push({
-                            range: new monaco.Range(line, 1, line, model.getLineMaxColumn(line)),
-                            options: {
-                                isWholeLine: true,
-                                className: 'diff-line-hidden-for-zone'
-                            }
-                        });
-                    }
-                } else {
-                    console.log('⏭️ 没有实际变化，跳过Zone和decoration');
-                }
+                });
             }
         });
 
@@ -727,25 +748,20 @@ class AIToolsManager {
     }
     
     /**
-     * 智能计算字符级 diff - 只高亮真正变化的部分
+     * 计算逐字符 diff
      * @param {string} oldText 
      * @param {string} newText 
      * @returns {object} 包含高亮的HTML
      */
     computeCharDiff(oldText, newText) {
-        // 完全相同，不需要高亮
-        if (oldText === newText) {
-            return {
-                oldHtml: this.escapeHtml(oldText),
-                newHtml: this.escapeHtml(newText),
-                hasChanges: false
-            };
-        }
-        
+        // 简单的逐字符对比算法
         const oldChars = oldText.split('');
         const newChars = newText.split('');
         
-        // 找到公共前缀（相同的开头部分）
+        let oldHtml = '';
+        let newHtml = '';
+        
+        // 找到公共前缀
         let commonPrefix = 0;
         while (commonPrefix < oldChars.length && 
                commonPrefix < newChars.length && 
@@ -753,7 +769,7 @@ class AIToolsManager {
             commonPrefix++;
         }
         
-        // 找到公共后缀（相同的结尾部分）
+        // 找到公共后缀
         let commonSuffix = 0;
         while (commonSuffix < (oldChars.length - commonPrefix) && 
                commonSuffix < (newChars.length - commonPrefix) && 
@@ -761,28 +777,21 @@ class AIToolsManager {
             commonSuffix++;
         }
         
-        // 构建HTML - 只高亮中间变化的部分
-        const oldPrefix = oldChars.slice(0, commonPrefix).join('');
-        const oldMiddle = oldChars.slice(commonPrefix, oldChars.length - commonSuffix).join('');
-        const oldSuffix = oldChars.slice(oldChars.length - commonSuffix).join('');
-        
-        const newPrefix = newChars.slice(0, commonPrefix).join('');
-        const newMiddle = newChars.slice(commonPrefix, newChars.length - commonSuffix).join('');
-        const newSuffix = newChars.slice(newChars.length - commonSuffix).join('');
-        
-        let oldHtml = this.escapeHtml(oldPrefix);
-        if (oldMiddle) {
-            oldHtml += `<span class="diff-char-deleted">${this.escapeHtml(oldMiddle)}</span>`;
+        // 构建旧文本HTML（高亮变化部分）
+        oldHtml += this.escapeHtml(oldChars.slice(0, commonPrefix).join(''));
+        if (commonPrefix < oldChars.length - commonSuffix) {
+            oldHtml += `<span class="diff-char-deleted">${this.escapeHtml(oldChars.slice(commonPrefix, oldChars.length - commonSuffix).join(''))}</span>`;
         }
-        oldHtml += this.escapeHtml(oldSuffix);
+        oldHtml += this.escapeHtml(oldChars.slice(oldChars.length - commonSuffix).join(''));
         
-        let newHtml = this.escapeHtml(newPrefix);
-        if (newMiddle) {
-            newHtml += `<span class="diff-char-added">${this.escapeHtml(newMiddle)}</span>`;
+        // 构建新文本HTML（高亮变化部分）
+        newHtml += this.escapeHtml(newChars.slice(0, commonPrefix).join(''));
+        if (commonPrefix < newChars.length - commonSuffix) {
+            newHtml += `<span class="diff-char-added">${this.escapeHtml(newChars.slice(commonPrefix, newChars.length - commonSuffix).join(''))}</span>`;
         }
-        newHtml += this.escapeHtml(newSuffix);
+        newHtml += this.escapeHtml(newChars.slice(newChars.length - commonSuffix).join(''));
         
-        return { oldHtml, newHtml, hasChanges: true };
+        return { oldHtml, newHtml };
     }
 
     /**
