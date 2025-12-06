@@ -388,10 +388,34 @@ func executeSubmitResults(argsJSON string) (string, error) {
 
 // callCodeSearchLLM 调用LLM（使用CodeSearchModel）
 func callCodeSearchLLM(config *storage.AIConfig, messages []map[string]interface{}) ([]interface{}, string, error) {
-	// 获取Provider配置
-	provider, err := storage.GetProvider("default")
+	// 获取所有Provider
+	providers, err := storage.GetProviders()
 	if err != nil {
-		return nil, "", fmt.Errorf("获取Provider失败: %v", err)
+		return nil, "", fmt.Errorf("获取Providers失败: %v", err)
+	}
+	
+	if len(providers) == 0 {
+		return nil, "", fmt.Errorf("没有配置任何Provider")
+	}
+	
+	// 查找包含该模型的Provider
+	var provider *storage.Provider
+	for _, p := range providers {
+		for _, model := range p.Models {
+			if model.ID == config.CodeSearchModel {
+				provider = &p
+				break
+			}
+		}
+		if provider != nil {
+			break
+		}
+	}
+	
+	// 如果没找到，使用第一个Provider
+	if provider == nil {
+		log.Printf("⚠️ 未找到包含模型 %s 的Provider，使用第一个Provider", config.CodeSearchModel)
+		provider = &providers[0]
 	}
 
 	// 构建请求体（非流式）
