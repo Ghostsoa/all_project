@@ -1199,22 +1199,17 @@ async function streamChat(sessionId, message, thinkingId) {
                 if (data.type === 'content') {
                     let content = data.content;
                     
-                    // 🔧 过滤：如果是第一条内容
+                    // 🔧 过滤：如果是第一条内容，去掉开头的\n和纯空白
                     const isFirstContent = assistantMessage === '';
-                    if (isFirstContent) {
-                        // 1. 如果整个内容只有空白字符（\n、空格、tab等），跳过
-                        if (!content || content.trim() === '') {
-                            return; // 跳过纯空白内容
-                        }
-                        
-                        // 2. 去掉开头的\n（只去掉\n，保留有意义的空格）
+                    if (isFirstContent && content) {
+                        // 1. 去掉开头的所有\n
                         while (content.startsWith('\n')) {
                             content = content.substring(1);
                         }
                         
-                        // 3. 再次检查，如果去掉\n后只剩空白，跳过
-                        if (!content || content.trim() === '') {
-                            return;
+                        // 2. 如果去掉\n后只剩空白，清空为""（但继续渲染）
+                        if (content.trim() === '') {
+                            content = '';
                         }
                     }
                     
@@ -1270,30 +1265,28 @@ async function streamChat(sessionId, message, thinkingId) {
                     // 思维链内容
                     let newReasoning = data.reasoning_content || data.content || '';
                     
-                    // 🔧 过滤：如果是第一条reasoning
+                    // 🔧 过滤：如果是第一条reasoning，去掉开头的\n和纯空白
                     const isFirstReasoning = reasoningContent === '';
-                    if (isFirstReasoning) {
-                        // 1. 如果整个内容只有空白字符（\n、空格、tab等），跳过
-                        if (!newReasoning || newReasoning.trim() === '') {
-                            return; // 跳过纯空白内容
-                        }
-                        
-                        // 2. 去掉开头的\n（只去掉\n，保留有意义的空格）
+                    if (isFirstReasoning && newReasoning) {
+                        // 1. 去掉开头的所有\n
                         while (newReasoning.startsWith('\n')) {
                             newReasoning = newReasoning.substring(1);
                         }
                         
-                        // 3. 再次检查，如果去掉\n后只剩空白，跳过
-                        if (!newReasoning || newReasoning.trim() === '') {
-                            return;
+                        // 2. 如果去掉\n后只剩空白，清空为""（但继续渲染）
+                        if (newReasoning.trim() === '') {
+                            newReasoning = '';
                         }
                     }
                     
                     if (newReasoning) {
                         reasoningContent += newReasoning;
+                    } else if (isFirstReasoning && newReasoning === '') {
+                        // 第一条reasoning是空的，也继续（用于创建消息元素）
+                        reasoningContent = '';
                     } else {
                         console.warn('⚠️ 收到空的reasoning数据:', data);
-                        return; // 跳过空内容
+                        return; // 跳过后续的空内容
                     }
                     
                     // 如果还没有消息元素，将thinking转换为正式消息
@@ -1481,21 +1474,16 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
     const contentWrapper = document.createElement('div');
     contentWrapper.className = 'message-content-wrapper';  // 注意：这个类名在工具调用中也会使用
     
-    // 🔧 过滤reasoning：去掉开头\n和纯空白字符
+    // 🔧 过滤reasoning：去掉开头\n，纯空白时清空为""
     let filteredReasoning = reasoning;
     if (filteredReasoning) {
-        // 1. 如果整个内容只有空白字符，设为null
+        // 1. 去掉开头的所有\n
+        while (filteredReasoning.startsWith('\n')) {
+            filteredReasoning = filteredReasoning.substring(1);
+        }
+        // 2. 如果只剩空白，清空为""（而不是null）
         if (filteredReasoning.trim() === '') {
-            filteredReasoning = null;
-        } else {
-            // 2. 去掉开头的所有\n
-            while (filteredReasoning.startsWith('\n')) {
-                filteredReasoning = filteredReasoning.substring(1);
-            }
-            // 3. 再次检查是否为空
-            if (!filteredReasoning || filteredReasoning.trim() === '') {
-                filteredReasoning = null;
-            }
+            filteredReasoning = '';
         }
     }
     
@@ -1513,26 +1501,21 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
         contentWrapper.appendChild(reasoningDiv);
     }
     
-    // 🔧 过滤content：去掉开头\n和纯空白字符
+    // 🔧 过滤content：去掉开头\n，纯空白时清空为""
     let filteredContent = content;
     if (filteredContent && role !== 'user') {
-        // 1. 如果整个内容只有空白字符，设为null
+        // 1. 去掉开头的所有\n
+        while (filteredContent.startsWith('\n')) {
+            filteredContent = filteredContent.substring(1);
+        }
+        // 2. 如果只剩空白，清空为""（而不是null，继续渲染）
         if (filteredContent.trim() === '') {
-            filteredContent = null;
-        } else {
-            // 2. 去掉开头的所有\n
-            while (filteredContent.startsWith('\n')) {
-                filteredContent = filteredContent.substring(1);
-            }
-            // 3. 再次检查是否为空
-            if (!filteredContent || filteredContent.trim() === '') {
-                filteredContent = null;
-            }
+            filteredContent = '';
         }
     }
     
-    // 添加正文内容（如果有内容的话）
-    if (filteredContent || role === 'user') {
+    // 添加正文内容（user消息或有filteredContent时）
+    if (filteredContent !== null && filteredContent !== undefined || role === 'user') {
         const contentDiv = document.createElement('div');
         contentDiv.className = 'message-content';
         // 用户消息只做简单转义，AI消息应用Markdown渲染

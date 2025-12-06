@@ -5,7 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Web SSH 客户端管理</title>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🖥️</text></svg>">
-    <link rel="stylesheet" href="/static/vendor/xterm/css/xterm.min.css">
+    <!-- Xterm.js CDN -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/xterm@5.3.0/css/xterm.min.css">
     <!-- 模块化CSS -->
     <link rel="stylesheet" href="/static/css/base.css">
     <link rel="stylesheet" href="/static/css/layout.css">
@@ -22,12 +23,12 @@
     <link rel="stylesheet" href="/static/css/ai-settings.css">
     <link rel="stylesheet" href="/static/css/ai-tools.css">
     <link rel="stylesheet" href="/static/css/toast.css">
-    <!-- Devicon图标库 - 专业开发者图标 -->
-    <link rel="stylesheet" href="/static/vendor/devicon/devicon.min.css">
-    <!-- Font Awesome图标库 - 通用文件图标 -->
-    <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
-    <!-- Markdown代码高亮样式 -->
-    <link rel="stylesheet" href="/static/vendor/highlight.js/styles/github-dark.min.css">
+    <!-- Devicon CDN -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/devicon@2.16.0/devicon.min.css">
+    <!-- Font Awesome CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <!-- Highlight.js CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/github-dark.min.css">
 </head>
 <body>
     <div class="header">
@@ -475,14 +476,16 @@
     <!-- 上传进度容器 -->
     <div id="uploadProgressContainer" class="upload-progress-container"></div>
 
-    <script src="/static/vendor/xterm/lib/xterm.min.js"></script>
-    <script src="/static/vendor/xterm-addon-fit/lib/xterm-addon-fit.min.js"></script>
-    <script src="/static/vendor/xterm-addon-webgl/lib/xterm-addon-webgl.min.js"></script>
-    <script src="/static/vendor/monaco-editor/min/vs/loader.js"></script>
-    <!-- 代码高亮库 -->
-    <script src="/static/vendor/highlight.js/lib/highlight.min.js"></script>
-    <!-- Markdown解析库 -->
-    <script src="/static/vendor/marked/marked.min.js"></script>
+    <!-- Xterm.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/xterm@5.3.0/lib/xterm.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.8.0/lib/xterm-addon-fit.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xterm-addon-webgl@0.16.0/lib/xterm-addon-webgl.min.js"></script>
+    <!-- Monaco Editor CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
+    <!-- Highlight.js CDN -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    <!-- Marked.js CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
     <script>
         // 暴露hljs到window供Markdown使用
         if (typeof hljs !== 'undefined') {

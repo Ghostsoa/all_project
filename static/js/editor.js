@@ -123,7 +123,7 @@ function getFileIconHTML(fileName) {
 // 配置Monaco Editor（只配置一次）
 // 注意：require.config只能调用一次，否则会报错
 if (typeof require !== 'undefined' && typeof window.monaco === 'undefined') {
-    require.config({ paths: { vs: '/static/vendor/monaco-editor/min/vs' } });
+    require.config({ paths: { vs: 'https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs' } });
 }
 
 // 动态导入marked（使用本地文件）
