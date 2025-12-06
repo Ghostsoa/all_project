@@ -177,18 +177,19 @@ class AIToolsManager {
      * 渲染 list 工具
      */
     renderListTool(result) {
-        const { path, count, files = [], truncated, truncated_msg } = result;
-        const dirName = path.split('/').pop() || path;
+        const { file_path, items = [], truncated, truncated_msg } = result;
+        const count = items.length;
+        const dirName = file_path ? file_path.split('/').pop() || file_path : 'directory';
         
         // 生成唯一ID用于折叠
         const resultId = `list-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         
         // 渲染文件列表
         let filesHTML = '';
-        if (files.length > 0) {
-            filesHTML = files.map(file => {
-                const icon = file.isDir ? 'fa-folder' : 'fa-file';
-                const sizeText = file.isDir ? 'dir' : this.formatSize(file.size);
+        if (items.length > 0) {
+            filesHTML = items.map(file => {
+                const icon = file.is_dir ? 'fa-folder' : 'fa-file';
+                const sizeText = file.is_dir ? 'dir' : this.formatSize(file.size);
                 
                 return `
                     <div class="find-file-item">
