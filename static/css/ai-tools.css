@@ -311,6 +311,7 @@
     display: block;
     height: 20px;
     line-height: 20px;
+    padding-left: 58px;  /* 给文本内容留出行号区域 */
 }
 
 /* 添加行（绿色） */
@@ -319,10 +320,12 @@
     color: #6ee7b7;
 }
 
-/* +/- 标记 */
+/* +/- 标记（放在行号区域） */
 .diff-zone-marker {
     position: absolute;
-    left: 50px;
+    left: 6px;  /* 靠左，在行号区域 */
+    top: 0;
+    width: 10px;
     font-weight: bold;
     color: #10b981;
 }
