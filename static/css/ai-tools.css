@@ -282,17 +282,10 @@
 
 /* ==================== Monaco Diff 装饰样式 ==================== */
 
-/* 修改的行（黄色背景） */
-.diff-line-modified {
-    background-color: rgba(234, 179, 8, 0.1);
-    border-left: 3px solid #eab308;
-}
-
-/* Glyph 图标（行号旁边的标记） */
-.diff-glyph-modified {
-    background-color: #eab308;
-    width: 4px !important;
-    margin-left: 3px;
+/* 隐藏的行（被替换的原始行） */
+.diff-line-hidden {
+    opacity: 0.3;
+    background-color: rgba(100, 100, 100, 0.1);
 }
 
 /* Zone Widget 容器 */

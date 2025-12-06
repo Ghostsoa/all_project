@@ -603,21 +603,7 @@ class AIToolsManager {
             console.log(`  操作 ${index + 1}:`, { type, start_line, end_line, old_text, new_text });
             
             if (type === 'replace') {
-                // 修改行装饰
-                decorations.push({
-                    range: new monaco.Range(start_line, 1, start_line, model.getLineMaxColumn(start_line)),
-                    options: {
-                        isWholeLine: true,
-                        className: 'diff-line-modified',
-                        glyphMarginClassName: 'diff-glyph-modified',
-                        minimap: {
-                            color: '#eab308',
-                            position: monaco.editor.MinimapPosition.Inline
-                        }
-                    }
-                });
-                
-                // 创建Zone Widget显示diff
+                // 创建Zone Widget显示diff（只显示红色删除和绿色添加）
                 const domNode = document.createElement('div');
                 domNode.className = 'diff-zone-widget';
                 domNode.innerHTML = `
@@ -633,12 +619,21 @@ class AIToolsManager {
                 
                 const zoneWidget = {
                     domNode: domNode,
-                    afterLineNumber: start_line,
+                    afterLineNumber: start_line - 1,  // 在目标行之前插入
                     heightInLines: 2,
                     suppressMouseDown: true
                 };
                 
                 zoneWidgets.push(zoneWidget);
+                
+                // 隐藏原始行（让它看起来像被替换了）
+                decorations.push({
+                    range: new monaco.Range(start_line, 1, start_line, model.getLineMaxColumn(start_line)),
+                    options: {
+                        isWholeLine: true,
+                        className: 'diff-line-hidden'
+                    }
+                });
             }
         });
 
