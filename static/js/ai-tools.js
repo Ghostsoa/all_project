@@ -600,43 +600,23 @@ class AIToolsManager {
             console.log(`  操作 ${index + 1}:`, { type, start_line, end_line, old_text, new_text });
             
             if (type === 'replace') {
-                const lineContent = model.getLineContent(start_line);
-                
-                // 修改行（黄色/蓝色背景）
+                // 修改行装饰（包含详细的diff信息）
                 decorations.push({
                     range: new monaco.Range(start_line, 1, start_line, model.getLineMaxColumn(start_line)),
                     options: {
                         isWholeLine: true,
                         className: 'diff-line-modified',
                         glyphMarginClassName: 'diff-glyph-modified',
-                        minimap: {
-                            color: '#3b82f6',
-                            position: monaco.editor.MinimapPosition.Inline
+                        glyphMarginHoverMessage: { 
+                            value: `**将会修改此行:**\n\n**旧:** \`${old_text}\`\n\n**新:** \`${new_text}\`` 
                         },
-                        hoverMessage: { 
-                            value: `**修改:**\n\n删除: \`${old_text}\`\n\n添加: \`${new_text}\`` 
-                        }
-                    }
-                });
-                
-                // 在该行前面显示 "-" 和 "+" 标记
-                decorations.push({
-                    range: new monaco.Range(start_line, 1, start_line, 1),
-                    options: {
-                        before: {
-                            content: '- ',
-                            inlineClassName: 'diff-inline-deleted-marker',
-                            inlineClassNameAffectsLetterSpacing: true
-                        }
-                    }
-                });
-                
-                decorations.push({
-                    range: new monaco.Range(start_line, model.getLineMaxColumn(start_line), start_line, model.getLineMaxColumn(start_line)),
-                    options: {
-                        after: {
-                            content: ` → ${new_text}`,
-                            inlineClassName: 'diff-inline-added'
+                        hoverMessage: [
+                            { value: `**📝 待修改:**` },
+                            { value: `\`\`\`diff\n- ${old_text}\n+ ${new_text}\n\`\`\`` }
+                        ],
+                        minimap: {
+                            color: '#eab308',
+                            position: monaco.editor.MinimapPosition.Inline
                         }
                     }
                 });
