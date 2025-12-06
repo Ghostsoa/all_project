@@ -610,25 +610,36 @@ class AIToolsManager {
             console.log(`  操作 ${index + 1}:`, { type, start_line, end_line, old_text, new_text });
             
             if (type === 'replace') {
-                // 原始行显示为红色删除状态
-                decorations.push({
-                    range: new monaco.Range(start_line, 1, start_line, model.getLineMaxColumn(start_line)),
-                    options: {
-                        isWholeLine: true,
-                        className: 'diff-line-deleted',
-                        glyphMarginClassName: 'diff-glyph-deleted'
-                    }
-                });
+                // 标记删除的行范围（可能是多行）
+                for (let line = start_line; line <= end_line; line++) {
+                    decorations.push({
+                        range: new monaco.Range(line, 1, line, model.getLineMaxColumn(line)),
+                        options: {
+                            isWholeLine: true,
+                            className: 'diff-line-deleted',
+                            glyphMarginClassName: 'diff-glyph-deleted'
+                        }
+                    });
+                }
                 
-                // 创建Zone Widget只显示绿色添加行
+                // 计算新内容的行数
+                const newLines = new_text.split('\n');
+                const lineCount = newLines.length;
+                
+                // 创建Zone Widget显示绿色添加行
                 const domNode = document.createElement('div');
                 domNode.className = 'diff-zone-widget';
-                domNode.innerHTML = `<div class="diff-zone-line diff-zone-added">${this.escapeHtml(new_text)}</div>`;
+                
+                // 为每一行创建一个div
+                const linesHtml = newLines.map(line => 
+                    `<div class="diff-zone-line diff-zone-added">${this.escapeHtml(line)}</div>`
+                ).join('');
+                domNode.innerHTML = linesHtml;
                 
                 const zoneWidget = {
                     domNode: domNode,
-                    afterLineNumber: start_line,
-                    heightInLines: 1,
+                    afterLineNumber: end_line,  // 在删除区域的最后一行之后插入
+                    heightInLines: lineCount,
                     suppressMouseDown: true
                 };
                 
