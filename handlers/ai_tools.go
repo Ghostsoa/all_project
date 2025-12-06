@@ -279,14 +279,17 @@ func (te *ToolExecutor) computeFullDiff(oldContent, newContent string) []Operati
 			i++
 		}
 
-		// 处理剩余的行（删除或添加）
-		for i < len(oldLines) {
-			oldBlock = append(oldBlock, oldLines[i])
-			i++
-		}
-		for i < len(newLines) {
-			newBlock = append(newBlock, newLines[i])
-			i++
+		// 只在到达文件末尾时处理剩余的行（纯删除或纯添加）
+		if i >= len(oldLines) || i >= len(newLines) {
+			// 文件长度不同，处理剩余行
+			for i < len(oldLines) {
+				oldBlock = append(oldBlock, oldLines[i])
+				i++
+			}
+			for i < len(newLines) {
+				newBlock = append(newBlock, newLines[i])
+				i++
+			}
 		}
 
 		if len(oldBlock) > 0 || len(newBlock) > 0 {

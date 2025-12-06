@@ -976,8 +976,9 @@ class AIToolsManager {
             const result = await response.json();
             
             if (result.success) {
-                // 保存文件路径（用于查找剩余pending）
+                // 保存文件路径和服务器ID（用于刷新和查找剩余pending）
                 const filePath = edit.file_path;
+                const serverId = edit.server_id;
                 
                 // 更新 UI
                 this.updateToolStatus(toolCallId, 'rejected');
@@ -988,8 +989,18 @@ class AIToolsManager {
                 // 移除待处理列表
                 this.pendingEdits.delete(toolCallId);
                 
-                // 重新显示同一文件的剩余pending diff（如果有）
-                this.reapplyRemainingDiff(filePath);
+                // 刷新编辑器内容为磁盘文件（如果没有剩余pending）
+                const hasRemainingPending = Array.from(this.pendingEdits.values()).some(
+                    e => e.file_path === filePath && e.status === 'pending' && e.type === 'edit'
+                );
+                
+                if (hasRemainingPending) {
+                    // 有剩余pending，重新显示diff
+                    this.reapplyRemainingDiff(filePath);
+                } else {
+                    // 没有剩余pending，刷新编辑器内容为磁盘文件
+                    await this.refreshEditorContent(filePath, serverId);
+                }
                 
                 this.showToast('已拒绝编辑', 'info');
             } else {
@@ -1082,14 +1093,16 @@ class AIToolsManager {
                 i++;
             }
             
-            // 处理剩余行
-            while (i < oldLines.length) {
-                oldBlock.push(oldLines[i]);
-                i++;
-            }
-            while (i < newLines.length) {
-                newBlock.push(newLines[i]);
-                i++;
+            // 只在到达文件末尾时处理剩余行（纯删除或纯添加）
+            if (i >= oldLines.length || i >= newLines.length) {
+                while (i < oldLines.length) {
+                    oldBlock.push(oldLines[i]);
+                    i++;
+                }
+                while (i < newLines.length) {
+                    newBlock.push(newLines[i]);
+                    i++;
+                }
             }
             
             if (oldBlock.length > 0 || newBlock.length > 0) {
