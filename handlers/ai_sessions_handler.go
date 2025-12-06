@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -334,17 +335,44 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 	if len(fileAcceptedCount) > 0 {
 		historyManager := models.GetFileHistoryManager()
 		for filePath, count := range fileAcceptedCount {
-			log.Printf("📝 文件 %s 需要恢复 %d 次（撤销%d个accepted edit）", filePath, count, count)
+			log.Printf("========================================")
+			log.Printf("📝 开始恢复文件: %s", filePath)
+			log.Printf("📝 需要撤销 %d 个accepted edit，恢复 %d 次", count, count)
+
+			// 读取撤销前的文件内容
+			beforeContent, err := os.ReadFile(filePath)
+			if err != nil {
+				log.Printf("⚠️ 读取撤销前文件失败: %v", err)
+			} else {
+				log.Printf("🔍 撤销前文件内容 (%d字节):", len(beforeContent))
+				log.Printf("--- 开始 ---")
+				log.Printf("%s", string(beforeContent))
+				log.Printf("--- 结束 ---")
+			}
+
 			for i := 0; i < count; i++ {
+				log.Printf("🔄 第 %d/%d 次恢复...", i+1, count)
+
 				// 使用RestoreAndRemoveLatestVersion，恢复后删除该版本
 				// 这样下一次恢复时会恢复前一个版本
 				if err := historyManager.RestoreAndRemoveLatestVersion(filePath); err != nil {
 					log.Printf("⚠️ 恢复文件失败 (第%d次): %s, error: %v", i+1, filePath, err)
 					break
+				}
+
+				// 读取恢复后的文件内容
+				afterContent, err := os.ReadFile(filePath)
+				if err != nil {
+					log.Printf("⚠️ 读取恢复后文件失败: %v", err)
 				} else {
-					log.Printf("✅ 已恢复文件并删除历史版本 (第%d/%d次): %s", i+1, count, filePath)
+					log.Printf("✅ 第%d次恢复完成，当前文件内容 (%d字节):", i+1, len(afterContent))
+					log.Printf("--- 开始 ---")
+					log.Printf("%s", string(afterContent))
+					log.Printf("--- 结束 ---")
 				}
 			}
+
+			log.Printf("========================================")
 		}
 	}
 
