@@ -5,9 +5,11 @@ import (
 	"all_project/storage"
 	"encoding/json"
 	"fmt"
+	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 )
 
@@ -32,7 +34,7 @@ type Operation struct {
 
 // FileOperationArgs 文件操作参数（统一）
 type FileOperationArgs struct {
-	Type     string `json:"type"`      // "read", "write", "edit", "list"
+	Type     string `json:"type"`      // "read", "write", "edit", "list", "grep", "find"
 	ServerID string `json:"server_id"` // 服务器ID（必需）
 	FilePath string `json:"file_path"` // 文件/目录路径（必需）
 
@@ -42,6 +44,17 @@ type FileOperationArgs struct {
 	// edit 专用
 	OldString string `json:"old_string,omitempty"`
 	NewString string `json:"new_string,omitempty"`
+
+	// grep 专用
+	Query      string   `json:"query,omitempty"`       // 搜索内容
+	SearchPath string   `json:"search_path,omitempty"` // 搜索路径
+	IsRegex    bool     `json:"is_regex,omitempty"`    // 是否正则表达式
+	Includes   []string `json:"includes,omitempty"`    // 文件类型过滤（如 ["*.py", "*.js"]）
+
+	// find 专用
+	Pattern  string   `json:"pattern,omitempty"`   // 文件名匹配模式（如 "*.config.js"）
+	MaxDepth int      `json:"max_depth,omitempty"` // 最大搜索深度
+	Excludes []string `json:"excludes,omitempty"`  // 排除模式（如 ["node_modules", ".git"]）
 }
 
 // Execute 执行工具调用
@@ -70,6 +83,10 @@ func (te *ToolExecutor) fileOperation(argsJSON string, conversationID string, me
 		return te.editFile(args, conversationID, messageID)
 	case "list":
 		return te.listDir(args)
+	case "grep":
+		return te.grepSearch(args)
+	case "find":
+		return te.findByName(args)
 	default:
 		return "", fmt.Errorf("未知操作类型: %s", args.Type)
 	}
@@ -279,6 +296,206 @@ func (te *ToolExecutor) listDir(args FileOperationArgs) (string, error) {
 	return string(resultJSON), nil
 }
 
+// grepSearch 搜索文件内容（支持正则表达式和文件类型过滤）
+func (te *ToolExecutor) grepSearch(args FileOperationArgs) (string, error) {
+	searchPath := args.SearchPath
+	if searchPath == "" {
+		searchPath = args.FilePath // 兼容旧参数
+	}
+
+	// 编译正则表达式（如果需要）
+	var regex *regexp.Regexp
+	var err error
+	if args.IsRegex {
+		regex, err = regexp.Compile(args.Query)
+		if err != nil {
+			return "", fmt.Errorf("正则表达式错误: %v", err)
+		}
+	}
+
+	type Match struct {
+		FilePath string `json:"file_path"`
+		Line     int    `json:"line"`
+		Content  string `json:"content"`
+	}
+
+	matches := []Match{}
+	fileCount := 0
+
+	// 遍历目录
+	err = filepath.WalkDir(searchPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil // 跳过错误
+		}
+
+		// 跳过目录
+		if d.IsDir() {
+			return nil
+		}
+
+		// 文件类型过滤
+		if len(args.Includes) > 0 {
+			matched := false
+			for _, pattern := range args.Includes {
+				if m, _ := filepath.Match(pattern, filepath.Base(path)); m {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				return nil
+			}
+		}
+
+		// 读取文件
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil // 跳过无法读取的文件
+		}
+
+		// 搜索每一行
+		lines := strings.Split(string(content), "\n")
+		hasMatch := false
+
+		for lineNum, line := range lines {
+			matched := false
+			if args.IsRegex {
+				matched = regex.MatchString(line)
+			} else {
+				matched = strings.Contains(line, args.Query)
+			}
+
+			if matched {
+				matches = append(matches, Match{
+					FilePath: path,
+					Line:     lineNum + 1, // 1-indexed
+					Content:  strings.TrimSpace(line),
+				})
+				hasMatch = true
+			}
+
+			// 限制单个文件的匹配数量（避免过多输出）
+			if len(matches) >= 1000 {
+				break
+			}
+		}
+
+		if hasMatch {
+			fileCount++
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return "", fmt.Errorf("搜索失败: %v", err)
+	}
+
+	result := map[string]interface{}{
+		"success":     true,
+		"type":        "grep",
+		"server_id":   args.ServerID,
+		"query":       args.Query,
+		"path":        searchPath,
+		"is_regex":    args.IsRegex,
+		"file_count":  fileCount,
+		"match_count": len(matches),
+		"matches":     matches,
+	}
+
+	resultJSON, _ := json.Marshal(result)
+	return string(resultJSON), nil
+}
+
+// findByName 按文件名搜索（支持通配符和深度限制）
+func (te *ToolExecutor) findByName(args FileOperationArgs) (string, error) {
+	searchPath := args.SearchPath
+	if searchPath == "" {
+		searchPath = args.FilePath
+	}
+
+	type FileInfo struct {
+		Path  string `json:"path"`
+		IsDir bool   `json:"is_dir"`
+		Size  int64  `json:"size"`
+	}
+
+	results := []FileInfo{}
+	baseDepth := strings.Count(searchPath, string(filepath.Separator))
+
+	// 排除目录集合
+	excludeSet := make(map[string]bool)
+	for _, exclude := range args.Excludes {
+		excludeSet[exclude] = true
+	}
+
+	err := filepath.WalkDir(searchPath, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return nil
+		}
+
+		// 检查深度限制
+		if args.MaxDepth > 0 {
+			currentDepth := strings.Count(path, string(filepath.Separator)) - baseDepth
+			if currentDepth > args.MaxDepth {
+				if d.IsDir() {
+					return filepath.SkipDir
+				}
+				return nil
+			}
+		}
+
+		// 检查排除列表
+		name := d.Name()
+		if excludeSet[name] {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// 匹配文件名
+		matched, _ := filepath.Match(args.Pattern, name)
+		if matched {
+			info, _ := d.Info()
+			size := int64(0)
+			if info != nil {
+				size = info.Size()
+			}
+
+			results = append(results, FileInfo{
+				Path:  path,
+				IsDir: d.IsDir(),
+				Size:  size,
+			})
+		}
+
+		// 限制结果数量（避免过多）
+		if len(results) >= 500 {
+			return filepath.SkipAll
+		}
+
+		return nil
+	})
+
+	if err != nil {
+		return "", fmt.Errorf("查找失败: %v", err)
+	}
+
+	result := map[string]interface{}{
+		"success":   true,
+		"type":      "find",
+		"server_id": args.ServerID,
+		"pattern":   args.Pattern,
+		"path":      searchPath,
+		"count":     len(results),
+		"results":   results,
+	}
+
+	resultJSON, _ := json.Marshal(result)
+	return string(resultJSON), nil
+}
+
 // computeFullDiff 计算完整文件的差异（显示累计变化）
 func (te *ToolExecutor) computeFullDiff(oldContent, newContent string) []Operation {
 	oldLines := strings.Split(oldContent, "\n")
@@ -388,19 +605,21 @@ func GetToolsDefinition() []map[string]interface{} {
 			"type": "function",
 			"function": map[string]interface{}{
 				"name": "file_operation",
-				"description": "统一的文件操作工具，支持读取、写入、编辑、列出目录。通过 type 参数指定操作类型。" +
-					"支持多服务器操作。所有操作都需要 server_id 和 file_path。",
+				"description": "统一的文件操作工具，支持读取、写入、编辑、列出目录、搜索内容、查找文件。通过 type 参数指定操作类型。" +
+					"支持多服务器操作。所有操作都需要 server_id。",
 				"parameters": map[string]interface{}{
 					"type": "object",
 					"properties": map[string]interface{}{
 						"type": map[string]interface{}{
 							"type": "string",
-							"enum": []string{"read", "write", "edit", "list"},
+							"enum": []string{"read", "write", "edit", "list", "grep", "find"},
 							"description": "操作类型：\n" +
 								"- read: 读取文件内容\n" +
 								"- write: 创建或完全覆盖文件\n" +
 								"- edit: 精确编辑文件（搜索替换）\n" +
-								"- list: 列出目录内容",
+								"- list: 列出目录内容\n" +
+								"- grep: 搜索文件内容（支持正则）\n" +
+								"- find: 按文件名查找文件",
 						},
 						"server_id": map[string]interface{}{
 							"type":        "string",
@@ -428,8 +647,45 @@ func GetToolsDefinition() []map[string]interface{} {
 							"description": "【仅 type=edit 时需要】新内容。\n" +
 								"必须保持正确的缩进和格式。",
 						},
+						"query": map[string]interface{}{
+							"type": "string",
+							"description": "【仅 type=grep 时需要】搜索内容或正则表达式。\n" +
+								"如果 is_regex=true，将作为正则表达式处理。",
+						},
+						"search_path": map[string]interface{}{
+							"type": "string",
+							"description": "【仅 type=grep/find 时需要】搜索的目录路径。\n" +
+								"将递归搜索该目录下的所有文件。",
+						},
+						"is_regex": map[string]interface{}{
+							"type":        "boolean",
+							"description": "【仅 type=grep 时可选】是否将query作为正则表达式（默认false）。",
+						},
+						"includes": map[string]interface{}{
+							"type": "array",
+							"items": map[string]interface{}{
+								"type": "string",
+							},
+							"description": "【仅 type=grep 时可选】文件类型过滤（如 [\"*.py\", \"*.js\"]）。\n" +
+								"只搜索匹配这些模式的文件。",
+						},
+						"pattern": map[string]interface{}{
+							"type":        "string",
+							"description": "【仅 type=find 时需要】文件名匹配模式（支持通配符，如 \"*.config.js\"）。",
+						},
+						"max_depth": map[string]interface{}{
+							"type":        "integer",
+							"description": "【仅 type=find 时可选】最大搜索深度（默认无限制）。",
+						},
+						"excludes": map[string]interface{}{
+							"type": "array",
+							"items": map[string]interface{}{
+								"type": "string",
+							},
+							"description": "【仅 type=find 时可选】排除的目录名（如 [\"node_modules\", \".git\"]）。",
+						},
 					},
-					"required": []string{"type", "server_id", "file_path"},
+					"required": []string{"type", "server_id"},
 				},
 			},
 		},

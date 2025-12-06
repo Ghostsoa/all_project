@@ -83,6 +83,10 @@ class AIToolsManager {
                 return this.renderReadTool(toolResult);
             case 'list':
                 return this.renderListTool(toolResult);
+            case 'grep':
+                return this.renderGrepTool(toolResult);
+            case 'find':
+                return this.renderFindTool(toolResult);
             case 'edit':
                 return this.renderEditTool(toolResult, toolCallId);
             case 'write':
@@ -164,6 +168,97 @@ class AIToolsManager {
                 <div class="tool-simple completed">
                     <i class="fa-solid fa-folder-open tool-simple-icon"></i>
                     List <strong>${dirName}</strong> (${count} items)
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * 渲染 grep 工具（内容搜索）
+     */
+    renderGrepTool(result) {
+        const { query, path, file_count, match_count, matches = [], is_regex } = result;
+        const searchType = is_regex ? 'Regex' : 'Text';
+        
+        // 生成唯一ID用于折叠
+        const resultId = `grep-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        // 渲染匹配列表
+        let matchesHTML = '';
+        if (matches.length > 0) {
+            matchesHTML = matches.map(match => {
+                const relativePath = match.file_path.replace(/\\/g, '/');
+                const displayPath = relativePath.length > 60 ? '...' + relativePath.slice(-57) : relativePath;
+                return `
+                    <div class="grep-match-item">
+                        <span class="grep-match-path">${displayPath}</span>
+                        <span class="grep-match-line">#${match.line}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        return `
+            <div class="tool-call">
+                <div class="tool-result-expandable">
+                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
+                        <i class="fa-solid fa-magnifying-glass tool-result-icon"></i>
+                        <span class="tool-result-title">
+                            ${searchType} grep "<strong>${query}</strong>"
+                        </span>
+                        <span class="tool-result-count">${match_count} matches in ${file_count} files</span>
+                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
+                    </div>
+                    <div class="tool-result-content" id="${resultId}">
+                        ${matchesHTML || '<div class="grep-no-matches">No matches found</div>'}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
+    /**
+     * 渲染 find 工具（文件名查找）
+     */
+    renderFindTool(result) {
+        const { pattern, path, count, results = [] } = result;
+        
+        // 生成唯一ID用于折叠
+        const resultId = `find-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        
+        // 渲染文件列表
+        let filesHTML = '';
+        if (results.length > 0) {
+            filesHTML = results.map(file => {
+                const relativePath = file.path.replace(/\\/g, '/');
+                const displayPath = relativePath.length > 60 ? '...' + relativePath.slice(-57) : relativePath;
+                const icon = file.is_dir ? 'fa-folder' : 'fa-file';
+                const sizeText = file.is_dir ? 'dir' : this.formatSize(file.size);
+                
+                return `
+                    <div class="find-file-item">
+                        <i class="fa-solid ${icon} find-file-icon"></i>
+                        <span class="find-file-path">${displayPath}</span>
+                        <span class="find-file-size">${sizeText}</span>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        return `
+            <div class="tool-call">
+                <div class="tool-result-expandable">
+                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
+                        <i class="fa-solid fa-file-magnifying-glass tool-result-icon"></i>
+                        <span class="tool-result-title">
+                            find "<strong>${pattern}</strong>"
+                        </span>
+                        <span class="tool-result-count">${count} files</span>
+                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
+                    </div>
+                    <div class="tool-result-content" id="${resultId}">
+                        ${filesHTML || '<div class="grep-no-matches">No files found</div>'}
+                    </div>
                 </div>
             </div>
         `;
@@ -383,18 +478,36 @@ class AIToolsManager {
         }
 
         const argsObj = JSON.parse(args);
-        const { type, file_path } = argsObj;
+        const { type, file_path, search_path, query, pattern } = argsObj;
 
-        if (type === 'read' || type === 'list') {
-            const fileName = file_path.split('/').pop();
-            const icon = type === 'read' ? 'book-open' : 'folder-open';
-            const action = type === 'read' ? 'Reading' : 'Listing';
+        if (type === 'read' || type === 'list' || type === 'grep' || type === 'find') {
+            let icon, action, displayText;
+            
+            if (type === 'read') {
+                const fileName = file_path.split('/').pop();
+                icon = 'book-open';
+                action = 'Reading';
+                displayText = fileName;
+            } else if (type === 'list') {
+                const fileName = file_path.split('/').pop();
+                icon = 'folder-open';
+                action = 'Listing';
+                displayText = fileName;
+            } else if (type === 'grep') {
+                icon = 'magnifying-glass';
+                action = 'Searching';
+                displayText = `"${query}"`;
+            } else if (type === 'find') {
+                icon = 'file-magnifying-glass';
+                action = 'Finding';
+                displayText = `"${pattern}"`;
+            }
             
             return `
                 <div class="tool-call">
                     <div class="tool-simple executing">
                         <i class="fa-solid fa-${icon} tool-simple-icon"></i>
-                        ${action} <strong>${fileName}</strong>...
+                        ${action} <strong>${displayText}</strong>...
                     </div>
                 </div>
             `;

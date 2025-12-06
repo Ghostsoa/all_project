@@ -49,6 +49,143 @@
     color: rgba(255, 255, 255, 0.35);
 }
 
+/* ==================== 可折叠工具结果（grep/find）==================== */
+.tool-result-expandable {
+    background: rgba(200, 200, 200, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    margin: 4px 0;
+    overflow: hidden;
+}
+
+.tool-result-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    cursor: pointer;
+    transition: background 0.2s ease;
+    font-size: 11px;
+}
+
+.tool-result-header:hover {
+    background: rgba(200, 200, 200, 0.12);
+}
+
+.tool-result-icon {
+    width: 14px;
+    font-size: 12px;
+    color: rgba(255, 255, 255, 0.6);
+    flex-shrink: 0;
+}
+
+.tool-result-title {
+    flex: 1;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.tool-result-count {
+    color: #10b981;
+    font-size: 10px;
+    font-weight: 600;
+}
+
+.tool-result-toggle {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.4);
+    transition: transform 0.2s ease;
+}
+
+.tool-result-expandable.expanded .tool-result-toggle {
+    transform: rotate(180deg);
+}
+
+.tool-result-content {
+    max-height: 0;
+    overflow: hidden;
+    transition: max-height 0.3s ease;
+    background: rgba(0, 0, 0, 0.2);
+}
+
+.tool-result-expandable.expanded .tool-result-content {
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+/* Grep匹配项样式 */
+.grep-match-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 4px 12px;
+    font-size: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.grep-match-item:last-child {
+    border-bottom: none;
+}
+
+.grep-match-path {
+    flex: 1;
+    color: rgba(255, 255, 255, 0.7);
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.grep-match-line {
+    color: rgba(255, 255, 255, 0.4);
+    font-family: 'Courier New', monospace;
+    margin-left: 8px;
+    flex-shrink: 0;
+}
+
+/* Find文件项样式 */
+.find-file-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 4px 12px;
+    font-size: 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.find-file-item:last-child {
+    border-bottom: none;
+}
+
+.find-file-icon {
+    width: 12px;
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.5);
+    flex-shrink: 0;
+}
+
+.find-file-path {
+    flex: 1;
+    color: rgba(255, 255, 255, 0.7);
+    font-family: 'Courier New', monospace;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.find-file-size {
+    color: rgba(255, 255, 255, 0.4);
+    font-family: 'Courier New', monospace;
+    margin-left: 8px;
+    flex-shrink: 0;
+}
+
+.grep-no-matches {
+    padding: 12px;
+    text-align: center;
+    color: rgba(255, 255, 255, 0.4);
+    font-size: 11px;
+}
+
 /* ==================== 复杂工具（edit/write）==================== */
 /* 卡片样式 - 占满宽度，灰色背景 */
 .tool-card {
