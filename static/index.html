@@ -192,7 +192,9 @@
 
                             <div class="form-group">
                                 <label>Code Search 模型 <span style="color: rgba(255,255,255,0.5); font-size: 11px;">(可选，用于智能代码搜索)</span></label>
-                                <input type="text" id="codeSearchModel" placeholder="如: gpt-4o（留空则禁用code_search工具）">
+                                <select id="codeSearchModel">
+                                    <option value="">-- 不启用 --</option>
+                                </select>
                             </div>
 
                             <div class="form-actions">

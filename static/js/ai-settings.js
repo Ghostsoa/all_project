@@ -245,16 +245,47 @@ async function loadGlobalConfig() {
     const container = document.getElementById('configForm');
     
     try {
-        const data = await apiRequest('/api/ai/config');
-        const config = data.data;
+        // 并行加载配置和模型列表
+        const [configData, providersData] = await Promise.all([
+            apiRequest('/api/ai/config'),
+            apiRequest('/api/ai/providers')
+        ]);
         
+        const config = configData.data;
+        const providers = providersData.data || [];
+        
+        // 填充基础配置
         document.getElementById('systemPrompt').value = config.system_prompt || '';
         document.getElementById('temperature').value = config.temperature || 0.7;
         document.getElementById('maxTokens').value = config.max_tokens || 4096;
         document.getElementById('topP').value = config.top_p || 1.0;
         document.getElementById('frequencyPenalty').value = config.frequency_penalty || 0;
         document.getElementById('presencePenalty').value = config.presence_penalty || 0;
-        document.getElementById('codeSearchModel').value = config.code_search_model || '';
+        
+        // 填充code_search_model下拉框
+        const codeSearchSelect = document.getElementById('codeSearchModel');
+        codeSearchSelect.innerHTML = '<option value="">-- 不启用 --</option>';
+        
+        // 遍历所有provider的模型
+        providers.forEach(provider => {
+            if (provider.models && provider.models.length > 0) {
+                // 添加provider分组标题
+                const optgroup = document.createElement('optgroup');
+                optgroup.label = provider.name;
+                
+                provider.models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model.id;
+                    option.textContent = model.name;
+                    optgroup.appendChild(option);
+                });
+                
+                codeSearchSelect.appendChild(optgroup);
+            }
+        });
+        
+        // 设置当前选中的模型
+        codeSearchSelect.value = config.code_search_model || '';
         
         // 显示当前值
         updateRangeDisplay();
@@ -275,7 +306,7 @@ window.saveGlobalConfig = async function(event) {
         top_p: parseFloat(document.getElementById('topP').value),
         frequency_penalty: parseFloat(document.getElementById('frequencyPenalty').value),
         presence_penalty: parseFloat(document.getElementById('presencePenalty').value),
-        code_search_model: document.getElementById('codeSearchModel').value.trim()
+        code_search_model: document.getElementById('codeSearchModel').value
     };
     
     try {
