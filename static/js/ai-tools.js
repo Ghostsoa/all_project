@@ -780,10 +780,21 @@ class AIToolsManager {
      */
     checkAllPendingEdits() {
         console.log('🔍 检查所有pending编辑:', this.pendingEdits.size, '个');
+        
+        // 按文件分组，只显示每个文件的最后一个pending
+        const fileLatestEdits = new Map();  // filePath -> {toolCallId, edit}
+        
         for (const [toolCallId, edit] of this.pendingEdits.entries()) {
             if (edit.type === 'edit' && edit.status === 'pending') {
-                this.autoApplyToOpenEditor(toolCallId);
+                // 覆盖同文件的edit（保留最后一个）
+                fileLatestEdits.set(edit.file_path, { toolCallId, edit });
             }
+        }
+        
+        // 只应用每个文件的最后一个pending
+        console.log(`📊 ${fileLatestEdits.size} 个文件有pending编辑`);
+        for (const { toolCallId } of fileLatestEdits.values()) {
+            this.autoApplyToOpenEditor(toolCallId);
         }
     }
     
@@ -917,7 +928,7 @@ class AIToolsManager {
             // 3. 更新 UI
             this.updateToolStatus(toolCallId, 'accepted');
             
-            // 清除装饰
+            // 清除当前装饰
             this.clearDiffDecorations(toolCallId);
             
             // 4. 刷新编辑器内容（如果文件已打开）
@@ -925,6 +936,9 @@ class AIToolsManager {
             
             // 移除待处理列表
             this.pendingEdits.delete(toolCallId);
+            
+            // 5. 重新计算并显示剩余pending的diff（基于新磁盘）
+            await this.recomputeRemainingDiff(file_path);
             
             // 标记为已应用
             this.appliedEdits.add(toolCallId);
@@ -988,7 +1002,112 @@ class AIToolsManager {
     }
 
     /**
-     * 重新显示同一文件的剩余pending diff
+     * Accept后重新计算剩余pending的diff（基于新磁盘）
+     * @param {string} filePath 
+     */
+    async recomputeRemainingDiff(filePath) {
+        console.log('🔄 重新计算剩余pending diff:', filePath);
+        
+        // 查找同一文件的剩余pending edits
+        const remainingEdits = [];
+        for (const [toolCallId, edit] of this.pendingEdits.entries()) {
+            if (edit.file_path === filePath && edit.status === 'pending' && edit.type === 'edit') {
+                remainingEdits.push({ toolCallId, edit });
+            }
+        }
+        
+        if (remainingEdits.length === 0) {
+            console.log('ℹ️ 没有剩余pending');
+            return;
+        }
+        
+        console.log(`✅ 找到 ${remainingEdits.length} 个剩余pending，重新计算diff`);
+        
+        // 获取编辑器实例和当前内容（新的磁盘内容）
+        const editor = window.getEditorByPath && window.getEditorByPath(filePath);
+        if (!editor) {
+            console.warn('❌ 无法获取编辑器实例，跳过重新计算');
+            return;
+        }
+        
+        const diskContent = editor.getValue();  // 新的磁盘内容（刚Accept的）
+        
+        // 对每个剩余pending重新计算diff
+        const lastEdit = remainingEdits[remainingEdits.length - 1];  // 只显示最后一个
+        const { toolCallId, edit } = lastEdit;
+        
+        // 重新计算operations（从新磁盘到pending内容）
+        const newOperations = this.computeDiff(diskContent, edit.new_content);
+        
+        // 更新pendingEdits中的operations
+        edit.operations = newOperations;
+        this.pendingEdits.set(toolCallId, edit);
+        
+        // 显示新的diff
+        console.log('🎨 显示重新计算的diff:', toolCallId);
+        this.applyDiffDecorations(filePath, newOperations, toolCallId);
+    }
+    
+    /**
+     * 计算两个文本的diff（简单实现）
+     * @param {string} oldContent 
+     * @param {string} newContent 
+     * @returns {Array} operations
+     */
+    computeDiff(oldContent, newContent) {
+        const oldLines = oldContent.split('\n');
+        const newLines = newContent.split('\n');
+        const operations = [];
+        
+        // 简单的逐行对比
+        let i = 0;
+        const maxLines = Math.max(oldLines.length, newLines.length);
+        
+        while (i < maxLines) {
+            // 跳过相同的行
+            while (i < oldLines.length && i < newLines.length && oldLines[i] === newLines[i]) {
+                i++;
+            }
+            
+            if (i >= maxLines) break;
+            
+            // 收集不同的行
+            const startLine = i + 1;
+            const oldBlock = [];
+            const newBlock = [];
+            
+            while (i < oldLines.length && i < newLines.length && oldLines[i] !== newLines[i]) {
+                oldBlock.push(oldLines[i]);
+                newBlock.push(newLines[i]);
+                i++;
+            }
+            
+            // 处理剩余行
+            while (i < oldLines.length) {
+                oldBlock.push(oldLines[i]);
+                i++;
+            }
+            while (i < newLines.length) {
+                newBlock.push(newLines[i]);
+                i++;
+            }
+            
+            if (oldBlock.length > 0 || newBlock.length > 0) {
+                operations.push({
+                    type: 'replace',
+                    start_line: startLine,
+                    end_line: startLine + oldBlock.length - 1,
+                    old_text: oldBlock.join('\n'),
+                    new_text: newBlock.join('\n')
+                });
+            }
+        }
+        
+        return operations;
+    }
+
+    /**
+     * 重新显示同一文件的剩余pending diff（用于Reject）
      * @param {string} filePath 
      */
     reapplyRemainingDiff(filePath) {
