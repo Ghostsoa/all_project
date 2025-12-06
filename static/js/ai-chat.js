@@ -1300,7 +1300,11 @@ async function streamChat(sessionId, message, thinkingId) {
                     if (!messageElement) {
                         messageElement = convertThinkingToMessage(thinkingId);
                         if (!messageElement) {
+                            // 🔧 修复：创建新元素时必须添加到DOM
+                            const messagesContainer = document.getElementById('aiMessages');
                             messageElement = createMessageElement('assistant', '');
+                            messagesContainer.appendChild(messageElement);
+                            console.log('🆕 Reasoning创建新消息元素并添加到DOM');
                         }
                     }
                     
@@ -1344,6 +1348,11 @@ async function streamChat(sessionId, message, thinkingId) {
                 } else if (data.type === 'tool_call') {
                     // 工具调用
                     console.log('🔧 工具调用:', data);
+                    console.log('🔍 messageElement状态:', {
+                        exists: !!messageElement,
+                        inDOM: messageElement ? document.body.contains(messageElement) : false,
+                        hasParent: messageElement ? !!messageElement.parentElement : false
+                    });
                     
                     // 🔧 标记已有tool_call，后续reasoning将被忽略
                     hasToolCall = true;
@@ -1686,6 +1695,9 @@ function updateReasoningContent(messageElement, reasoning, autoCollapse = false,
     
     if (!reasoningDiv) {
         isNewDiv = true;
+        console.log('🆕 创建新的reasoning div, autoCollapse:', autoCollapse, 'addShimmer:', addShimmer);
+        console.trace('调用堆栈:');
+        
         reasoningDiv = document.createElement('div');
         reasoningDiv.className = 'message-reasoning';
         reasoningDiv.innerHTML = `
