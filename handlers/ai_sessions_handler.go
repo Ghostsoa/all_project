@@ -261,13 +261,31 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 	log.Printf("========================================")
 	log.Printf("🔄 撤销会话 %s 从索引 %d 开始的消息", req.SessionID, req.MessageIndex)
 
-	// 1. 删除从messageIndex开始的pending轮次
-	if err := pendingManager.RemoveTurnsFrom(req.SessionID, req.MessageIndex); err != nil {
+	// 0. 将消息索引转换为Turn索引
+	session, err := storage.GetSession(req.SessionID)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": "获取会话失败"})
+		return
+	}
+
+	// 统计从0到messageIndex之间的用户消息数量，这就是要删除的Turn索引
+	userMessageCount := 0
+	for i := 0; i < len(session.Messages) && i < req.MessageIndex; i++ {
+		if session.Messages[i].Role == "user" {
+			userMessageCount++
+		}
+	}
+	turnIndex := userMessageCount
+
+	log.Printf("📊 消息索引%d对应Turn%d（共%d个用户消息）", req.MessageIndex, turnIndex, userMessageCount)
+
+	// 1. 删除从turnIndex开始的pending轮次
+	if err := pendingManager.RemoveTurnsFrom(req.SessionID, turnIndex); err != nil {
 		log.Printf("⚠️ 删除pending失败: %v", err)
 	}
 
-	// 2. 删除从messageIndex开始的快照，并获取需要恢复的文件
-	restoredFiles, err := historyManager.RemoveSnapshotsFrom(req.SessionID, req.MessageIndex)
+	// 2. 删除从turnIndex开始的快照，并获取需要恢复的文件
+	restoredFiles, err := historyManager.RemoveSnapshotsFrom(req.SessionID, turnIndex)
 	if err != nil {
 		log.Printf("⚠️ 删除快照失败: %v", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
