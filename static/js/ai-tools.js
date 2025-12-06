@@ -610,14 +610,20 @@ class AIToolsManager {
             console.log(`  操作 ${index + 1}:`, { type, start_line, end_line, old_text, new_text });
             
             if (type === 'replace') {
-                // 创建Zone Widget显示diff（只显示红色删除和绿色添加）
+                // 原始行显示为红色删除状态
+                decorations.push({
+                    range: new monaco.Range(start_line, 1, start_line, model.getLineMaxColumn(start_line)),
+                    options: {
+                        isWholeLine: true,
+                        className: 'diff-line-deleted',
+                        glyphMarginClassName: 'diff-glyph-deleted'
+                    }
+                });
+                
+                // 创建Zone Widget只显示绿色添加行
                 const domNode = document.createElement('div');
                 domNode.className = 'diff-zone-widget';
                 domNode.innerHTML = `
-                    <div class="diff-zone-line diff-zone-deleted">
-                        <span class="diff-zone-marker">−</span>
-                        <span class="diff-zone-content">${this.escapeHtml(old_text)}</span>
-                    </div>
                     <div class="diff-zone-line diff-zone-added">
                         <span class="diff-zone-marker">+</span>
                         <span class="diff-zone-content">${this.escapeHtml(new_text)}</span>
@@ -626,21 +632,12 @@ class AIToolsManager {
                 
                 const zoneWidget = {
                     domNode: domNode,
-                    afterLineNumber: start_line,  // 在目标行之后插入
-                    heightInLines: 2,
+                    afterLineNumber: start_line,
+                    heightInLines: 1,
                     suppressMouseDown: true
                 };
                 
                 zoneWidgets.push(zoneWidget);
-                
-                // 完全隐藏原始行
-                decorations.push({
-                    range: new monaco.Range(start_line, 1, start_line, model.getLineMaxColumn(start_line)),
-                    options: {
-                        isWholeLine: true,
-                        className: 'diff-line-hidden'
-                    }
-                });
             }
         });
 

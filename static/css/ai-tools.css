@@ -282,17 +282,24 @@
 
 /* ==================== Monaco Diff 装饰样式 ==================== */
 
-/* 隐藏的行（被替换的原始行） */
-.diff-line-hidden {
-    opacity: 0 !important;
-    height: 0 !important;
-    display: none !important;
+/* 删除行（红色背景，原始行） */
+.diff-line-deleted {
+    background-color: rgba(239, 68, 68, 0.2) !important;
+    opacity: 1 !important;
+}
+
+/* 删除行的Glyph */
+.diff-glyph-deleted {
+    background-color: #ef4444;
+    width: 4px !important;
+    margin-left: 3px;
 }
 
 /* Zone Widget 容器 */
 .diff-zone-widget {
     background-color: transparent;
     padding: 0;
+    margin-left: 0;
     font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
     font-size: 14px;
     line-height: 20px;
@@ -300,16 +307,10 @@
 
 /* Zone Widget 中的每一行 */
 .diff-zone-line {
-    padding: 0 10px 0 55px;
-    display: flex;
-    align-items: center;
+    padding-left: 58px;  /* 与编辑器文本对齐（行号宽度） */
+    display: block;
     height: 20px;
-}
-
-/* 删除行（红色） */
-.diff-zone-deleted {
-    background-color: rgba(239, 68, 68, 0.2);
-    color: #fca5a5;
+    line-height: 20px;
 }
 
 /* 添加行（绿色） */
@@ -320,24 +321,16 @@
 
 /* +/- 标记 */
 .diff-zone-marker {
-    display: inline-block;
-    width: 20px;
+    position: absolute;
+    left: 50px;  /* 行号右边 */
+    width: 8px;
     text-align: center;
     font-weight: bold;
-    margin-right: 8px;
-}
-
-.diff-zone-deleted .diff-zone-marker {
-    color: #ef4444;
-}
-
-.diff-zone-added .diff-zone-marker {
     color: #10b981;
 }
 
 /* 内容 */
 .diff-zone-content {
-    flex: 1;
+    display: inline;
     white-space: pre;
-    overflow-x: auto;
 }
