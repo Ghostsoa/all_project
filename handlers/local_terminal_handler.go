@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"runtime"
 	"sync"
+	"time"
 
 	"github.com/creack/pty"
 	"github.com/gin-gonic/gin"
@@ -22,11 +23,13 @@ var (
 
 // LocalTerminalSession 本地终端会话
 type LocalTerminalSession struct {
-	cmd       *exec.Cmd
-	ptmx      *os.File
-	clients   map[*websocket.Conn]*clientInfo
-	clientsMu sync.RWMutex
-	input     chan []byte
+	cmd          *exec.Cmd
+	ptmx         *os.File
+	clients      map[*websocket.Conn]*clientInfo
+	clientsMu    sync.RWMutex
+	input        chan []byte
+	lastDropWarn time.Time  // 上次打印丢弃警告的时间
+	dropWarnMu   sync.Mutex // 保护lastDropWarn
 }
 
 // clientInfo 客户端信息
@@ -118,17 +121,29 @@ func (s *LocalTerminalSession) broadcastOutput() {
 
 			// 通过channel发送，每个客户端有独立的writer goroutine处理
 			s.clientsMu.RLock()
+			dropped := 0
 			for _, client := range s.clients {
 				if !client.closed {
 					select {
 					case client.output <- data:
 					default:
 						// 缓冲区满，跳过此帧
-						log.Println("客户端输出缓冲区满，跳过数据")
+						dropped++
 					}
 				}
 			}
 			s.clientsMu.RUnlock()
+
+			// 限流：每秒最多打印一次警告（避免日志刷屏）
+			if dropped > 0 {
+				s.dropWarnMu.Lock()
+				now := time.Now()
+				if now.Sub(s.lastDropWarn) >= time.Second {
+					log.Printf("⚠️ 终端输出过快，缓冲区溢出（已跳过部分数据）")
+					s.lastDropWarn = now
+				}
+				s.dropWarnMu.Unlock()
+			}
 		}
 	}
 }
@@ -146,7 +161,7 @@ func (s *LocalTerminalSession) handleInput() {
 func (s *LocalTerminalSession) addClient(ws *websocket.Conn) {
 	client := &clientInfo{
 		ws:     ws,
-		output: make(chan []byte, 100), // 100帧缓冲
+		output: make(chan []byte, 1000), // 1000帧缓冲，避免快速输出时溢出
 		closed: false,
 	}
 
