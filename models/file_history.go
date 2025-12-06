@@ -111,6 +111,29 @@ func (m *FileHistoryManager) GetLastSnapshot(conversationID, filePath string) (s
 	return lastSnapshot.Content, true
 }
 
+// HasSnapshot 检查特定Turn的快照是否存在
+func (m *FileHistoryManager) HasSnapshot(conversationID, filePath string, turnIndex int) bool {
+	m.mutex.RLock()
+	defer m.mutex.RUnlock()
+
+	conv, exists := m.histories[conversationID]
+	if !exists {
+		return false
+	}
+
+	fileHist, exists := conv.Files[filePath]
+	if !exists {
+		return false
+	}
+
+	for _, snapshot := range fileHist.Snapshots {
+		if snapshot.UserMessageIndex == turnIndex {
+			return true
+		}
+	}
+	return false
+}
+
 // RemoveSnapshotsFrom 删除从指定messageIndex开始的快照
 func (m *FileHistoryManager) RemoveSnapshotsFrom(conversationID string, fromMessageIndex int) (map[string]string, error) {
 	m.mutex.Lock()

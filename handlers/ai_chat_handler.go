@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"all_project/models"
 	"all_project/storage"
 	"bufio"
 	"bytes"
@@ -9,6 +10,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 	"time"
 
@@ -188,6 +190,9 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 			// 检查是否有工具调用
 			if len(toolCalls) == 0 {
 				// 没有工具调用，结束循环
+				// 保存当前轮次的快照
+				h.saveCurrentTurnSnapshot(req.SessionID)
+
 				ws.WriteJSON(map[string]interface{}{
 					"type": "done",
 				})
@@ -286,6 +291,67 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 				"type":    "warning",
 				"message": "工具调用达到最大次数限制",
 			})
+		}
+	}
+}
+
+// saveCurrentTurnSnapshot 保存当前轮次的快照到file_history
+// Turn N: 保存初始快照（磁盘状态）+ 最终快照（pending状态）
+func (h *AIChatHandler) saveCurrentTurnSnapshot(sessionID string) {
+	pendingManager := models.GetPendingStateManager()
+	historyManager := models.GetFileHistoryManager()
+
+	// 获取所有pending文件
+	allFiles := pendingManager.GetAllPendingFiles(sessionID)
+	if len(allFiles) == 0 {
+		log.Printf("ℹ️ 没有pending修改，跳过快照保存")
+		return
+	}
+
+	// 获取当前轮次（统计用户消息数量）
+	messages, err := storage.GetMessages(sessionID, 0)
+	if err != nil {
+		log.Printf("⚠️ 获取消息失败，无法保存快照: %v", err)
+		return
+	}
+
+	userMessageCount := 0
+	for _, msg := range messages {
+		if msg.Role == "user" {
+			userMessageCount++
+		}
+	}
+	currentTurn := userMessageCount - 1 // Turn从0开始
+
+	log.Printf("📸 保存Turn%d快照，涉及%d个文件", currentTurn, len(allFiles))
+
+	// 对每个文件保存快照
+	for filePath := range allFiles {
+		// 读取磁盘内容
+		diskContent, err := os.ReadFile(filePath)
+		if err != nil {
+			log.Printf("⚠️ 读取文件失败 %s: %v", filePath, err)
+			continue
+		}
+		diskContentStr := string(diskContent)
+
+		// 1. 保存Turn N快照 = 磁盘初始状态（如果还没保存）
+		if !historyManager.HasSnapshot(sessionID, filePath, currentTurn) {
+			if err := historyManager.AddSnapshot(sessionID, filePath, currentTurn, diskContentStr); err != nil {
+				log.Printf("⚠️ 保存Turn%d快照失败: %v", currentTurn, err)
+			} else {
+				log.Printf("✅ 保存Turn%d快照（初始状态）: %s (%d字节)", currentTurn, filePath, len(diskContentStr))
+			}
+		} else {
+			log.Printf("ℹ️ Turn%d快照已存在，跳过: %s", currentTurn, filePath)
+		}
+
+		// 2. 保存Turn N+1快照 = pending最终状态
+		finalContent := pendingManager.GetCurrentContent(sessionID, filePath, diskContentStr)
+		if err := historyManager.AddSnapshot(sessionID, filePath, currentTurn+1, finalContent); err != nil {
+			log.Printf("⚠️ 保存Turn%d快照失败: %v", currentTurn+1, err)
+		} else {
+			log.Printf("✅ 保存Turn%d快照（最终状态）: %s (%d字节)", currentTurn+1, filePath, len(finalContent))
 		}
 	}
 }

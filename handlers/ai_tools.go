@@ -146,13 +146,20 @@ func (te *ToolExecutor) writeFile(args FileOperationArgs) (string, error) {
 func (te *ToolExecutor) editFile(args FileOperationArgs, conversationID string, messageID string) (string, error) {
 	manager := models.GetPendingStateManager()
 
-	// 0. 获取当前消息数量作为messageIndex
+	// 0. 获取当前用户消息数量作为messageIndex
 	messages, err := storage.GetMessages(conversationID, 0)
 	if err != nil {
 		log.Printf("⚠️ 获取消息列表失败: %v，使用默认messageIndex=0", err)
 		messages = []storage.ChatMessage{}
 	}
-	messageIndex := len(messages)
+
+	// 统计用户消息数量（只计算role="user"的消息）
+	messageIndex := 0
+	for _, msg := range messages {
+		if msg.Role == "user" {
+			messageIndex++
+		}
+	}
 
 	// 1. 读取磁盘原始内容（用于计算累计diff）
 	diskContent, err := os.ReadFile(args.FilePath)
