@@ -683,12 +683,10 @@ class AIToolsManager {
                     
                     const linesHtml = [];
                     
-                    // 只显示绿色添加行
-                    for (const idx of group) {
+                    // 显示整个组范围的所有绿色行（对应红色行）
+                    for (let idx = firstIdx; idx <= lastIdx; idx++) {
                         const newLine = newLines[idx] || '';
-                        if (newLine) {
-                            linesHtml.push(`<div class="diff-zone-line diff-zone-added">${this.escapeHtml(newLine)}</div>`);
-                        }
+                        linesHtml.push(`<div class="diff-zone-line diff-zone-added">${this.escapeHtml(newLine)}</div>`);
                     }
                     
                     domNode.innerHTML = linesHtml.join('');
