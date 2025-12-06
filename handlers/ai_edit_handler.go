@@ -110,13 +110,30 @@ func (h *AIEditHandler) acceptAll(conversationID string, pendingManager *models.
 	log.Printf("📋 收集到%d个tool_call_id", len(allToolCallIDs))
 
 	// 4. 对每个文件：应用edits，生成快照，写入磁盘
+	finalTurnContents := make(map[string]string) // 保存每个文件的最终内容
 	for filePath := range allFiles {
-		if err := h.acceptFileEdits(conversationID, filePath, turns, historyManager); err != nil {
+		finalContent, err := h.acceptFileEdits(conversationID, filePath, turns, historyManager)
+		if err != nil {
 			return fmt.Errorf("处理文件失败 %s: %v", filePath, err)
+		}
+		finalTurnContents[filePath] = finalContent
+	}
+
+	// 5. 保存最终Turn的快照（Turn N+1）
+	if len(turns) > 0 {
+		lastTurnIndex := turns[len(turns)-1].UserMessageIndex
+		finalTurnIndex := lastTurnIndex + 1
+
+		for filePath, finalContent := range finalTurnContents {
+			if err := historyManager.AddSnapshot(conversationID, filePath, finalTurnIndex, finalContent); err != nil {
+				log.Printf("⚠️ 保存Turn%d快照失败: %v", finalTurnIndex, err)
+			} else {
+				log.Printf("✅ 保存Turn%d快照（Accept All最终状态）: %s (%d字节)", finalTurnIndex, filePath, len(finalContent))
+			}
 		}
 	}
 
-	// 5. 更新所有tool消息的status为accepted
+	// 6. 更新所有tool消息的status为accepted
 	for _, toolCallID := range allToolCallIDs {
 		if err := storage.UpdateToolMessageStatus(toolCallID, "accepted"); err != nil {
 			log.Printf("⚠️ 更新tool消息状态失败 (%s): %v", toolCallID, err)
@@ -124,7 +141,7 @@ func (h *AIEditHandler) acceptAll(conversationID string, pendingManager *models.
 	}
 	log.Printf("✅ 已更新%d个tool消息状态为accepted", len(allToolCallIDs))
 
-	// 6. 清空pending
+	// 7. 清空pending
 	if err := pendingManager.ClearAll(conversationID); err != nil {
 		return fmt.Errorf("清空pending失败: %v", err)
 	}
@@ -132,12 +149,12 @@ func (h *AIEditHandler) acceptAll(conversationID string, pendingManager *models.
 	return nil
 }
 
-// acceptFileEdits 应用单个文件的所有edits
-func (h *AIEditHandler) acceptFileEdits(conversationID, filePath string, turns []models.TurnEdits, historyManager *models.FileHistoryManager) error {
+// acceptFileEdits 应用单个文件的所有edits并返回最终内容
+func (h *AIEditHandler) acceptFileEdits(conversationID, filePath string, turns []models.TurnEdits, historyManager *models.FileHistoryManager) (string, error) {
 	// 读取磁盘内容
 	diskContent, err := os.ReadFile(filePath)
 	if err != nil {
-		return fmt.Errorf("读取文件失败: %v", err)
+		return "", fmt.Errorf("读取文件失败: %v", err)
 	}
 
 	state := string(diskContent)
@@ -152,7 +169,7 @@ func (h *AIEditHandler) acceptFileEdits(conversationID, filePath string, turns [
 
 		// 保存该轮开始前的快照
 		if err := historyManager.AddSnapshot(conversationID, filePath, turn.UserMessageIndex, state); err != nil {
-			return fmt.Errorf("保存快照失败: %v", err)
+			return "", fmt.Errorf("保存快照失败: %v", err)
 		}
 		log.Printf("📸 Turn%d快照: %d字节", turn.UserMessageIndex, len(state))
 
@@ -165,11 +182,11 @@ func (h *AIEditHandler) acceptFileEdits(conversationID, filePath string, turns [
 
 	// 写入最终状态到磁盘
 	if err := os.WriteFile(filePath, []byte(state), 0644); err != nil {
-		return fmt.Errorf("写入文件失败: %v", err)
+		return "", fmt.Errorf("写入文件失败: %v", err)
 	}
 
 	log.Printf("💾 写入磁盘: %s (%d字节)", filePath, len(state))
-	return nil
+	return state, nil
 }
 
 // rejectAll 取消所有pending修改
