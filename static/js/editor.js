@@ -19,8 +19,16 @@ export function getEditorByPath(filePath) {
     return editorInstances.get(fileInfo.tabId);
 }
 
+// 获取文件的tabId
+export function getTabIdByPath(filePath) {
+    const fileInfo = openFiles.get(filePath);
+    return fileInfo ? fileInfo.tabId : null;
+}
+
 // 暴露到全局（供AI工具管理器使用）
 window.getEditorByPath = getEditorByPath;
+window.getTabIdByPath = getTabIdByPath;
+window.markAsUnmodified = markAsUnmodified;
 window.openFile = openFileEditor;
 
 // 获取文件图标HTML（用于标签页）

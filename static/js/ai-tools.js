@@ -936,8 +936,8 @@ class AIToolsManager {
     /**
      * 刷新编辑器内容
      */
-    async refreshEditorContent(filePath, serverId) {
-        console.log('🔄 刷新编辑器内容:', { filePath, serverId });
+    async refreshEditorContent(filePath, serverId, markAsSaved = true) {
+        console.log('🔄 刷新编辑器内容:', { filePath, serverId, markAsSaved });
         
         // 获取编辑器实例
         const editor = window.getEditorByPath && window.getEditorByPath(filePath);
@@ -962,8 +962,30 @@ class AIToolsManager {
             // 更新编辑器内容
             const model = editor.getModel();
             if (model) {
-                model.setValue(data.content);
+                const currentContent = model.getValue();
+                const newContent = data.content;
+                
+                // 如果内容相同，不需要更新
+                if (currentContent === newContent) {
+                    console.log('✅ 编辑器内容无变化，跳过更新');
+                    return;
+                }
+                
+                // 更新内容（会触发onChange，可能标记为未保存）
+                model.setValue(newContent);
                 console.log('✅ 编辑器内容已刷新');
+                
+                // 如果需要标记为已保存（Reject All恢复到磁盘状态）
+                if (markAsSaved && window.getTabIdByPath && window.markAsUnmodified) {
+                    const tabId = window.getTabIdByPath(filePath);
+                    if (tabId) {
+                        // 延迟标记，确保onChange事件已处理完
+                        setTimeout(() => {
+                            window.markAsUnmodified(tabId);
+                            console.log('✅ 已标记为已保存状态');
+                        }, 50);
+                    }
+                }
             }
         } catch (error) {
             console.error('刷新编辑器失败:', error);
@@ -1151,12 +1173,10 @@ class AIToolsManager {
             }
             
             // 清空所有pending edits
-            const affectedFiles = new Set();
             for (const [toolCallId, edit] of this.pendingEdits.entries()) {
                 this.updateToolStatus(toolCallId, 'accepted');
                 this.clearDiffDecorations(toolCallId);
                 this.appliedEdits.add(toolCallId);
-                affectedFiles.add(edit.file_path);
             }
             
             this.pendingEdits.clear();
@@ -1165,10 +1185,11 @@ class AIToolsManager {
             // 更新Pending Actions Bar
             this.updatePendingActionsBar();
             
-            // 刷新所有受影响文件的编辑器
-            for (const filePath of affectedFiles) {
-                await this.refreshEditorContent(filePath, 'local');
-            }
+            // Accept后不需要刷新编辑器，因为：
+            // 1. 后端写入的内容 = 当前pending内容（编辑器已经显示）
+            // 2. 已经清除了diff装饰
+            // 3. 刷新会触发"未保存"状态，造成困扰
+            console.log('✅ Accept All完成，已清除diff装饰');
             
             this.showToast(`已确认所有修改 (${pendingCount}个)`, 'success');
         } catch (error) {
@@ -1219,8 +1240,9 @@ class AIToolsManager {
             this.updatePendingActionsBar();
             
             // 刷新所有受影响文件的编辑器（恢复到磁盘状态）
+            // markAsSaved=true 因为恢复到磁盘状态就是已保存状态
             for (const filePath of affectedFiles) {
-                await this.refreshEditorContent(filePath, 'local');
+                await this.refreshEditorContent(filePath, 'local', true);
             }
             
             this.showToast(`已取消所有修改 (${pendingCount}个)`, 'success');
