@@ -208,12 +208,15 @@ class AIToolsManager {
         
         return `
             <div class="tool-call">
-                <div class="tool-compact" data-tool-call-id="${toolCallId}" onclick="aiToolsManager.handleToolClick('${toolCallId}')">
-                    <span class="tool-compact-icon">${fileIcon}</span>
-                    <span class="tool-compact-name">${fileName}</span>
-                    <span class="tool-compact-type">edit</span>
-                    ${lines_added > 0 ? `<span class="tool-compact-stat added">+${lines_added}</span>` : ''}
-                    ${lines_deleted > 0 ? `<span class="tool-compact-stat deleted">-${lines_deleted}</span>` : ''}
+                <div class="tool-card" data-tool-call-id="${toolCallId}" onclick="aiToolsManager.handleToolClick('${toolCallId}')">
+                    <div class="tool-card-left">
+                        <span class="tool-card-icon">${fileIcon}</span>
+                        <span class="tool-card-name">${fileName}</span>
+                    </div>
+                    <div class="tool-card-right">
+                        ${lines_added > 0 ? `<span class="tool-card-stat added">+${lines_added}</span>` : ''}
+                        ${lines_deleted > 0 ? `<span class="tool-card-stat deleted">-${lines_deleted}</span>` : ''}
+                    </div>
                 </div>
             </div>
         `;
@@ -242,11 +245,14 @@ class AIToolsManager {
         
         return `
             <div class="tool-call">
-                <div class="tool-compact" data-tool-call-id="${toolCallId}" onclick="aiToolsManager.handleToolClick('${toolCallId}')">
-                    <span class="tool-compact-icon">${fileIcon}</span>
-                    <span class="tool-compact-name">${fileName}</span>
-                    <span class="tool-compact-type">write</span>
-                    <span class="tool-compact-stat added">+${total_lines}</span>
+                <div class="tool-card" data-tool-call-id="${toolCallId}" onclick="aiToolsManager.handleToolClick('${toolCallId}')">
+                    <div class="tool-card-left">
+                        <span class="tool-card-icon">${fileIcon}</span>
+                        <span class="tool-card-name">${fileName}</span>
+                    </div>
+                    <div class="tool-card-right">
+                        <span class="tool-card-stat added">+${total_lines}</span>
+                    </div>
                 </div>
             </div>
         `;
