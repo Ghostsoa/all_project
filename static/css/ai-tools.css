@@ -288,13 +288,6 @@
     opacity: 1 !important;
 }
 
-/* 删除行的-号标记（显示在行装饰区） */
-.diff-line-deleted-marker::before {
-    content: '−';
-    color: #ef4444 !important;
-    font-weight: bold;
-}
-
 /* 删除行的Glyph */
 .diff-glyph-deleted {
     background-color: #ef4444;
@@ -314,28 +307,14 @@
 
 /* Zone Widget 中的每一行 */
 .diff-zone-line {
-    position: relative;
     display: block;
     height: 20px;
     line-height: 20px;
+    white-space: pre;
 }
 
 /* 添加行（绿色） */
 .diff-zone-added {
     background-color: rgba(16, 185, 129, 0.2);
     color: #6ee7b7;
-}
-
-/* +/- 标记 */
-.diff-zone-marker {
-    display: inline-block;
-    font-weight: bold;
-    color: #10b981;
-}
-
-/* 内容 */
-.diff-zone-content {
-    display: inline;
-    white-space: pre;
-    margin-left: 4px;
 }

@@ -616,15 +616,14 @@ class AIToolsManager {
                     options: {
                         isWholeLine: true,
                         className: 'diff-line-deleted',
-                        glyphMarginClassName: 'diff-glyph-deleted',
-                        linesDecorationsClassName: 'diff-line-deleted-marker'
+                        glyphMarginClassName: 'diff-glyph-deleted'
                     }
                 });
                 
                 // 创建Zone Widget只显示绿色添加行
                 const domNode = document.createElement('div');
                 domNode.className = 'diff-zone-widget';
-                domNode.innerHTML = `<div class="diff-zone-line diff-zone-added"><span class="diff-zone-marker">+</span><span class="diff-zone-content">${this.escapeHtml(new_text)}</span></div>`;
+                domNode.innerHTML = `<div class="diff-zone-line diff-zone-added">${this.escapeHtml(new_text)}</div>`;
                 
                 const zoneWidget = {
                     domNode: domNode,
