@@ -59,6 +59,11 @@ function updateModelDisplay() {
     }
 }
 
+// 获取当前会话ID（供ai-tools使用）
+window.getCurrentConversationID = function() {
+    return currentSession ? currentSession.id : null;
+};
+
 // 切换模型选择器
 window.toggleModelSelector = async function() {
     const popup = document.getElementById('modelPopup');

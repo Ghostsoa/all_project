@@ -1325,10 +1325,18 @@ class AIToolsManager {
     }
 
     /**
-     * 获取当前会话 ID
+     * 获取当前会话 ID（conversationID）
      */
     getCurrentSessionId() {
-        // 从 filetree 模块获取当前会话ID
+        // 优先从AI聊天界面获取会话ID（真实的conversationID）
+        if (window.getCurrentConversationID) {
+            const conversationID = window.getCurrentConversationID();
+            if (conversationID) {
+                return conversationID;
+            }
+        }
+        
+        // 回退：从 filetree 模块获取会话ID（可能是"local"）
         if (window.getCurrentSessionID) {
             return window.getCurrentSessionID();
         }
