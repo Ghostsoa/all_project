@@ -183,6 +183,8 @@ class AIToolsManager {
         const fileName = file_path.split('/').pop();
         const fileIcon = this.getFileIconHTML(fileName);
         
+        console.log('📝 renderEditTool:', { toolCallId, file_path, operations, new_content });
+        
         // 保存到待处理列表（使用tool_call_id作为key）
         this.pendingEdits.set(toolCallId, {
             tool_call_id: toolCallId,
@@ -193,6 +195,8 @@ class AIToolsManager {
             status: 'pending',
             type: 'edit'
         });
+        
+        console.log('💾 保存到pendingEdits:', this.pendingEdits.get(toolCallId));
         
         return `
             <div class="tool-call">
@@ -453,8 +457,13 @@ class AIToolsManager {
      * @param {string} toolCallId 
      */
     async handleToolClick(toolCallId) {
+        console.log('🖱️ handleToolClick:', toolCallId);
         const edit = this.pendingEdits.get(toolCallId);
-        if (!edit) return;
+        console.log('📦 从pendingEdits获取:', edit);
+        if (!edit) {
+            console.error('❌ 未找到编辑信息:', toolCallId);
+            return;
+        }
 
         const { server_id, file_path } = edit;
         
