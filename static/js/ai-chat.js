@@ -1371,19 +1371,20 @@ async function streamChat(sessionId, message, thinkingId) {
                         const existingReasoningDivs = messageElement.querySelectorAll('.message-reasoning');
                         console.log('🔍 Tool call到来，reasoning div数量:', existingReasoningDivs.length);
                         
-                        // 只有在已存在reasoning div时才折叠
                         if (existingReasoningDivs.length > 0) {
+                            // 已存在div，直接折叠
                             updateReasoningContent(messageElement, reasoningContent, true, false);
-                            // 停止所有思维链header的流光
-                            const allReasoningHeaders = messageElement.querySelectorAll('.reasoning-header');
-                            allReasoningHeaders.forEach(header => {
-                                header.classList.remove('shimmer-text');
-                            });
                         } else {
-                            console.log('⚠️ Reasoning内容存在但div未创建，不调用updateReasoningContent');
+                            // div未创建，强制创建并折叠（不添加流光）
+                            console.log('⚠️ Reasoning内容存在但div未创建，强制创建并折叠');
+                            updateReasoningContent(messageElement, reasoningContent, true, false);
                         }
-                        // 🔧 不要重置reasoningContent，避免后续reasoning创建重复的div
-                        // reasoningContent = '';
+                        
+                        // 停止所有思维链header的流光
+                        const allReasoningHeaders = messageElement.querySelectorAll('.reasoning-header');
+                        allReasoningHeaders.forEach(header => {
+                            header.classList.remove('shimmer-text');
+                        });
                     }
                     
                     appendToolCall(messageElement, data);
