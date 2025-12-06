@@ -963,6 +963,25 @@ class AIToolsManager {
                 for (let i = 0; i <= acceptIndex; i++) {
                     const { toolCallId: tid } = sameFileEdits[i];
                     console.log('✅ 连带Accept:', tid);
+                    
+                    // 调用后端API更新消息状态（除了主Accept已经调用过的）
+                    if (i < acceptIndex) {
+                        try {
+                            await fetch('/api/ai/edit/apply', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ 
+                                    tool_call_id: tid,
+                                    status: 'accepted',
+                                    file_path: file_path,
+                                    conversation_id: this.getCurrentSessionId()
+                                })
+                            });
+                        } catch (e) {
+                            console.warn('连带Accept后端更新失败:', tid, e);
+                        }
+                    }
+                    
                     this.updateToolStatus(tid, 'accepted');
                     this.clearDiffDecorations(tid);
                     this.pendingEdits.delete(tid);

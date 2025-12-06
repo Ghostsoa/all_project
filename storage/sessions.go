@@ -324,8 +324,60 @@ func RevokeMessagesFromIndex(sessionID string, messageIndex int) error {
 		return fmt.Errorf("消息索引超出范围")
 	}
 
+	// 检查是否删除了tool响应，如果是，需要连带删除assistant tool_calls
+	actualIndex := messageIndex
+	if messageIndex > 0 && session.Messages[messageIndex].Role == "tool" {
+		// 向前查找对应的assistant消息
+		for i := messageIndex - 1; i >= 0; i-- {
+			if session.Messages[i].Role == "assistant" && len(session.Messages[i].ToolCalls) > 0 {
+				// 检查这个assistant的tool_calls是否包含当前tool
+				for _, tc := range session.Messages[i].ToolCalls {
+					if tcID, ok := tc["id"].(string); ok && tcID == session.Messages[messageIndex].ToolCallID {
+						// 找到了，需要从这个assistant开始删除
+						actualIndex = i
+						break
+					}
+				}
+				break
+			}
+		}
+	}
+
+	// 继续向前检查，如果有assistant带tool_calls但没有对应tool响应，也要删除
+	for actualIndex > 0 {
+		prevIdx := actualIndex - 1
+		if session.Messages[prevIdx].Role == "assistant" && len(session.Messages[prevIdx].ToolCalls) > 0 {
+			// 检查这些tool_calls是否都有响应
+			hasIncompleteTools := false
+			for _, tc := range session.Messages[prevIdx].ToolCalls {
+				tcID, ok := tc["id"].(string)
+				if !ok {
+					continue
+				}
+				found := false
+				for i := prevIdx + 1; i < actualIndex; i++ {
+					if session.Messages[i].Role == "tool" && session.Messages[i].ToolCallID == tcID {
+						found = true
+						break
+					}
+				}
+				if !found {
+					hasIncompleteTools = true
+					break
+				}
+			}
+			if hasIncompleteTools {
+				actualIndex = prevIdx
+			} else {
+				break
+			}
+		} else {
+			break
+		}
+	}
+
 	// 撤销该消息及之后的所有消息
-	session.Messages = session.Messages[:messageIndex]
+	session.Messages = session.Messages[:actualIndex]
 	session.UpdatedAt = time.Now()
 
 	// 写入文件
