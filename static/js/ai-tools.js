@@ -627,9 +627,22 @@ class AIToolsManager {
                 const lineCount = newLines.length;
                 console.log(`📏 新内容有 ${lineCount} 行:`, newLines);
                 
+                // 获取编辑器的字体配置
+                const editorOptions = editor.getOptions();
+                const fontSize = editorOptions.get(monaco.editor.EditorOption.fontSize);
+                const fontFamily = editorOptions.get(monaco.editor.EditorOption.fontFamily);
+                const lineHeight = editorOptions.get(monaco.editor.EditorOption.lineHeight);
+                
+                console.log('🎨 编辑器字体配置:', { fontSize, fontFamily, lineHeight });
+                
                 // 创建Zone Widget显示绿色添加行
                 const domNode = document.createElement('div');
                 domNode.className = 'diff-zone-widget';
+                
+                // 动态设置字体样式
+                domNode.style.fontSize = `${fontSize}px`;
+                domNode.style.fontFamily = fontFamily;
+                domNode.style.lineHeight = `${lineHeight}px`;
                 
                 // 为每一行创建一个div
                 const linesHtml = newLines.map((line, idx) => {
