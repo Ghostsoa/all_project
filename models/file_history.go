@@ -123,9 +123,22 @@ func (m *FileHistoryManager) RemoveSnapshotsFrom(conversationID string, fromMess
 
 	restoredFiles := make(map[string]string)
 
-	// 遍历所有文件
+	// 撤销逻辑：
+	// 1. 找到Turn fromMessageIndex的快照，这是该轮开始前的状态
+	// 2. 删除 >= fromMessageIndex 的所有快照
+	// 3. 恢复到Turn fromMessageIndex快照的内容
+
 	for filePath, fileHist := range conv.Files {
-		// 保留 < fromMessageIndex 的快照
+		// 先找到fromMessageIndex的快照内容（用于恢复）
+		for _, snapshot := range fileHist.Snapshots {
+			if snapshot.UserMessageIndex == fromMessageIndex {
+				restoredFiles[filePath] = snapshot.Content
+				log.Printf("📂 将恢复到Turn%d快照: %s (%d字节)", fromMessageIndex, filePath, len(snapshot.Content))
+				break
+			}
+		}
+
+		// 删除 >= fromMessageIndex 的快照
 		newSnapshots := []TurnSnapshot{}
 		for _, snapshot := range fileHist.Snapshots {
 			if snapshot.UserMessageIndex < fromMessageIndex {
@@ -135,15 +148,15 @@ func (m *FileHistoryManager) RemoveSnapshotsFrom(conversationID string, fromMess
 
 		fileHist.Snapshots = newSnapshots
 
-		// 如果有快照，记录最后一个用于恢复
-		if len(newSnapshots) > 0 {
-			restoredFiles[filePath] = newSnapshots[len(newSnapshots)-1].Content
-		}
-
 		// 如果没有快照了，删除该文件历史
 		if len(newSnapshots) == 0 {
 			delete(conv.Files, filePath)
 		}
+	}
+
+	// 如果所有文件都没有快照了，删除整个会话历史
+	if len(conv.Files) == 0 {
+		delete(m.histories, conversationID)
 	}
 
 	log.Printf("🗑️ 删除从Turn%d开始的快照，需恢复%d个文件", fromMessageIndex, len(restoredFiles))
