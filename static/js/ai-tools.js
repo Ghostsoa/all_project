@@ -9,6 +9,9 @@ class AIToolsManager {
         this.appliedEdits = new Set(
             JSON.parse(localStorage.getItem('appliedEdits') || '[]')
         );
+        
+        // 初始化Pending Actions Bar显示
+        setTimeout(() => this.updatePendingActionsBar(), 100);
     }
 
     /**
