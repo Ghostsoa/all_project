@@ -186,7 +186,6 @@ func main() {
 
 		// AI工具确认/拒绝（更新状态，实际文件操作由前端调用文件API）
 		api.POST("/ai/edit/apply", aiEditHandler.ApplyEdit)
-		api.POST("/ai/edit/reject", aiEditHandler.RejectEdit)
 	}
 
 	// WebSocket 路由（需要认证，未登录则重定向）

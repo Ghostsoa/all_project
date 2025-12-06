@@ -534,8 +534,13 @@ func (h *AIChatHandler) executeToolCall(toolName, argsJSON string) string {
 	result, err := h.toolExecutor.Execute(toolName, argsJSON)
 	if err != nil {
 		log.Printf("❌ 工具执行失败: %v", err)
-		// 返回错误信息给AI
-		return fmt.Sprintf(`{"success": false, "error": "%s"}`, err.Error())
+		// 返回错误信息给AI（使用json.Marshal正确转义）
+		errorResult := map[string]interface{}{
+			"success": false,
+			"error":   err.Error(),
+		}
+		resultJSON, _ := json.Marshal(errorResult)
+		return string(resultJSON)
 	}
 
 	log.Printf("✅ 工具执行成功: %s", toolName)

@@ -51,26 +51,3 @@ func (h *AIEditHandler) ApplyEdit(c *gin.Context) {
 		"message": "状态已更新",
 	})
 }
-
-// RejectEdit 拒绝编辑 - 只返回成功，前端负责清理UI
-func (h *AIEditHandler) RejectEdit(c *gin.Context) {
-	var req ApplyEditRequest
-	if err := c.ShouldBindJSON(&req); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"success": false,
-			"error":   "Invalid request",
-		})
-		return
-	}
-
-	// 更新数据库中对应的tool消息状态
-	if err := storage.UpdateToolMessageStatus(req.ToolCallID, "rejected"); err != nil {
-		log.Printf("❌ 更新tool消息状态失败: %v", err)
-	}
-
-	log.Printf("🚫 已拒绝编辑: %s", req.ToolCallID)
-	c.JSON(http.StatusOK, gin.H{
-		"success": true,
-		"message": "已拒绝",
-	})
-}

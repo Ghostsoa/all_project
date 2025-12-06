@@ -1458,7 +1458,16 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
                         const result = typeof msg.content === 'string' ? JSON.parse(msg.content) : msg.content;
                         toolResults.set(msg.tool_call_id, { result, toolName: msg.tool_name });
                     } catch (e) {
-                        console.error('解析tool结果失败:', e);
+                        console.error('解析tool结果失败:', e, '原始内容:', msg.content);
+                        // 解析失败时，将原始内容作为错误结果
+                        toolResults.set(msg.tool_call_id, { 
+                            result: { 
+                                success: false, 
+                                error: '结果解析失败',
+                                raw: msg.content 
+                            }, 
+                            toolName: msg.tool_name 
+                        });
                     }
                 }
             });
