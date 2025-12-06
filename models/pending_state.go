@@ -143,6 +143,22 @@ func (m *PendingStateManager) RemoveFile(conversationID, filePath string) error 
 	return m.Save()
 }
 
+// RemoveConversation 删除整个会话的pending状态
+func (m *PendingStateManager) RemoveConversation(conversationID string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	_, exists := m.states[conversationID]
+	if !exists {
+		return nil
+	}
+
+	delete(m.states, conversationID)
+	log.Printf("🗑️ 已删除会话的pending状态: %s", conversationID)
+
+	return m.Save()
+}
+
 // RejectVersion 拒绝某个版本（回滚），返回被删除的所有toolCallIDs
 func (m *PendingStateManager) RejectVersion(conversationID, filePath, toolCallID string) ([]string, error) {
 	m.mutex.Lock()

@@ -76,7 +76,7 @@ func (h *AIEditHandler) ApplyEdit(c *gin.Context) {
 				for i, version := range acceptedVersions {
 					// 1. 备份当前磁盘状态
 					description := fmt.Sprintf("Accept %s 前备份", version.ToolCallID)
-					if err := historyManager.BackupAndAddVersion(req.FilePath, description); err != nil {
+					if err := historyManager.BackupAndAddVersion(req.FilePath, conversationID, description); err != nil {
 						log.Printf("⚠️ 备份文件失败 (%s): %v（继续写入）", version.ToolCallID, err)
 					} else {
 						log.Printf("📦 已备份文件到历史: %s", description)

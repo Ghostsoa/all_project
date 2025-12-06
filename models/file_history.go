@@ -12,14 +12,15 @@ import (
 
 // HistoryVersion 文件的一个历史版本
 type HistoryVersion struct {
-	ID          int       `json:"id"`
-	IsSnapshot  bool      `json:"is_snapshot"`
-	Content     string    `json:"content,omitempty"`    // 完整内容（仅快照）
-	DiffPatch   string    `json:"diff_patch,omitempty"` // diff补丁（仅增量）
-	BaseVersion int       `json:"base_version"`         // 基于哪个版本（-1表示无依赖）
-	Timestamp   time.Time `json:"timestamp"`
-	Description string    `json:"description"` // 描述（如"Accept修改3"）
-	Size        int64     `json:"size"`        // 存储大小
+	ID             int       `json:"id"`
+	ConversationID string    `json:"conversation_id"` // 所属会话ID
+	IsSnapshot     bool      `json:"is_snapshot"`
+	Content        string    `json:"content,omitempty"`    // 完整内容（仅快照）
+	DiffPatch      string    `json:"diff_patch,omitempty"` // diff补丁（仅增量）
+	BaseVersion    int       `json:"base_version"`         // 基于哪个版本（-1表示无依赖）
+	Timestamp      time.Time `json:"timestamp"`
+	Description    string    `json:"description"` // 版本描述（如"Accept前备份"）
+	Size           int       `json:"size"`        // 内容大小（字节）
 }
 
 // FileHistory 单个文件的历史记录
@@ -56,18 +57,18 @@ func GetFileHistoryManager() *FileHistoryManager {
 }
 
 // BackupAndAddVersion 备份当前文件并添加版本
-func (m *FileHistoryManager) BackupAndAddVersion(filePath, description string) error {
+func (m *FileHistoryManager) BackupAndAddVersion(filePath, conversationID, description string) error {
 	// 读取当前磁盘文件
 	content, err := os.ReadFile(filePath)
 	if err != nil {
 		return fmt.Errorf("读取文件失败: %v", err)
 	}
 
-	return m.AddVersion(filePath, string(content), description)
+	return m.AddVersion(filePath, conversationID, string(content), description)
 }
 
 // AddVersion 添加新版本
-func (m *FileHistoryManager) AddVersion(filePath, content, description string) error {
+func (m *FileHistoryManager) AddVersion(filePath, conversationID, content, description string) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
@@ -87,13 +88,14 @@ func (m *FileHistoryManager) AddVersion(filePath, content, description string) e
 	if versionID%10 == 1 {
 		// 创建快照
 		version := HistoryVersion{
-			ID:          versionID,
-			IsSnapshot:  true,
-			Content:     content,
-			BaseVersion: -1,
-			Timestamp:   time.Now(),
-			Description: description,
-			Size:        int64(len(content)),
+			ID:             versionID,
+			ConversationID: conversationID,
+			IsSnapshot:     true,
+			Content:        content,
+			BaseVersion:    -1,
+			Timestamp:      time.Now(),
+			Description:    description,
+			Size:           len(content),
 		}
 		history.Versions = append(history.Versions, version)
 	} else {
@@ -101,13 +103,14 @@ func (m *FileHistoryManager) AddVersion(filePath, content, description string) e
 		if len(history.Versions) == 0 {
 			// 第一个版本，创建快照
 			version := HistoryVersion{
-				ID:          1,
-				IsSnapshot:  true,
-				Content:     content,
-				BaseVersion: -1,
-				Timestamp:   time.Now(),
-				Description: description,
-				Size:        int64(len(content)),
+				ID:             1,
+				ConversationID: conversationID,
+				IsSnapshot:     true,
+				Content:        content,
+				BaseVersion:    -1,
+				Timestamp:      time.Now(),
+				Description:    description,
+				Size:           len(content),
 			}
 			history.Versions = append(history.Versions, version)
 		} else {
@@ -119,13 +122,14 @@ func (m *FileHistoryManager) AddVersion(filePath, content, description string) e
 			diffPatch := computeDiff(baseContent, content)
 
 			version := HistoryVersion{
-				ID:          versionID,
-				IsSnapshot:  false,
-				DiffPatch:   diffPatch,
-				BaseVersion: baseVersion.ID,
-				Timestamp:   time.Now(),
-				Description: description,
-				Size:        int64(len(diffPatch)),
+				ID:             versionID,
+				ConversationID: conversationID,
+				IsSnapshot:     false,
+				DiffPatch:      diffPatch,
+				BaseVersion:    baseVersion.ID,
+				Timestamp:      time.Now(),
+				Description:    description,
+				Size:           len(diffPatch),
 			}
 			history.Versions = append(history.Versions, version)
 		}
@@ -205,6 +209,46 @@ func (m *FileHistoryManager) RestoreLatestVersion(filePath string) error {
 	}
 
 	log.Printf("✅ 已从历史恢复文件: %s (版本 %d)", filePath, latestVersionID)
+	return nil
+}
+
+// DeleteConversationHistory 删除指定会话的所有历史版本
+func (m *FileHistoryManager) DeleteConversationHistory(conversationID string) error {
+	m.mutex.Lock()
+	defer m.mutex.Unlock()
+
+	deletedCount := 0
+
+	// 遍历所有文件的历史
+	for filePath, history := range m.histories {
+		// 过滤掉属于该会话的版本
+		newVersions := []HistoryVersion{}
+		for _, version := range history.Versions {
+			if version.ConversationID != conversationID {
+				newVersions = append(newVersions, version)
+			} else {
+				deletedCount++
+			}
+		}
+
+		// 更新版本列表
+		if len(newVersions) == 0 {
+			// 没有版本了，删除整个文件历史
+			delete(m.histories, filePath)
+		} else {
+			history.Versions = newVersions
+			// 重新编号版本ID
+			for i := range history.Versions {
+				history.Versions[i].ID = i + 1
+			}
+		}
+	}
+
+	if deletedCount > 0 {
+		log.Printf("🗑️ 已删除会话 %s 的 %d 个历史版本", conversationID, deletedCount)
+		return m.saveLocked()
+	}
+
 	return nil
 }
 

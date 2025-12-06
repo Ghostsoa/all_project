@@ -120,11 +120,25 @@ func (h *AISessionsHandler) DeleteSession(c *gin.Context) {
 		return
 	}
 
+	// 1. 清理file_history
+	historyManager := models.GetFileHistoryManager()
+	if err := historyManager.DeleteConversationHistory(id); err != nil {
+		log.Printf("⚠️ 清理文件历史失败: %v", err)
+	}
+
+	// 2. 清理pending_state
+	pendingManager := models.GetPendingStateManager()
+	if err := pendingManager.RemoveConversation(id); err != nil {
+		log.Printf("⚠️ 清理pending状态失败: %v", err)
+	}
+
+	// 3. 删除会话
 	if err := storage.DeleteSession(id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 
+	log.Printf("✅ 已删除会话及关联数据: %s", id)
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "删除成功"})
 }
 
@@ -136,11 +150,25 @@ func (h *AISessionsHandler) ClearSession(c *gin.Context) {
 		return
 	}
 
+	// 1. 清理file_history
+	historyManager := models.GetFileHistoryManager()
+	if err := historyManager.DeleteConversationHistory(id); err != nil {
+		log.Printf("⚠️ 清理文件历史失败: %v", err)
+	}
+
+	// 2. 清理pending_state
+	pendingManager := models.GetPendingStateManager()
+	if err := pendingManager.RemoveConversation(id); err != nil {
+		log.Printf("⚠️ 清理pending状态失败: %v", err)
+	}
+
+	// 3. 清空消息
 	if err := storage.ClearMessages(id); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}
 
+	log.Printf("✅ 已清空会话及关联数据: %s", id)
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "清空成功"})
 }
 
