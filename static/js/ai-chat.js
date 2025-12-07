@@ -1201,24 +1201,24 @@ async function streamChat(sessionId, message, thinkingId) {
                     let content = data.content;
                     const isFirstContent = assistantMessage === '';
                     
-                    // 🔧 过滤纯\n和纯空白的content
-                    if (content) {
-                        // 1. 第一条content：去掉开头的所有\n
-                        if (isFirstContent) {
-                            while (content.startsWith('\n')) {
-                                content = content.substring(1);
-                            }
-                        }
-                        
-                        // 2. 任何时候：如果只剩纯\n或纯空白，忽略这条content
-                        if (content.trim() === '') {
-                            console.log('⚠️ 忽略纯空白content');
-                            return;
+                    // 🔧 不要过滤单个content块！直接累积
+                    // AI可能会发送单独的"\n"块用于换行，必须保留
+                    assistantMessage += content;  // 保留累积总文本（用于判断isFirstContent）
+                    currentBlockText += content;  // 当前块的文本
+                    
+                    // 🔧 在累积文本上处理：只在开头时去掉前导换行
+                    let displayText = currentBlockText;
+                    if (isFirstContent && currentBlockText) {
+                        // 第一条content：去掉累积文本开头的所有\n
+                        while (displayText.startsWith('\n')) {
+                            displayText = displayText.substring(1);
                         }
                     }
                     
-                    assistantMessage += content;  // 保留累积总文本（用于判断isFirstContent）
-                    currentBlockText += content;  // 当前块的文本
+                    // 如果处理后为空，跳过渲染
+                    if (!displayText.trim()) {
+                        return;
+                    }
                     
                     // 如果是第一条内容且有thinking，转换为正式消息
                     // 🔧 但如果messageElement已存在（reasoning创建的），不要替换
@@ -1248,8 +1248,8 @@ async function streamChat(sessionId, message, thinkingId) {
                         contentWrapper.appendChild(currentContentDiv);
                     }
                     
-                    // 更新当前块的content div
-                    currentContentDiv.innerHTML = formatMessageContent(currentBlockText);
+                    // 更新当前块的content div（使用处理后的displayText）
+                    currentContentDiv.innerHTML = formatMessageContent(displayText);
                     
                     // 🎨 立即对新渲染的代码块进行语法高亮
                     if (window.hljs) {
@@ -1290,27 +1290,27 @@ async function streamChat(sessionId, message, thinkingId) {
                     let newReasoning = data.reasoning_content || data.content || '';
                     const isFirstReasoning = reasoningContent === '';
                     
-                    // 🔧 过滤纯\n和纯空白的reasoning
-                    if (newReasoning) {
-                        // 1. 第一条reasoning：去掉开头的所有\n
-                        if (isFirstReasoning) {
-                            while (newReasoning.startsWith('\n')) {
-                                newReasoning = newReasoning.substring(1);
-                            }
-                        }
-                        
-                        // 2. 任何时候：如果只剩纯\n或纯空白，忽略这条reasoning
-                        if (newReasoning.trim() === '') {
-                            console.log('⚠️ 忽略纯空白reasoning');
-                            return;
+                    // 🔧 不要过滤单个reasoning块！直接累积
+                    // AI可能会发送单独的"\n"块用于换行，必须保留
+                    if (!newReasoning && newReasoning !== '') {
+                        console.warn('⚠️ 收到空的reasoning数据:', data);
+                        return;
+                    }
+                    
+                    reasoningContent += newReasoning;
+                    
+                    // 🔧 在累积文本上处理：只在开头时去掉前导换行
+                    let displayReasoning = reasoningContent;
+                    if (isFirstReasoning && reasoningContent) {
+                        // 第一条reasoning：去掉累积文本开头的所有\n
+                        while (displayReasoning.startsWith('\n')) {
+                            displayReasoning = displayReasoning.substring(1);
                         }
                     }
                     
-                    if (newReasoning) {
-                        reasoningContent += newReasoning;
-                    } else {
-                        console.warn('⚠️ 收到空的reasoning数据:', data);
-                        return; // 跳过后续的空内容
+                    // 如果处理后为空，跳过渲染
+                    if (!displayReasoning.trim()) {
+                        return;
                     }
                     
                     // 如果还没有消息元素，将thinking转换为正式消息
@@ -1324,9 +1324,9 @@ async function streamChat(sessionId, message, thinkingId) {
                         }
                     }
                     
-                    // 只有内容不为空时才更新思维链
-                    if (reasoningContent) {
-                        updateReasoningContent(messageElement, reasoningContent, false, true);
+                    // 只有内容不为空时才更新思维链（使用处理后的displayReasoning）
+                    if (displayReasoning) {
+                        updateReasoningContent(messageElement, displayReasoning, false, true);
                         scrollToBottom();
                     }
                     
