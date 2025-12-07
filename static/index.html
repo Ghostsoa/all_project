@@ -495,43 +495,23 @@
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown-dark.min.css">
     <!-- Marked.js CDN -->
     <script>
-        // 创建一个临时的全局接收器
-        (function() {
-            const originalDefine = window.define;
-            const originalExports = window.exports;
-            const originalModule = window.module;
-            
-            // 临时禁用 AMD/CommonJS 检测，强制使用全局模式
-            delete window.define;
-            delete window.exports;
-            delete window.module;
-            
-            // 恢复函数
-            window.__restoreMarkedEnv = function() {
-                if (originalDefine) window.define = originalDefine;
-                else delete window.define;
-                if (originalExports) window.exports = originalExports;
-                else delete window.exports;
-                if (originalModule) window.module = originalModule;
-                else delete window.module;
-                delete window.__restoreMarkedEnv;
-            };
-        })();
+        // 创建假的 CommonJS 环境来捕获导出
+        window.module = { exports: {} };
+        window.exports = window.module.exports;
     </script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
-        // 恢复环境并检查
-        if (window.__restoreMarkedEnv) {
-            window.__restoreMarkedEnv();
+        // 从 module.exports 中提取 marked 并暴露到全局
+        if (window.module && window.module.exports) {
+            window.marked = window.module.exports;
+            console.log('✅ marked已成功加载:', typeof window.marked.parse);
+        } else {
+            console.error('❌ marked加载失败');
         }
         
-        // 验证 marked 是否加载
-        if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
-            window.marked = marked;
-            console.log('✅ marked已成功加载:', typeof marked.parse);
-        } else {
-            console.error('❌ marked仍未加载，window.marked =', window.marked);
-        }
+        // 清理临时变量
+        delete window.module;
+        delete window.exports;
         
         // 检查hljs
         if (typeof hljs !== 'undefined') {
