@@ -504,19 +504,8 @@ func editFile(args FileOperationArgs, conversationID string, messageID string) (
 	return string(resultJSON), nil
 }
 
-// listDir 列出目录内容
+// listDir 列出目录内容（支持本地和远程）
 func listDir(args FileOperationArgs) (string, error) {
-	// 检查server_id（目前只支持本地）
-	if args.ServerID != "" && args.ServerID != "local" {
-		return "", fmt.Errorf("目录列表操作目前仅支持本地文件系统，不支持远程服务器 [%s]", args.ServerID)
-	}
-
-	// 读取目录
-	entries, err := os.ReadDir(args.FilePath)
-	if err != nil {
-		return "", fmt.Errorf("读取目录失败: %v", err)
-	}
-
 	type DirItem struct {
 		Name  string `json:"name"`
 		IsDir bool   `json:"is_dir"`
@@ -524,32 +513,73 @@ func listDir(args FileOperationArgs) (string, error) {
 	}
 
 	items := []DirItem{}
-	for _, entry := range entries {
-		info, _ := entry.Info()
-		size := int64(0)
-		if info != nil {
-			size = info.Size()
+	truncated := false
+
+	if args.ServerID == "" || args.ServerID == "local" {
+		// 本地目录
+		entries, err := os.ReadDir(args.FilePath)
+		if err != nil {
+			return "", fmt.Errorf("读取本地目录失败: %v", err)
 		}
 
-		name := entry.Name()
-		// 🔧 截断文件名（避免极长文件名）
-		if len(name) > 200 {
-			name = truncateLine(name, 200)
+		for _, entry := range entries {
+			info, _ := entry.Info()
+			size := int64(0)
+			if info != nil {
+				size = info.Size()
+			}
+
+			name := entry.Name()
+			if len(name) > 200 {
+				name = truncateLine(name, 200)
+			}
+
+			items = append(items, DirItem{
+				Name:  name,
+				IsDir: entry.IsDir(),
+				Size:  size,
+			})
+
+			if len(items) >= 100 {
+				break
+			}
 		}
 
-		items = append(items, DirItem{
-			Name:  name,
-			IsDir: entry.IsDir(),
-			Size:  size,
-		})
-
-		// 限制返回数量（避免目录项过多）
-		if len(items) >= 100 {
-			break
+		truncated = len(entries) > 100
+		log.Printf("📁 [本地] 列出目录: %s (%d项)", args.FilePath, len(items))
+	} else {
+		// 远程目录（SFTP）
+		sftpClient, err := getSFTPClient(args.ServerID)
+		if err != nil {
+			return "", fmt.Errorf("获取远程服务器连接失败: %v", err)
 		}
+
+		// 读取远程目录
+		entries, err := sftpClient.ReadDir(args.FilePath)
+		if err != nil {
+			return "", fmt.Errorf("读取远程目录失败: %v", err)
+		}
+
+		for _, entry := range entries {
+			name := entry.Name()
+			if len(name) > 200 {
+				name = truncateLine(name, 200)
+			}
+
+			items = append(items, DirItem{
+				Name:  name,
+				IsDir: entry.IsDir(),
+				Size:  entry.Size(),
+			})
+
+			if len(items) >= 100 {
+				break
+			}
+		}
+
+		truncated = len(entries) > 100
+		log.Printf("📁 [%s] 列出远程目录: %s (%d项)", args.ServerID, args.FilePath, len(items))
 	}
-
-	truncated := len(entries) > 100
 
 	result := map[string]interface{}{
 		"success":   true,
