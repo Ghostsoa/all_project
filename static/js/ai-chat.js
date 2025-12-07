@@ -1831,27 +1831,14 @@ function convertThinkingToMessage(thinkingId) {
     return thinkingDiv;
 }
 
-// markdown-it实例（延迟初始化）
-let mdInstance = null;
-
-// 格式化消息内容（使用markdown-it）
+// 格式化消息内容（使用marked + GitHub CSS）
 function formatMessageContent(content) {
     if (!content) return '';
     
-    // 检查markdown-it是否可用
-    if (typeof window.markdownit === 'undefined') {
-        console.warn('⚠️ markdown-it未加载，使用简单转义');
+    // 检查marked是否可用
+    if (typeof window.marked === 'undefined' || typeof window.marked.parse !== 'function') {
+        console.warn('⚠️ marked.js未加载，使用简单转义');
         return escapeHtml(content).replace(/\n/g, '<br>');
-    }
-    
-    // 初始化markdown-it实例（只初始化一次）
-    if (!mdInstance) {
-        mdInstance = window.markdownit({
-            html: false,        // 不允许HTML标签
-            breaks: true,       // 转换换行符为<br>
-            linkify: true,      // 自动转换URL为链接
-            typographer: true,  // 美化排版（引号、破折号等）
-        });
     }
     
     try {
@@ -1881,15 +1868,20 @@ function formatMessageContent(content) {
             return placeholder;
         });
         
-        // 2. 使用markdown-it渲染（不包含代码块）
-        let html = mdInstance.render(processedContent);
+        // 2. 使用marked渲染（不包含代码块）
+        let html = marked.parse(processedContent, {
+            breaks: true,     // GFM换行
+            gfm: true,        // GitHub Flavored Markdown
+            headerIds: false, // 不生成header id
+        });
         
         // 3. 恢复代码块
         codeBlocks.forEach((block, i) => {
             html = html.replace(`__CODEBLOCK_${i}__`, block);
         });
         
-        return html;
+        // 4. 用GitHub CSS的class包裹（获得美观样式）
+        return `<div class="markdown-body">${html}</div>`;
     } catch (error) {
         console.error('❌ Markdown渲染失败:', error);
         // 降级处理

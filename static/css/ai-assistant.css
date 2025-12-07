@@ -810,33 +810,52 @@
     margin: 8px 0 4px 0;
 }
 
-/* 列表 */
-.message-content ul,
-.message-content ol {
-    margin: 6px 0;
-    padding-left: 20px;
-}
-
-.message-content li {
-    margin: 3px 0;
+/* GitHub Markdown 样式配置 */
+.message-content .markdown-body {
+    font-size: 14px;
     line-height: 1.6;
+    word-wrap: break-word;
+    background: transparent !important;
+    color: inherit !important;
+    padding: 0 !important;
+    margin: 0 !important;
 }
 
-.message-content ul li {
-    list-style-type: disc;
+/* 覆盖GitHub CSS的代码块样式，使用我们的自定义样式 */
+.message-content .markdown-body .code-block {
+    margin: 12px 0;
 }
 
-.message-content ol li {
-    list-style-type: decimal;
+.message-content .markdown-body pre {
+    all: unset; /* 重置GitHub CSS的pre样式 */
 }
 
-/* 嵌套列表 */
-.message-content ul ul,
-.message-content ol ul,
-.message-content ul ol,
-.message-content ol ol {
-    margin-top: 3px;
-    margin-bottom: 3px;
+/* 保持原有列表样式（如果需要覆盖GitHub CSS） */
+.message-content .markdown-body ul,
+.message-content .markdown-body ol {
+    padding-left: 2em;
+}
+
+.message-content .markdown-body li {
+    margin: 0.25em 0;
+}
+
+/* 表格样式 */
+.message-content .markdown-body table {
+    border-collapse: collapse;
+    margin: 12px 0;
+    width: 100%;
+}
+
+.message-content .markdown-body table th,
+.message-content .markdown-body table td {
+    padding: 8px 12px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.message-content .markdown-body table th {
+    background: rgba(96, 165, 250, 0.1);
+    font-weight: 600;
 }
 
 /* 引用 */

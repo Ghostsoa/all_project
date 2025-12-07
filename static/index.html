@@ -491,8 +491,10 @@
     <script src="https://cdn.jsdelivr.net/npm/monaco-editor@0.45.0/min/vs/loader.js"></script>
     <!-- Highlight.js CDN -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
-    <!-- Markdown-it CDN (更漂亮的渲染，支持插件) -->
-    <script src="https://cdn.jsdelivr.net/npm/markdown-it@14.0.0/dist/markdown-it.min.js" onload="console.log('✅ markdown-it已加载:', typeof markdownit)"></script>
+    <!-- GitHub Markdown CSS (美观的样式) -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown-dark.min.css">
+    <!-- Marked.js UMD版本 (稳定可靠) -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/lib/marked.umd.min.js" onload="console.log('✅ marked.js已加载:', typeof marked)"></script>
     <script>
         // 等待DOM加载完成后检查依赖
         window.addEventListener('DOMContentLoaded', function() {
@@ -504,12 +506,12 @@
                 console.warn('⚠️ hljs未加载');
             }
             
-            // 检查markdown-it
-            if (typeof markdownit !== 'undefined') {
-                window.markdownit = markdownit;
-                console.log('✅ markdown-it已加载并暴露到window');
+            // 检查marked
+            if (typeof marked !== 'undefined') {
+                window.marked = marked;
+                console.log('✅ marked已加载并暴露到window');
             } else {
-                console.error('❌ markdown-it未加载！请检查CDN连接');
+                console.error('❌ marked未加载！请检查CDN连接');
             }
         });
     </script>
