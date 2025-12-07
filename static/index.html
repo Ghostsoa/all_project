@@ -493,17 +493,9 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <!-- GitHub Markdown CSS (美观的样式) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown-dark.min.css">
-    <!-- Marked.js 使用unpkg CDN (更稳定) + 使用旧版本v4 (UMD格式) -->
-    <script src="https://unpkg.com/marked@4.3.0/marked.min.js"></script>
+    <!-- Marked.js 官方推荐CDN -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/lib/marked.umd.js"></script>
     <script>
-        // 立即检查并暴露marked
-        if (typeof marked !== 'undefined') {
-            window.marked = marked;
-            console.log('✅ marked已加载 (v4.3.0):', typeof marked);
-        } else {
-            console.error('❌ marked未加载！');
-        }
-        
         // 等待DOM加载完成后检查依赖
         window.addEventListener('DOMContentLoaded', function() {
             // 检查hljs
@@ -514,11 +506,12 @@
                 console.warn('⚠️ hljs未加载');
             }
             
-            // 再次检查marked
-            if (typeof window.marked !== 'undefined') {
-                console.log('✅ marked可用:', typeof window.marked);
+            // 检查marked
+            if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
+                window.marked = marked;
+                console.log('✅ marked已加载并可用');
             } else {
-                console.error('❌ marked不可用！');
+                console.error('❌ marked未加载！');
             }
         });
     </script>

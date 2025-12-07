@@ -1836,7 +1836,7 @@ function formatMessageContent(content) {
     if (!content) return '';
     
     // 检查marked是否可用
-    if (typeof window.marked !== 'function') {
+    if (!window.marked || typeof window.marked.parse !== 'function') {
         console.warn('⚠️ marked.js未加载，使用简单转义');
         return escapeHtml(content).replace(/\n/g, '<br>');
     }
@@ -1869,8 +1869,8 @@ function formatMessageContent(content) {
         });
         
         // 2. 使用marked渲染（不包含代码块）
-        // marked v4 API: 直接调用marked()函数
-        let html = marked(processedContent, {
+        // 官方API: marked.parse()
+        let html = marked.parse(processedContent, {
             breaks: true,     // GFM换行
             gfm: true,        // GitHub Flavored Markdown
             headerIds: false, // 不生成header id
