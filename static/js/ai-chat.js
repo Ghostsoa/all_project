@@ -1828,20 +1828,44 @@ function formatMessageContent(content) {
     }
     
     try {
-        // 1. 先提取并保护代码块（添加执行按钮）
-        const codeBlocks = [];
-        let processedContent = content.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+        // 1. 先用 marked 渲染整个内容
+        let html = marked.parse(content, {
+            breaks: true,     // GFM换行
+            gfm: true,        // GitHub Flavored Markdown
+            headerIds: false, // 不生成header id
+        });
+        
+        // 2. 包裹 GitHub CSS
+        const wrapper = document.createElement('div');
+        wrapper.className = 'markdown-body';
+        wrapper.innerHTML = html;
+        
+        // 3. 查找所有代码块并替换成自定义结构
+        const preElements = wrapper.querySelectorAll('pre > code');
+        preElements.forEach(codeElement => {
+            const preElement = codeElement.parentElement;
             const codeId = 'code-' + Math.random().toString(36).substr(2, 9);
-            const placeholder = `__CODEBLOCK_${codeBlocks.length}__`;
-            const isBash = lang === 'bash' || lang === 'sh' || lang === 'shell';
-            const executeBtn = isBash ? `<button class="code-execute-btn" onclick="executeCode('${codeId}')" title="在终端执行">
-                        <i class="fa-solid fa-play"></i> Run
-                    </button>` : '';
             
-            const escapedCode = escapeHtml(code.trim());
-            codeBlocks.push(`<div class="code-block">
+            // 获取语言（从 class="language-xxx" 中提取）
+            const langMatch = codeElement.className.match(/language-(\w+)/);
+            const lang = langMatch ? langMatch[1] : 'text';
+            
+            // 判断是否为可执行的 shell 代码
+            const isBash = lang === 'bash' || lang === 'sh' || lang === 'shell';
+            const executeBtn = isBash ? 
+                `<button class="code-execute-btn" onclick="executeCode('${codeId}')" title="在终端执行">
+                    <i class="fa-solid fa-play"></i> Run
+                </button>` : '';
+            
+            // 获取代码内容
+            const code = codeElement.textContent;
+            
+            // 创建自定义代码块
+            const customBlock = document.createElement('div');
+            customBlock.className = 'code-block';
+            customBlock.innerHTML = `
                 <div class="code-header">
-                    <span class="code-lang">${lang || 'text'}</span>
+                    <span class="code-lang">${lang}</span>
                     <div class="code-actions">
                         ${executeBtn}
                         <button class="code-copy-btn" onclick="copyCode('${codeId}', event)" title="复制代码">
@@ -1849,26 +1873,14 @@ function formatMessageContent(content) {
                         </button>
                     </div>
                 </div>
-                <pre><code id="${codeId}" class="language-${lang || 'text'}">${escapedCode}</code></pre>
-            </div>`);
-            return placeholder;
+                <pre><code id="${codeId}" class="language-${lang}">${escapeHtml(code)}</code></pre>
+            `;
+            
+            // 替换原来的 pre 元素
+            preElement.replaceWith(customBlock);
         });
         
-        // 2. 使用marked渲染（不包含代码块）
-        // 官方API: marked.parse()
-        let html = marked.parse(processedContent, {
-            breaks: true,     // GFM换行
-            gfm: true,        // GitHub Flavored Markdown
-            headerIds: false, // 不生成header id
-        });
-        
-        // 3. 恢复代码块
-        codeBlocks.forEach((block, i) => {
-            html = html.replace(`__CODEBLOCK_${i}__`, block);
-        });
-        
-        // 4. 用GitHub CSS的class包裹（获得美观样式）
-        return `<div class="markdown-body">${html}</div>`;
+        return wrapper.outerHTML;
     } catch (error) {
         console.error('❌ Markdown渲染失败:', error);
         // 降级处理
