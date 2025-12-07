@@ -493,25 +493,45 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <!-- GitHub Markdown CSS (美观的样式) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown-dark.min.css">
-    <!-- Marked.js CDN - 使用同步加载 -->
+    <!-- Marked.js CDN -->
+    <script>
+        // 创建一个临时的全局接收器
+        (function() {
+            const originalDefine = window.define;
+            const originalExports = window.exports;
+            const originalModule = window.module;
+            
+            // 临时禁用 AMD/CommonJS 检测，强制使用全局模式
+            delete window.define;
+            delete window.exports;
+            delete window.module;
+            
+            // 恢复函数
+            window.__restoreMarkedEnv = function() {
+                if (originalDefine) window.define = originalDefine;
+                else delete window.define;
+                if (originalExports) window.exports = originalExports;
+                else delete window.exports;
+                if (originalModule) window.module = originalModule;
+                else delete window.module;
+                delete window.__restoreMarkedEnv;
+            };
+        })();
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
     <script>
-        // 等待并确保 marked 加载完成
-        (function() {
-            let retries = 0;
-            const checkMarked = () => {
-                if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
-                    window.marked = marked;
-                    console.log('✅ marked已加载:', typeof marked.parse);
-                } else if (retries < 10) {
-                    retries++;
-                    setTimeout(checkMarked, 50);
-                } else {
-                    console.error('❌ marked加载超时');
-                }
-            };
-            checkMarked();
-        })();
+        // 恢复环境并检查
+        if (window.__restoreMarkedEnv) {
+            window.__restoreMarkedEnv();
+        }
+        
+        // 验证 marked 是否加载
+        if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
+            window.marked = marked;
+            console.log('✅ marked已成功加载:', typeof marked.parse);
+        } else {
+            console.error('❌ marked仍未加载，window.marked =', window.marked);
+        }
         
         // 检查hljs
         if (typeof hljs !== 'undefined') {
