@@ -23,8 +23,7 @@ func main() {
 	log.Println("✓ 存储系统初始化成功")
 
 	// 2️⃣ 初始化加密系统（生成或加载密钥）
-	dataDir := storage.GetServerDataDir("") // 获取根目录
-	if err := storage.InitEncryption(dataDir); err != nil {
+	if err := storage.InitEncryption(storage.GetBaseDataDir()); err != nil {
 		log.Fatalf("❌ 加密系统初始化失败: %v", err)
 	}
 	log.Println("✓ 加密系统初始化成功")

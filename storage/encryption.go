@@ -22,6 +22,11 @@ var (
 
 // InitEncryption 初始化加密系统（生成或加载密钥）
 func InitEncryption(dataDir string) error {
+	// 确保数据目录存在
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		return fmt.Errorf("创建数据目录失败: %v", err)
+	}
+
 	keyPath := filepath.Join(dataDir, keyFile)
 
 	// 检查密钥文件是否存在

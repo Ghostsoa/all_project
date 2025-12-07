@@ -37,6 +37,11 @@ func getDataDir() string {
 	return filepath.Join(homeDir, ".ssh_web_data")
 }
 
+// GetBaseDataDir 获取根数据目录（用于存放全局配置和密钥）
+func GetBaseDataDir() string {
+	return baseDir
+}
+
 // GetServerDataDir 获取指定服务器的数据目录
 func GetServerDataDir(serverID string) string {
 	if serverID == "" {
