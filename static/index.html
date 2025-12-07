@@ -493,16 +493,16 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
     <!-- GitHub Markdown CSS (美观的样式) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown-dark.min.css">
-    <!-- Marked.js CDN - 使用 min 版本确保全局暴露 -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <!-- Marked.js CDN - 官方推荐UMD版本 -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/lib/marked.umd.js"></script>
     <script>
         // 检查hljs
         if (typeof hljs !== 'undefined') {
             window.hljs = hljs;
             console.log('✅ hljs已加载并暴露到window');
         }
-        // 检查marked
-        if (typeof marked !== 'undefined') {
+        // 检查marked - 官方API直接使用marked.parse()
+        if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
             window.marked = marked;
             console.log('✅ marked已加载并暴露到window:', typeof marked.parse);
         } else {
