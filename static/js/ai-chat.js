@@ -1525,16 +1525,9 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
                 <span class="thought-text">Thought</span>
                 <i class="fa-solid fa-chevron-right reasoning-arrow"></i>
             </div>
-            <div class="reasoning-content collapsed">${formatMessageContent(filteredReasoning)}</div>
+            <div class="reasoning-content collapsed">${escapeHtml(filteredReasoning).replace(/\n/g, '<br>')}</div>
         `;
         contentWrapper.appendChild(reasoningDiv);
-        
-        // 🎨 立即对思维链中的代码块进行语法高亮
-        if (window.hljs) {
-            reasoningDiv.querySelectorAll('pre code').forEach((block) => {
-                hljs.highlightElement(block);
-            });
-        }
     }
     
     // 🔧 过滤content：去掉开头\n，纯空白时清空为""
@@ -1749,15 +1742,8 @@ function updateReasoningContent(messageElement, reasoning, autoCollapse = false,
     const header = reasoningDiv.querySelector('.reasoning-header');
     
     if (reasoningContent) {
-        // 使用Markdown渲染思维链内容
-        reasoningContent.innerHTML = formatMessageContent(reasoning);
-        
-        // 🎨 立即对新渲染的代码块进行语法高亮
-        if (window.hljs) {
-            reasoningContent.querySelectorAll('pre code').forEach((block) => {
-                hljs.highlightElement(block);
-            });
-        }
+        // 思维链使用纯文本显示（不渲染 Markdown）
+        reasoningContent.innerHTML = escapeHtml(reasoning).replace(/\n/g, '<br>');
         
         // 🔧 如果正在更新内容（不是自动折叠），且div已折叠，则展开它
         if (!autoCollapse && reasoningContent.classList.contains('collapsed')) {

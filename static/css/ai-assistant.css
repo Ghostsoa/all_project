@@ -682,19 +682,7 @@
     overflow-wrap: break-word;
 }
 
-/* Markdown样式 */
-
-/* 行内代码 */
-.message-content code {
-    background: rgba(255, 255, 255, 0.1);
-    color: #e879f9;
-    padding: 2px 6px;
-    border-radius: 3px;
-    font-size: 12px;
-    font-family: 'Consolas', 'Monaco', 'Courier New', monospace;
-}
-
-/* 代码块容器 */
+/* 代码块容器（自定义功能：带复制和执行按钮）*/
 .code-block {
     margin: 8px 0;
     border-radius: 6px;
@@ -775,110 +763,22 @@
     display: block;
 }
 
-/* 粗体和斜体 */
-.message-content strong {
-    font-weight: 600;
-    color: #60a5fa;
-}
-
-.message-content em {
-    font-style: italic;
-    color: rgba(255, 255, 255, 0.9);
-}
-
-/* 标题 */
-.message-content h1 {
-    font-size: 18px;
-    font-weight: 600;
-    color: #60a5fa;
-    margin: 12px 0 8px 0;
-    padding-bottom: 4px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.message-content h2 {
-    font-size: 16px;
-    font-weight: 600;
-    color: #60a5fa;
-    margin: 10px 0 6px 0;
-}
-
-.message-content h3 {
-    font-size: 14px;
-    font-weight: 600;
-    color: #60a5fa;
-    margin: 8px 0 4px 0;
-}
-
-/* GitHub Markdown 样式配置 */
+/* GitHub Markdown 样式自定义覆盖 */
 .message-content .markdown-body {
     font-size: 14px;
     line-height: 1.6;
-    word-wrap: break-word;
     background: transparent !important;
-    color: inherit !important;
     padding: 0 !important;
     margin: 0 !important;
 }
 
-/* 覆盖GitHub CSS的代码块样式，使用我们的自定义样式 */
+/* 覆盖 GitHub CSS 的代码块，使用我们的自定义代码块样式 */
+.message-content .markdown-body pre {
+    all: unset;
+}
+
 .message-content .markdown-body .code-block {
     margin: 12px 0;
-}
-
-.message-content .markdown-body pre {
-    all: unset; /* 重置GitHub CSS的pre样式 */
-}
-
-/* 保持原有列表样式（如果需要覆盖GitHub CSS） */
-.message-content .markdown-body ul,
-.message-content .markdown-body ol {
-    padding-left: 2em;
-}
-
-.message-content .markdown-body li {
-    margin: 0.25em 0;
-}
-
-/* 表格样式 */
-.message-content .markdown-body table {
-    border-collapse: collapse;
-    margin: 12px 0;
-    width: 100%;
-}
-
-.message-content .markdown-body table th,
-.message-content .markdown-body table td {
-    padding: 8px 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.message-content .markdown-body table th {
-    background: rgba(96, 165, 250, 0.1);
-    font-weight: 600;
-}
-
-/* 引用 */
-.message-content blockquote {
-    margin: 8px 0;
-    padding: 8px 12px;
-    border-left: 3px solid rgba(96, 165, 250, 0.5);
-    background: rgba(96, 165, 250, 0.05);
-    color: rgba(255, 255, 255, 0.8);
-    font-style: italic;
-}
-
-/* 链接 */
-.message-content a {
-    color: #60a5fa;
-    text-decoration: none;
-    border-bottom: 1px solid rgba(96, 165, 250, 0.3);
-    transition: all 0.2s ease;
-}
-
-.message-content a:hover {
-    color: #93c5fd;
-    border-bottom-color: #93c5fd;
 }
 
 /* 思维链样式 */
