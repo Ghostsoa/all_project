@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"log"
 	"time"
 )
 
@@ -38,6 +39,20 @@ func CreateServer(server *Server) error {
 		return fmt.Errorf("配置未加载")
 	}
 
+	// 🔐 如果有明文密码，立即加密
+	if server.Password != "" {
+		log.Printf("🔒 检测到明文密码，立即加密: [%s] %s", server.ID, server.Name)
+
+		encrypted, err := Encrypt(server.Password)
+		if err != nil {
+			return fmt.Errorf("密码加密失败: %v", err)
+		}
+
+		server.PasswordEncrypted = encrypted
+		server.Password = "" // 清空明文
+		log.Printf("✅ 密码已加密: [%s]", server.ID)
+	}
+
 	server.CreatedAt = time.Now()
 	server.UpdatedAt = time.Now()
 	globalConfig.Servers = append(globalConfig.Servers, *server)
@@ -52,6 +67,20 @@ func UpdateServer(server *Server) error {
 
 	if globalConfig == nil {
 		return fmt.Errorf("配置未加载")
+	}
+
+	// 🔐 如果有明文密码，立即加密
+	if server.Password != "" {
+		log.Printf("🔒 检测到明文密码，立即加密: [%s] %s", server.ID, server.Name)
+
+		encrypted, err := Encrypt(server.Password)
+		if err != nil {
+			return fmt.Errorf("密码加密失败: %v", err)
+		}
+
+		server.PasswordEncrypted = encrypted
+		server.Password = "" // 清空明文
+		log.Printf("✅ 密码已加密: [%s]", server.ID)
 	}
 
 	found := false

@@ -77,10 +77,10 @@ func main() {
 	tools.SetSFTPClientGetter(func(serverID string) (*sftp.Client, error) {
 		session := handlers.GetSessionManager().GetSessionByServerID(serverID)
 		if session == nil {
-			return nil, fmt.Errorf("远程服务器未连接: %s，请先在终端中连接SSH会话", serverID)
+			return nil, fmt.Errorf("❌ 服务器 [%s] 当前未连接SSH。请停止继续操作，并提示用户：需要先在终端中手动连接该服务器后，才能进行文件操作", serverID)
 		}
 		if session.SFTPClient == nil {
-			return nil, fmt.Errorf("远程服务器的SFTP客户端未初始化: %s", serverID)
+			return nil, fmt.Errorf("❌ 服务器 [%s] 的SFTP客户端未初始化。请停止继续操作，并提示用户：需要先在终端中手动连接该服务器后，才能进行文件操作", serverID)
 		}
 		return session.SFTPClient, nil
 	})
@@ -90,10 +90,10 @@ func main() {
 	tools.SetSSHClientGetter(func(serverID string) (interface{}, error) {
 		session := handlers.GetSessionManager().GetSessionByServerID(serverID)
 		if session == nil {
-			return nil, fmt.Errorf("远程服务器未连接: %s，请先在终端中连接SSH会话", serverID)
+			return nil, fmt.Errorf("❌ 服务器 [%s] 当前未连接SSH。请停止继续操作，并提示用户：需要先在终端中手动连接该服务器后，才能进行远程命令执行", serverID)
 		}
 		if session.SSHClient == nil {
-			return nil, fmt.Errorf("远程服务器的SSH客户端未初始化: %s", serverID)
+			return nil, fmt.Errorf("❌ 服务器 [%s] 的SSH客户端未初始化。请停止继续操作，并提示用户：需要先在终端中手动连接该服务器后，才能进行远程命令执行", serverID)
 		}
 		return session.SSHClient, nil
 	})

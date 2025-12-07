@@ -2,6 +2,7 @@ package storage
 
 import (
 	"fmt"
+	"log"
 )
 
 // LoadProvidersCache 加载供应商到内存（服务器启动时调用一次）
@@ -93,6 +94,20 @@ func CreateProvider(provider *Provider) error {
 		}
 	}
 
+	// 🔐 如果有明文API Key，立即加密
+	if provider.APIKey != "" {
+		log.Printf("🔒 检测到明文API Key，立即加密: %s", provider.Name)
+
+		encrypted, err := Encrypt(provider.APIKey)
+		if err != nil {
+			return fmt.Errorf("API Key加密失败: %v", err)
+		}
+
+		provider.APIKeyEncrypted = encrypted
+		provider.APIKey = "" // 清空明文
+		log.Printf("✅ API Key已加密: %s", provider.Name)
+	}
+
 	globalConfig.Providers = append(globalConfig.Providers, *provider)
 	return writeJSON(configFile, globalConfig)
 }
@@ -104,6 +119,20 @@ func UpdateProvider(provider *Provider) error {
 
 	if globalConfig == nil {
 		return fmt.Errorf("配置未加载")
+	}
+
+	// 🔐 如果有明文API Key，立即加密
+	if provider.APIKey != "" {
+		log.Printf("🔒 检测到明文API Key，立即加密: %s", provider.Name)
+
+		encrypted, err := Encrypt(provider.APIKey)
+		if err != nil {
+			return fmt.Errorf("API Key加密失败: %v", err)
+		}
+
+		provider.APIKeyEncrypted = encrypted
+		provider.APIKey = "" // 清空明文
+		log.Printf("✅ API Key已加密: %s", provider.Name)
 	}
 
 	found := false

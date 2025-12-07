@@ -131,8 +131,11 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
+		// 🔧 动态构建系统prompt（注入服务器列表）
+		systemPrompt := buildDynamicSystemPrompt(aiConfig.SystemPrompt)
+
 		// 构建消息历史
-		messages := buildMessagesForAPI(session.Messages, aiConfig.SystemPrompt)
+		messages := buildMessagesForAPI(session.Messages, systemPrompt)
 
 		// 构建用户消息内容（注入上下文信息）
 		userContent := req.Content
@@ -670,4 +673,29 @@ func getMap(m map[string]interface{}, key string) map[string]interface{} {
 		return v
 	}
 	return map[string]interface{}{}
+}
+
+// buildDynamicSystemPrompt 构建动态系统prompt（注入服务器列表等上下文信息）
+func buildDynamicSystemPrompt(basePrompt string) string {
+	// 获取所有服务器列表
+	servers, err := storage.GetServers()
+	if err != nil {
+		log.Printf("⚠️ 获取服务器列表失败: %v", err)
+		return basePrompt
+	}
+
+	// 如果没有服务器，返回原始prompt
+	if len(servers) == 0 {
+		return basePrompt
+	}
+
+	// 构建服务器列表文本（简洁版：只包含名称和server_id）
+	serverListText := "\n\n## 📡 可用服务器列表\n\n"
+
+	for _, server := range servers {
+		serverListText += fmt.Sprintf("- %s (server_id: `%s`)\n", server.Name, server.ID)
+	}
+
+	// 将服务器列表附加到原始prompt后面
+	return basePrompt + serverListText
 }
