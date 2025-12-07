@@ -2405,8 +2405,8 @@ function updateToolResult(messageElement, data) {
     // 解析result（可能是JSON字符串）
     let resultObj;
     try {
-        // code_search返回纯文本（XML格式），不需要JSON.parse
-        if (toolName === 'code_search') {
+        // code_search和baidu_search返回纯文本（XML/JSON格式），不需要JSON.parse
+        if (toolName === 'code_search' || toolName === 'baidu_search') {
             resultObj = result; // 直接使用原始文本
         } else {
             resultObj = typeof result === 'string' ? JSON.parse(result) : result;

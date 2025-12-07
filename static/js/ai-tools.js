@@ -540,8 +540,12 @@ class AIToolsManager {
      * 渲染baidu_search工具结果（展开式搜索结果列表）
      */
     renderBaiduSearchTool(result, toolCallId) {
+        console.log('🔍 renderBaiduSearchTool 接收到的result:', result);
+        
         // 获取结果文本
-        const resultText = typeof result === 'string' ? result : (result.content || result.result || '');
+        let resultText = typeof result === 'string' ? result : (result.content || result.result || '');
+        console.log('📝 resultText类型:', typeof resultText, '长度:', resultText.length);
+        console.log('📝 resultText前100字符:', resultText.substring(0, 100));
         
         // 解析JSON格式的搜索结果
         let searchData;
@@ -549,6 +553,7 @@ class AIToolsManager {
             searchData = JSON.parse(resultText);
         } catch (e) {
             console.error('解析百度搜索结果失败:', e);
+            console.error('原始文本:', resultText);
             return `
                 <div class="tool-call">
                     <div class="tool-simple completed">
