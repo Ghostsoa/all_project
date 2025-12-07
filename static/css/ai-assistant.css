@@ -763,19 +763,18 @@
     display: block;
 }
 
-/* Drake Dark 主题适配 */
-.message-content .markdown-body,
-.message-content #write {
+/* GitHub Markdown 样式自定义覆盖 */
+.message-content .markdown-body {
     font-size: 14px;
     line-height: 1.6;
     background: transparent !important;
     padding: 0 !important;
     margin: 0 !important;
-    color: rgba(255, 255, 255, 0.9) !important;
 }
 
-.message-content .markdown-body .code-block,
-.message-content #write .code-block {
+
+
+.message-content .markdown-body .code-block {
     margin: 12px 0;
 }
 
