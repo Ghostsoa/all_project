@@ -494,19 +494,12 @@
     <!-- GitHub Markdown CSS (美观的样式) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown-dark.min.css">
     <!-- Marked.js CDN - 官方推荐UMD版本 -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/lib/marked.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/lib/marked.umd.js" onload="console.log('✅ marked.js脚本加载完成:', typeof marked, typeof marked?.parse);"></script>
     <script>
         // 检查hljs
         if (typeof hljs !== 'undefined') {
             window.hljs = hljs;
             console.log('✅ hljs已加载并暴露到window');
-        }
-        // 检查marked - 官方API直接使用marked.parse()
-        if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
-            window.marked = marked;
-            console.log('✅ marked已加载并暴露到window:', typeof marked.parse);
-        } else {
-            console.error('❌ marked未加载');
         }
     </script>
     <script type="module" src="/static/js/main.js"></script>
