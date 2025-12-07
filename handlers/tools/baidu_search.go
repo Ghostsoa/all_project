@@ -116,8 +116,8 @@ func ExecuteBaiduSearch(argsJSON string) (string, error) {
 		return "", fmt.Errorf("百度搜索失败: %v", err)
 	}
 
-	// 格式化结果
-	return formatBaiduSearchResult(result), nil
+	// 返回JSON格式的结果
+	return formatBaiduSearchResultJSON(result, params.Query)
 }
 
 // callBaiduSearchAPI 调用百度搜索API
@@ -198,34 +198,56 @@ func callBaiduSearchAPI(apiKey string, params BaiduSearchParams) (*baiduSearchRe
 	return &result, nil
 }
 
-// formatBaiduSearchResult 格式化搜索结果为文本
-func formatBaiduSearchResult(result *baiduSearchResponse) string {
+// BaiduSearchResult 前端友好的搜索结果格式
+type BaiduSearchResult struct {
+	Query   string                  `json:"query"`
+	Count   int                     `json:"count"`
+	Results []BaiduSearchResultItem `json:"results"`
+}
+
+// BaiduSearchResultItem 单条搜索结果
+type BaiduSearchResultItem struct {
+	ID      int    `json:"id"`
+	Title   string `json:"title"`
+	URL     string `json:"url"`
+	Content string `json:"content"`
+	Date    string `json:"date,omitempty"`
+}
+
+// formatBaiduSearchResultJSON 格式化搜索结果为JSON
+func formatBaiduSearchResultJSON(result *baiduSearchResponse, query string) (string, error) {
 	if len(result.References) == 0 {
-		return "未找到相关搜索结果"
+		output := BaiduSearchResult{
+			Query:   query,
+			Count:   0,
+			Results: []BaiduSearchResultItem{},
+		}
+		jsonData, _ := json.Marshal(output)
+		return string(jsonData), nil
 	}
 
-	var output bytes.Buffer
-	output.WriteString(fmt.Sprintf("🔍 找到 %d 条搜索结果：\n\n", len(result.References)))
-
+	// 转换为前端友好的格式
+	items := make([]BaiduSearchResultItem, 0, len(result.References))
 	for _, ref := range result.References {
-		output.WriteString(fmt.Sprintf("[%d] %s\n", ref.ID, ref.Title))
-		output.WriteString(fmt.Sprintf("🔗 %s\n", ref.URL))
-
-		if ref.Date != "" {
-			output.WriteString(fmt.Sprintf("📅 %s\n", ref.Date))
-		}
-
-		if ref.Content != "" {
-			// 限制内容长度
-			content := ref.Content
-			if len(content) > 200 {
-				content = content[:200] + "..."
-			}
-			output.WriteString(fmt.Sprintf("📄 %s\n", content))
-		}
-
-		output.WriteString("\n")
+		items = append(items, BaiduSearchResultItem{
+			ID:      ref.ID,
+			Title:   ref.Title,
+			URL:     ref.URL,
+			Content: ref.Content,
+			Date:    ref.Date,
+		})
 	}
 
-	return output.String()
+	output := BaiduSearchResult{
+		Query:   query,
+		Count:   len(items),
+		Results: items,
+	}
+
+	jsonData, err := json.Marshal(output)
+	if err != nil {
+		return "", fmt.Errorf("序列化结果失败: %v", err)
+	}
+
+	return string(jsonData), nil
 }

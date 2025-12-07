@@ -543,69 +543,31 @@ class AIToolsManager {
         // 获取结果文本
         const resultText = typeof result === 'string' ? result : (result.content || result.result || '');
         
-        // 解析搜索结果
-        // 格式：[1] 标题\n🔗 URL\n📅 日期\n📄 内容...\n\n
-        const searchResults = [];
-        const lines = resultText.split('\n');
-        
-        let currentResult = null;
-        let query = '';
-        
-        for (let i = 0; i < lines.length; i++) {
-            const line = lines[i].trim();
-            
-            // 解析查询词
-            if (line.match(/^🔍 找到 \d+ 条搜索结果/)) {
-                continue;
-            }
-            
-            // 解析结果项 [1], [2], ...
-            const itemMatch = line.match(/^\[(\d+)\]\s+(.+)/);
-            if (itemMatch) {
-                if (currentResult) {
-                    searchResults.push(currentResult);
-                }
-                currentResult = {
-                    id: parseInt(itemMatch[1]),
-                    title: itemMatch[2],
-                    url: '',
-                    date: '',
-                    content: ''
-                };
-                continue;
-            }
-            
-            // 解析URL
-            if (line.startsWith('🔗 ') && currentResult) {
-                currentResult.url = line.substring(2).trim();
-                continue;
-            }
-            
-            // 解析日期
-            if (line.startsWith('📅 ') && currentResult) {
-                currentResult.date = line.substring(2).trim();
-                continue;
-            }
-            
-            // 解析内容
-            if (line.startsWith('📄 ') && currentResult) {
-                currentResult.content = line.substring(2).trim();
-                continue;
-            }
-        }
-        
-        // 添加最后一个结果
-        if (currentResult) {
-            searchResults.push(currentResult);
-        }
-        
-        // 如果没有搜索结果
-        if (searchResults.length === 0) {
+        // 解析JSON格式的搜索结果
+        let searchData;
+        try {
+            searchData = JSON.parse(resultText);
+        } catch (e) {
+            console.error('解析百度搜索结果失败:', e);
             return `
                 <div class="tool-call">
                     <div class="tool-simple completed">
                         <i class="fa-solid fa-magnifying-glass tool-simple-icon"></i>
-                        baidu_search: 未找到相关结果
+                        baidu_search: 解析结果失败
+                    </div>
+                </div>
+            `;
+        }
+        
+        const { query, count, results } = searchData;
+        
+        // 如果没有搜索结果
+        if (!results || results.length === 0) {
+            return `
+                <div class="tool-call">
+                    <div class="tool-simple completed">
+                        <i class="fa-solid fa-magnifying-glass tool-simple-icon"></i>
+                        baidu_search: "${this.escapeHtml(query)}" - 未找到相关结果
                     </div>
                 </div>
             `;
@@ -613,11 +575,13 @@ class AIToolsManager {
         
         // 渲染搜索结果列表
         const resultId = `baidu-search-${toolCallId}`;
-        const resultsHTML = searchResults.map((item) => {
+        const resultsHTML = results.map((item) => {
             // 限制标题长度
             const title = item.title.length > 60 ? item.title.substring(0, 60) + '...' : item.title;
             // 限制内容长度
-            const content = item.content.length > 100 ? item.content.substring(0, 100) + '...' : item.content;
+            const content = item.content && item.content.length > 100 
+                ? item.content.substring(0, 100) + '...' 
+                : (item.content || '');
             
             return `
                 <div class="search-result-item">
@@ -627,7 +591,7 @@ class AIToolsManager {
                             ${this.escapeHtml(title)}
                         </a>
                     </div>
-                    ${item.content ? `<div class="search-result-content">${this.escapeHtml(content)}</div>` : ''}
+                    ${content ? `<div class="search-result-content">${this.escapeHtml(content)}</div>` : ''}
                     ${item.date ? `<div class="search-result-date">📅 ${this.escapeHtml(item.date)}</div>` : ''}
                 </div>
             `;
@@ -639,9 +603,9 @@ class AIToolsManager {
                     <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
                         <i class="fa-solid fa-magnifying-glass tool-result-icon"></i>
                         <span class="tool-result-title">
-                            baidu_search
+                            "${this.escapeHtml(query)}"
                         </span>
-                        <span class="tool-result-count">${searchResults.length} 条结果</span>
+                        <span class="tool-result-count">${count} 条结果</span>
                         <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
                     </div>
                     <div class="tool-result-content" id="${resultId}">
