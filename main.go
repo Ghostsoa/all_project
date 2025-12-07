@@ -1,7 +1,6 @@
 package main
 
 import (
-	"all_project/config"
 	"all_project/handlers"
 	"all_project/handlers/tools"
 	"all_project/middleware"
@@ -232,7 +231,7 @@ func main() {
 	})
 
 	// 启动服务器
-	port := config.GetPort()
+	port := storage.GetServerPort()
 	fmt.Println("╔═══════════════════════════════════════════════════╗")
 	fmt.Println("║   🚀 Web SSH 客户端管理系统                       ║")
 	fmt.Printf("║   📡 服务地址: http://localhost:%s              ║\n", port)
