@@ -1250,6 +1250,14 @@ async function streamChat(sessionId, message, thinkingId) {
                     
                     // 更新当前块的content div
                     currentContentDiv.innerHTML = formatMessageContent(currentBlockText);
+                    
+                    // 🎨 立即对新渲染的代码块进行语法高亮
+                    if (window.hljs) {
+                        currentContentDiv.querySelectorAll('pre code').forEach((block) => {
+                            hljs.highlightElement(block);
+                        });
+                    }
+                    
                     scrollToBottom();
                     
                     // 收到第一条正文内容时：1) 自动折叠思维链 2) 停止流光
@@ -1520,6 +1528,13 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
             <div class="reasoning-content collapsed">${formatMessageContent(filteredReasoning)}</div>
         `;
         contentWrapper.appendChild(reasoningDiv);
+        
+        // 🎨 立即对思维链中的代码块进行语法高亮
+        if (window.hljs) {
+            reasoningDiv.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightElement(block);
+            });
+        }
     }
     
     // 🔧 过滤content：去掉开头\n，纯空白时清空为""
@@ -1544,6 +1559,13 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
             contentDiv.innerHTML = escapeHtml(filteredContent || '').replace(/\n/g, '<br>');
         } else {
             contentDiv.innerHTML = formatMessageContent(filteredContent || '');
+            
+            // 🎨 立即对新渲染的代码块进行语法高亮
+            if (window.hljs) {
+                contentDiv.querySelectorAll('pre code').forEach((block) => {
+                    hljs.highlightElement(block);
+                });
+            }
         }
         
         contentWrapper.appendChild(contentDiv);
@@ -1678,6 +1700,13 @@ function updateMessageContent(messageElement, content) {
     }
     
     contentDiv.innerHTML = formatMessageContent(content);
+    
+    // 🎨 立即对新渲染的代码块进行语法高亮
+    if (window.hljs) {
+        contentDiv.querySelectorAll('pre code').forEach((block) => {
+            hljs.highlightElement(block);
+        });
+    }
 }
 
 // 更新思维链内容
@@ -1722,6 +1751,13 @@ function updateReasoningContent(messageElement, reasoning, autoCollapse = false,
     if (reasoningContent) {
         // 使用Markdown渲染思维链内容
         reasoningContent.innerHTML = formatMessageContent(reasoning);
+        
+        // 🎨 立即对新渲染的代码块进行语法高亮
+        if (window.hljs) {
+            reasoningContent.querySelectorAll('pre code').forEach((block) => {
+                hljs.highlightElement(block);
+            });
+        }
         
         // 🔧 如果正在更新内容（不是自动折叠），且div已折叠，则展开它
         if (!autoCollapse && reasoningContent.classList.contains('collapsed')) {
