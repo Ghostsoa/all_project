@@ -11,7 +11,7 @@ func LoadAIConfigCache() error {
 	return nil
 }
 
-// GetAIConfig 获取全局AI配置（从内存读取）
+// GetAIConfig 获取全局AI配置（从内存读取，自动解密敏感信息）
 func GetAIConfig() (*AIConfig, error) {
 	config := GetConfig()
 	if config == nil {
@@ -27,16 +27,37 @@ func GetAIConfig() (*AIConfig, error) {
 		}, nil
 	}
 
-	return &config.AIConfig, nil
+	// 复制配置并解密敏感信息
+	aiConfig := config.AIConfig
+
+	// 解密百度搜索 API Key
+	if aiConfig.BaiduSearchAPIKeyEncrypted != "" && aiConfig.BaiduSearchAPIKey == "" {
+		decrypted, err := Decrypt(aiConfig.BaiduSearchAPIKeyEncrypted)
+		if err == nil {
+			aiConfig.BaiduSearchAPIKey = decrypted
+		}
+	}
+
+	return &aiConfig, nil
 }
 
-// UpdateAIConfig 更新全局AI配置（更新内存+写文件）
+// UpdateAIConfig 更新全局AI配置（更新内存+写文件，自动加密敏感信息）
 func UpdateAIConfig(aiConfig *AIConfig) error {
 	globalConfigLock.Lock()
 	defer globalConfigLock.Unlock()
 
 	if globalConfig == nil {
 		return fmt.Errorf("配置未加载")
+	}
+
+	// 如果提供了明文百度搜索 API Key，则加密
+	if aiConfig.BaiduSearchAPIKey != "" {
+		encrypted, err := Encrypt(aiConfig.BaiduSearchAPIKey)
+		if err != nil {
+			return fmt.Errorf("加密百度搜索 API Key失败: %v", err)
+		}
+		aiConfig.BaiduSearchAPIKeyEncrypted = encrypted
+		aiConfig.BaiduSearchAPIKey = "" // 清空明文
 	}
 
 	globalConfig.AIConfig = *aiConfig

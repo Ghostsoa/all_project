@@ -46,13 +46,15 @@ type Model struct {
 
 // AIConfig 全局AI配置（唯一，提示词+参数）
 type AIConfig struct {
-	SystemPrompt     string  `json:"system_prompt"`
-	Temperature      float64 `json:"temperature"`
-	MaxTokens        int     `json:"max_tokens"`
-	TopP             float64 `json:"top_p"`
-	FrequencyPenalty float64 `json:"frequency_penalty"`
-	PresencePenalty  float64 `json:"presence_penalty"`
-	CodeSearchModel  string  `json:"code_search_model"` // 智能代码搜索使用的模型ID
+	SystemPrompt               string  `json:"system_prompt"`
+	Temperature                float64 `json:"temperature"`
+	MaxTokens                  int     `json:"max_tokens"`
+	TopP                       float64 `json:"top_p"`
+	FrequencyPenalty           float64 `json:"frequency_penalty"`
+	PresencePenalty            float64 `json:"presence_penalty"`
+	CodeSearchModel            string  `json:"code_search_model"`              // 智能代码搜索使用的模型ID
+	BaiduSearchAPIKey          string  `json:"baidu_search_api_key"`           // 百度搜索API Key（明文，启动后自动加密并清空）
+	BaiduSearchAPIKeyEncrypted string  `json:"baidu_search_api_key_encrypted"` // 百度搜索API Key（加密后，持久化存储）
 }
 
 // ChatSession 对话会话

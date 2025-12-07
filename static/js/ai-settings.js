@@ -261,6 +261,7 @@ async function loadGlobalConfig() {
         document.getElementById('topP').value = config.top_p || 1.0;
         document.getElementById('frequencyPenalty').value = config.frequency_penalty || 0;
         document.getElementById('presencePenalty').value = config.presence_penalty || 0;
+        document.getElementById('baiduSearchApiKey').value = config.baidu_search_api_key || '';
         
         // 填充code_search_model下拉框
         const codeSearchSelect = document.getElementById('codeSearchModel');
@@ -306,7 +307,8 @@ window.saveGlobalConfig = async function(event) {
         top_p: parseFloat(document.getElementById('topP').value),
         frequency_penalty: parseFloat(document.getElementById('frequencyPenalty').value),
         presence_penalty: parseFloat(document.getElementById('presencePenalty').value),
-        code_search_model: document.getElementById('codeSearchModel').value
+        code_search_model: document.getElementById('codeSearchModel').value,
+        baidu_search_api_key: document.getElementById('baiduSearchApiKey').value
     };
     
     try {

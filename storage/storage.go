@@ -210,6 +210,21 @@ func encryptSensitiveData() error {
 		}
 	}
 
+	// 🔐 加密百度搜索 API Key
+	if globalConfig.AIConfig.BaiduSearchAPIKey != "" {
+		log.Println("🔒 加密百度搜索 API Key...")
+
+		encrypted, err := Encrypt(globalConfig.AIConfig.BaiduSearchAPIKey)
+		if err != nil {
+			log.Printf("❌ 加密失败: %v", err)
+		} else {
+			globalConfig.AIConfig.BaiduSearchAPIKeyEncrypted = encrypted
+			globalConfig.AIConfig.BaiduSearchAPIKey = "" // 清空明文
+			needSave = true
+			log.Println("✅ 百度搜索 API Key已加密")
+		}
+	}
+
 	// 保存配置
 	if needSave {
 		if err := writeJSON(configFile, globalConfig); err != nil {

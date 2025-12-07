@@ -42,6 +42,10 @@ func (te *ToolExecutor) Execute(toolName string, argsJSON string, conversationID
 		}
 		return tools.ExecuteCodeSearch(argsJSON, config, conversationID)
 
+	// 百度搜索
+	case "baidu_search":
+		return tools.ExecuteBaiduSearch(argsJSON)
+
 	default:
 		return "", fmt.Errorf("未知工具: %s", toolName)
 	}
@@ -63,6 +67,11 @@ func GetToolsDefinition(config *storage.AIConfig) []map[string]interface{} {
 	// 如果配置了CodeSearchModel，添加code_search工具
 	if config != nil && config.CodeSearchModel != "" {
 		toolDefs = append(toolDefs, tools.GetCodeSearchDefinition(config))
+	}
+
+	// 如果配置了BaiduSearchAPIKey，添加baidu_search工具
+	if config != nil && config.BaiduSearchAPIKey != "" {
+		toolDefs = append(toolDefs, tools.GetBaiduSearchDefinition())
 	}
 
 	return toolDefs
