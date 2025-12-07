@@ -1874,6 +1874,15 @@ function formatMessageContent(content) {
     // 3. 转义HTML（但保留占位符）
     formatted = escapeHtml(formatted);
     
+    // 3.5 预处理：确保标题标记前有换行（修复流式输出中标题粘连问题）
+    // 将 "内容##标题" 转换为 "内容\n##标题"
+    formatted = formatted.replace(/([^\n])(#{1,3} )/g, '$1\n$2');
+    
+    // 3.6 预处理：移除缩进的列表标记（它们会打断主列表）
+    // 将 "   - xxx" 或 "   1. xxx" 转换为 "   xxx"（移除列表标记，保留内容）
+    formatted = formatted.replace(/^[ \t]+[-*] (.+)$/gm, '   $1');
+    formatted = formatted.replace(/^[ \t]+\d+\. (.+)$/gm, '   $1');
+    
     // 4. 粗体
     formatted = formatted.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
     
@@ -1883,31 +1892,34 @@ function formatMessageContent(content) {
     // 6. 分隔线（--- 或 *** 或 ___）
     formatted = formatted.replace(/^(?:---|\*\*\*|___)\s*$/gm, '<hr>');
     
-    // 7. 标题（消耗末尾换行）
-    formatted = formatted.replace(/^### (.+)\n?$/gm, '<h3>$1</h3>');
-    formatted = formatted.replace(/^## (.+)\n?$/gm, '<h2>$1</h2>');
-    formatted = formatted.replace(/^# (.+)\n?$/gm, '<h1>$1</h1>');
+    // 7. 标题（支持流式输出中没有换行的情况）
+    // 修复：不要求必须有行尾，支持 "## 标题" 和 "## 标题\n" 两种情况
+    formatted = formatted.replace(/^### (.+?)(?:\n|$)/gm, '<h3>$1</h3>\n');
+    formatted = formatted.replace(/^## (.+?)(?:\n|$)/gm, '<h2>$1</h2>\n');
+    formatted = formatted.replace(/^# (.+?)(?:\n|$)/gm, '<h1>$1</h1>\n');
     
-    // 8. 无序列表（标记为UL）
-    formatted = formatted.replace(/^[-*] (.+)\n?$/gm, '<li class="ul-item">$1</li>');
+    // 8. 无序列表（贪婪匹配到行尾，捕获完整内容）
+    formatted = formatted.replace(/^[-*] (.+)$/gm, '<li class="ul-item">$1</li>');
     
-    // 9. 有序列表（标记为OL）
-    formatted = formatted.replace(/^\d+\. (.+)\n?$/gm, '<li class="ol-item">$1</li>');
+    // 9. 有序列表（贪婪匹配到行尾，捕获完整内容）
+    formatted = formatted.replace(/^\d+\. (.+)$/gm, '<li class="ol-item">$1</li>');
     
-    // 10. 合并连续的无序列表项
+    // 10. 合并连续的无序列表项（保留列表项间的换行避免内容粘连）
     formatted = formatted.replace(/(<li class="ul-item">[\s\S]*?<\/li>(?:\n*<li class="ul-item">[\s\S]*?<\/li>)*)/g, match => {
-        const cleaned = match.replace(/\n/g, '').replace(/ class="ul-item"/g, '');
+        // 移除类标记，但保留</li>和<li>之间的换行
+        const cleaned = match.replace(/ class="ul-item"/g, '');
         return '<ul>' + cleaned + '</ul>';
     });
     
-    // 11. 合并连续的有序列表项
+    // 11. 合并连续的有序列表项（保留列表项间的换行避免内容粘连）
     formatted = formatted.replace(/(<li class="ol-item">[\s\S]*?<\/li>(?:\n*<li class="ol-item">[\s\S]*?<\/li>)*)/g, match => {
-        const cleaned = match.replace(/\n/g, '').replace(/ class="ol-item"/g, '');
+        // 移除类标记，但保留</li>和<li>之间的换行
+        const cleaned = match.replace(/ class="ol-item"/g, '');
         return '<ol>' + cleaned + '</ol>';
     });
     
-    // 12. 引用（消耗末尾换行）
-    formatted = formatted.replace(/^&gt; (.+)\n?$/gm, '<blockquote>$1</blockquote>');
+    // 12. 引用（支持流式输出）
+    formatted = formatted.replace(/^&gt; (.+?)(?:\n|$)/gm, '<blockquote>$1</blockquote>\n');
     
     // 10. 链接
     formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
