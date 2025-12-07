@@ -2,85 +2,203 @@ package tools
 
 import "all_project/storage"
 
-// GetFileOperationDefinition 获取file_operation工具定义
-func GetFileOperationDefinition() map[string]interface{} {
+// ========== 文件操作工具定义（拆分后的独立工具） ==========
+
+// GetReadFileDefinition 读取文件工具
+func GetReadFileDefinition() map[string]interface{} {
 	return map[string]interface{}{
 		"type": "function",
 		"function": map[string]interface{}{
-			"name":        "file_operation",
-			"description": "文件操作工具。支持read/write/edit/list/grep/find操作。",
+			"name":        "read_file",
+			"description": "读取文件内容。支持读取整个文件或指定行范围。",
 			"parameters": map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
-					"type": map[string]interface{}{
+					"file_path": map[string]interface{}{
 						"type":        "string",
-						"enum":        []string{"read", "write", "edit", "list", "grep", "find"},
-						"description": "操作类型",
+						"description": "文件的绝对路径",
 					},
 					"server_id": map[string]interface{}{
 						"type":        "string",
 						"description": "服务器ID（local=本地）",
 					},
+					"offset": map[string]interface{}{
+						"type":        "integer",
+						"description": "起始行号（1-indexed，可选）",
+					},
+					"limit": map[string]interface{}{
+						"type":        "integer",
+						"description": "读取行数（可选，最大1000行）",
+					},
+				},
+				"required": []string{"file_path", "server_id"},
+			},
+		},
+	}
+}
+
+// GetWriteFileDefinition 写入文件工具
+func GetWriteFileDefinition() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "function",
+		"function": map[string]interface{}{
+			"name":        "write_file",
+			"description": "写入或创建文件。会覆盖已存在的文件。",
+			"parameters": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
 					"file_path": map[string]interface{}{
 						"type":        "string",
-						"description": "文件或目录的绝对路径",
+						"description": "文件的绝对路径",
 					},
 					"content": map[string]interface{}{
 						"type":        "string",
-						"description": "【write】文件内容",
+						"description": "要写入的文件内容",
+					},
+					"server_id": map[string]interface{}{
+						"type":        "string",
+						"description": "服务器ID（local=本地）",
+					},
+				},
+				"required": []string{"file_path", "content", "server_id"},
+			},
+		},
+	}
+}
+
+// GetEditFileDefinition 编辑文件工具
+func GetEditFileDefinition() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "function",
+		"function": map[string]interface{}{
+			"name":        "edit_file",
+			"description": "精确替换文件中的内容。使用字符串匹配替换（需要完全匹配）。",
+			"parameters": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"file_path": map[string]interface{}{
+						"type":        "string",
+						"description": "文件的绝对路径",
 					},
 					"old_string": map[string]interface{}{
 						"type":        "string",
-						"description": "【edit】要替换的旧内容（需完全匹配）",
+						"description": "要替换的旧内容（必须完全匹配，包括空格和换行）",
 					},
 					"new_string": map[string]interface{}{
 						"type":        "string",
-						"description": "【edit】新内容",
+						"description": "新内容",
 					},
+					"server_id": map[string]interface{}{
+						"type":        "string",
+						"description": "服务器ID（local=本地）",
+					},
+				},
+				"required": []string{"file_path", "old_string", "new_string", "server_id"},
+			},
+		},
+	}
+}
+
+// GetListDirectoryDefinition 列出目录工具
+func GetListDirectoryDefinition() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "function",
+		"function": map[string]interface{}{
+			"name":        "list_directory",
+			"description": "列出目录中的文件和子目录。",
+			"parameters": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"directory_path": map[string]interface{}{
+						"type":        "string",
+						"description": "目录的绝对路径",
+					},
+					"server_id": map[string]interface{}{
+						"type":        "string",
+						"description": "服务器ID（local=本地）",
+					},
+				},
+				"required": []string{"directory_path", "server_id"},
+			},
+		},
+	}
+}
+
+// GetGrepSearchDefinition grep搜索工具
+func GetGrepSearchDefinition() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "function",
+		"function": map[string]interface{}{
+			"name":        "grep_search",
+			"description": "在文件中搜索文本内容。支持正则表达式和文件类型过滤。",
+			"parameters": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
 					"query": map[string]interface{}{
 						"type":        "string",
-						"description": "【grep】搜索内容",
+						"description": "搜索内容或正则表达式",
 					},
 					"search_path": map[string]interface{}{
 						"type":        "string",
-						"description": "【grep/find】搜索目录路径",
+						"description": "搜索目录的绝对路径",
+					},
+					"server_id": map[string]interface{}{
+						"type":        "string",
+						"description": "服务器ID（local=本地）",
 					},
 					"is_regex": map[string]interface{}{
 						"type":        "boolean",
-						"description": "【grep】是否使用正则表达式",
+						"description": "是否将query作为正则表达式（默认false）",
 					},
 					"includes": map[string]interface{}{
 						"type": "array",
 						"items": map[string]interface{}{
 							"type": "string",
 						},
-						"description": "【grep】文件类型过滤",
+						"description": "文件类型过滤（如 [\"*.go\", \"*.js\"]）",
 					},
+				},
+				"required": []string{"query", "search_path", "server_id"},
+			},
+		},
+	}
+}
+
+// GetFindFilesDefinition 查找文件工具
+func GetFindFilesDefinition() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "function",
+		"function": map[string]interface{}{
+			"name":        "find_files",
+			"description": "按文件名模式查找文件。支持glob模式匹配。",
+			"parameters": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
 					"pattern": map[string]interface{}{
 						"type":        "string",
-						"description": "【find】文件名匹配模式",
+						"description": "文件名匹配模式（glob格式，如 *.go 或 test_*.js）",
+					},
+					"search_path": map[string]interface{}{
+						"type":        "string",
+						"description": "搜索目录的绝对路径",
+					},
+					"server_id": map[string]interface{}{
+						"type":        "string",
+						"description": "服务器ID（local=本地）",
 					},
 					"max_depth": map[string]interface{}{
 						"type":        "integer",
-						"description": "【find】最大搜索深度",
+						"description": "最大搜索深度（可选）",
 					},
 					"excludes": map[string]interface{}{
 						"type": "array",
 						"items": map[string]interface{}{
 							"type": "string",
 						},
-						"description": "【find】排除的目录",
-					},
-					"offset": map[string]interface{}{
-						"type":        "integer",
-						"description": "【read】起始行号（1-indexed）",
-					},
-					"limit": map[string]interface{}{
-						"type":        "integer",
-						"description": "【read】读取行数",
+						"description": "排除的目录模式（如 [\"node_modules\", \".git\"]）",
 					},
 				},
-				"required": []string{"type", "server_id"},
+				"required": []string{"pattern", "search_path", "server_id"},
 			},
 		},
 	}

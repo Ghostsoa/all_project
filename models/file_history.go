@@ -287,6 +287,12 @@ func (m *FileHistoryManager) Save() error {
 
 func (m *FileHistoryManager) saveLocked() error {
 	filePath := filepath.Join(m.dataDir, "history_index.json")
+
+	// 🔧 确保目录存在
+	if err := os.MkdirAll(m.dataDir, 0755); err != nil {
+		return err
+	}
+
 	data, err := json.MarshalIndent(m.histories, "", "  ")
 	if err != nil {
 		return err

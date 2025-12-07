@@ -59,11 +59,25 @@ class AIToolsManager {
             return this.renderCodeSearchTool(toolResult, toolCallId);
         }
         
-        if (toolName !== 'file_operation') {
+        // 文件操作工具列表
+        const fileOperationTools = ['read_file', 'write_file', 'edit_file', 'list_directory', 'grep_search', 'find_files'];
+        
+        if (!fileOperationTools.includes(toolName)) {
             return this.renderGenericTool(toolResult, toolName);
         }
 
-        const { type, status, success } = toolResult;
+        // 从工具名称提取type（read_file → read, list_directory → list）
+        const typeMap = {
+            'read_file': 'read',
+            'write_file': 'write',
+            'edit_file': 'edit',
+            'list_directory': 'list',
+            'grep_search': 'grep',
+            'find_files': 'find'
+        };
+        const type = typeMap[toolName];
+
+        const { status, success } = toolResult;
         
         // 如果工具执行失败，显示失败状态
         if (success === false) {
@@ -73,13 +87,15 @@ class AIToolsManager {
         
         // 如果status是accepted或rejected，显示完成状态（不可交互）
         if (status === 'accepted' || status === 'rejected') {
+            // 确保toolResult包含type
+            toolResult = { ...toolResult, type };
             return this.renderCompletedToolResult(toolResult, toolCallId, status);
         }
         
         // 如果status是pending，需要从toolCallArgs获取完整参数
         if (status === 'pending' && toolCallArgs) {
             // 合并tool结果和tool_calls参数
-            toolResult = { ...toolResult, ...toolCallArgs };
+            toolResult = { ...toolResult, ...toolCallArgs, type };
         }
         
         // 渲染pending状态（可交互）

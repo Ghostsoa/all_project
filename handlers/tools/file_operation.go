@@ -13,7 +13,144 @@ import (
 	"strings"
 )
 
-// FileOperationArgs 文件操作参数（统一）
+// ========== 独立工具的参数结构 ==========
+
+// ReadFileArgs read_file工具参数
+type ReadFileArgs struct {
+	FilePath string `json:"file_path"`
+	ServerID string `json:"server_id"`
+	Offset   int    `json:"offset,omitempty"`
+	Limit    int    `json:"limit,omitempty"`
+}
+
+// WriteFileArgs write_file工具参数
+type WriteFileArgs struct {
+	FilePath string `json:"file_path"`
+	Content  string `json:"content"`
+	ServerID string `json:"server_id"`
+}
+
+// EditFileArgs edit_file工具参数
+type EditFileArgs struct {
+	FilePath  string `json:"file_path"`
+	OldString string `json:"old_string"`
+	NewString string `json:"new_string"`
+	ServerID  string `json:"server_id"`
+}
+
+// ListDirectoryArgs list_directory工具参数
+type ListDirectoryArgs struct {
+	DirectoryPath string `json:"directory_path"`
+	ServerID      string `json:"server_id"`
+}
+
+// GrepSearchArgs grep_search工具参数
+type GrepSearchArgs struct {
+	Query      string   `json:"query"`
+	SearchPath string   `json:"search_path"`
+	ServerID   string   `json:"server_id"`
+	IsRegex    bool     `json:"is_regex,omitempty"`
+	Includes   []string `json:"includes,omitempty"`
+}
+
+// FindFilesArgs find_files工具参数
+type FindFilesArgs struct {
+	Pattern    string   `json:"pattern"`
+	SearchPath string   `json:"search_path"`
+	ServerID   string   `json:"server_id"`
+	MaxDepth   int      `json:"max_depth,omitempty"`
+	Excludes   []string `json:"excludes,omitempty"`
+}
+
+// ========== 独立工具的执行函数 ==========
+
+// ExecuteReadFile 执行read_file工具
+func ExecuteReadFile(argsJSON string, conversationID string) (string, error) {
+	var args ReadFileArgs
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return "", fmt.Errorf("解析参数失败: %v", err)
+	}
+	// 转换为FileOperationArgs复用现有逻辑
+	return readFile(FileOperationArgs{
+		FilePath: args.FilePath,
+		ServerID: args.ServerID,
+		Offset:   args.Offset,
+		Limit:    args.Limit,
+	}, conversationID)
+}
+
+// ExecuteWriteFile 执行write_file工具
+func ExecuteWriteFile(argsJSON string, conversationID string, messageID string) (string, error) {
+	var args WriteFileArgs
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return "", fmt.Errorf("解析参数失败: %v", err)
+	}
+	return writeFile(FileOperationArgs{
+		FilePath: args.FilePath,
+		Content:  args.Content,
+		ServerID: args.ServerID,
+	}, conversationID, messageID)
+}
+
+// ExecuteEditFile 执行edit_file工具
+func ExecuteEditFile(argsJSON string, conversationID string, messageID string) (string, error) {
+	var args EditFileArgs
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return "", fmt.Errorf("解析参数失败: %v", err)
+	}
+	return editFile(FileOperationArgs{
+		FilePath:  args.FilePath,
+		OldString: args.OldString,
+		NewString: args.NewString,
+		ServerID:  args.ServerID,
+	}, conversationID, messageID)
+}
+
+// ExecuteListDirectory 执行list_directory工具
+func ExecuteListDirectory(argsJSON string) (string, error) {
+	var args ListDirectoryArgs
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return "", fmt.Errorf("解析参数失败: %v", err)
+	}
+	return listDir(FileOperationArgs{
+		FilePath: args.DirectoryPath,
+		ServerID: args.ServerID,
+	})
+}
+
+// ExecuteGrepSearch 执行grep_search工具
+func ExecuteGrepSearch(argsJSON string) (string, error) {
+	var args GrepSearchArgs
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return "", fmt.Errorf("解析参数失败: %v", err)
+	}
+	return grepSearch(FileOperationArgs{
+		Query:      args.Query,
+		SearchPath: args.SearchPath,
+		ServerID:   args.ServerID,
+		IsRegex:    args.IsRegex,
+		Includes:   args.Includes,
+	})
+}
+
+// ExecuteFindFiles 执行find_files工具
+func ExecuteFindFiles(argsJSON string) (string, error) {
+	var args FindFilesArgs
+	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
+		return "", fmt.Errorf("解析参数失败: %v", err)
+	}
+	return findByName(FileOperationArgs{
+		Pattern:    args.Pattern,
+		SearchPath: args.SearchPath,
+		ServerID:   args.ServerID,
+		MaxDepth:   args.MaxDepth,
+		Excludes:   args.Excludes,
+	})
+}
+
+// ========== 内部共享的参数结构（复用底层逻辑） ==========
+
+// FileOperationArgs 内部参数结构（用于复用底层实现函数）
 type FileOperationArgs struct {
 	Type     string `json:"type"`      // "read", "write", "edit", "list", "grep", "find"`
 	ServerID string `json:"server_id"` // 服务器ID（必需）
@@ -56,32 +193,6 @@ type FileInfo struct {
 	Path  string `json:"path"`
 	IsDir bool   `json:"is_dir"`
 	Size  int64  `json:"size"`
-}
-
-// ExecuteFileOperation 执行文件操作
-func ExecuteFileOperation(argsJSON string, conversationID string, messageID string) (string, error) {
-	var args FileOperationArgs
-	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
-		return "", fmt.Errorf("解析参数失败: %v", err)
-	}
-
-	// 根据操作类型分发
-	switch args.Type {
-	case "read":
-		return readFile(args, conversationID)
-	case "write":
-		return writeFile(args)
-	case "edit":
-		return editFile(args, conversationID, messageID)
-	case "list":
-		return listDir(args)
-	case "grep":
-		return grepSearch(args)
-	case "find":
-		return findByName(args)
-	default:
-		return "", fmt.Errorf("未知操作类型: %s", args.Type)
-	}
 }
 
 // readFile 读取文件内容（支持行范围读取）
@@ -173,24 +284,62 @@ func readFile(args FileOperationArgs, conversationID string) (string, error) {
 	return string(resultJSON), nil
 }
 
-// writeFile 写入文件（创建或覆盖） - 只返回pending状态，不执行写入
-func writeFile(args FileOperationArgs) (string, error) {
-	// 检查文件是否已存在
+// writeFile 写入文件（创建或覆盖） - 记录到pending state
+func writeFile(args FileOperationArgs, conversationID string, messageID string) (string, error) {
+	manager := models.GetPendingStateManager()
+
+	// 0. 获取当前用户消息数量作为messageIndex（Turn从0开始）
+	messageIndex := 0
+	session, err := storage.GetSession(conversationID)
+	if err == nil {
+		userMsgCount := 0
+		for _, msg := range session.Messages {
+			if msg.Role == "user" {
+				userMsgCount++
+			}
+		}
+		messageIndex = userMsgCount - 1
+	}
+
+	// 1. 获取当前内容（用于pending和history）
+	oldContent := ""
 	fileExists := false
-	if _, err := os.Stat(args.FilePath); err == nil {
+	if diskContent, err := os.ReadFile(args.FilePath); err == nil {
+		// 文件存在，获取当前内容（可能有pending修改）
+		oldContent = manager.GetCurrentContent(conversationID, args.FilePath, string(diskContent))
 		fileExists = true
 	}
 
-	totalLines := len(strings.Split(args.Content, "\n"))
+	// 2. 计算行数变化
+	linesDeleted := 0
+	linesAdded := len(strings.Split(args.Content, "\n"))
+	if fileExists {
+		linesDeleted = len(strings.Split(oldContent, "\n"))
+	}
 
+	// 3. 保存到pending state（OldString=旧内容，NewString=新内容）
+	writeOp := models.EditOperation{
+		ToolCallID: messageID,
+		MessageID:  messageID,
+		OldString:  oldContent, // 空字符串（新建）或旧内容（覆盖）
+		NewString:  args.Content,
+	}
+	if err := manager.AddEdit(conversationID, args.FilePath, messageIndex, writeOp); err != nil {
+		return "", fmt.Errorf("保存写入操作失败: %v", err)
+	}
+
+	// 4. 返回pending状态
 	result := map[string]interface{}{
-		"success":     true,
-		"type":        "write",
-		"status":      "pending",
-		"file_path":   args.FilePath,
-		"size":        len(args.Content),
-		"total_lines": totalLines,
-		"exists":      fileExists,
+		"success":       true,
+		"type":          "write",
+		"status":        "pending",
+		"file_path":     args.FilePath,
+		"tool_call_id":  messageID,
+		"size":          len(args.Content),
+		"total_lines":   linesAdded,
+		"exists":        fileExists,
+		"lines_deleted": linesDeleted,
+		"lines_added":   linesAdded,
 	}
 
 	resultJSON, _ := json.Marshal(result)

@@ -110,6 +110,13 @@ func (h *LocalFileHandler) SaveLocalFile(c *gin.Context) {
 		return
 	}
 
+	// 🔧 确保父目录存在
+	dir := filepath.Dir(req.Path)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "创建目录失败: " + err.Error()})
+		return
+	}
+
 	err := os.WriteFile(req.Path, []byte(req.Content), 0644)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "保存文件失败: " + err.Error()})

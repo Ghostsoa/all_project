@@ -7,6 +7,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -151,14 +152,15 @@ func (h *AIEditHandler) acceptAll(conversationID string, pendingManager *models.
 
 // acceptFileEdits 应用单个文件的所有edits并返回最终内容
 func (h *AIEditHandler) acceptFileEdits(conversationID, filePath string, turns []models.TurnEdits, historyManager *models.FileHistoryManager) (string, error) {
-	// 读取磁盘内容
+	// 读取磁盘内容（如果文件不存在，初始为空字符串）
+	state := ""
 	diskContent, err := os.ReadFile(filePath)
-	if err != nil {
-		return "", fmt.Errorf("读取文件失败: %v", err)
+	if err == nil {
+		state = string(diskContent)
+		log.Printf("📝 处理文件: %s (初始: %d字节)", filePath, len(state))
+	} else {
+		log.Printf("📝 处理新文件: %s (文件不存在，将创建)", filePath)
 	}
-
-	state := string(diskContent)
-	log.Printf("📝 处理文件: %s (初始: %d字节)", filePath, len(state))
 
 	// 逐轮应用edits并保存快照
 	for _, turn := range turns {
@@ -181,6 +183,12 @@ func (h *AIEditHandler) acceptFileEdits(conversationID, filePath string, turns [
 	}
 
 	// 写入最终状态到磁盘
+	// 🔧 确保父目录存在
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0755); err != nil {
+		return "", fmt.Errorf("创建目录失败: %v", err)
+	}
+
 	if err := os.WriteFile(filePath, []byte(state), 0644); err != nil {
 		return "", fmt.Errorf("写入文件失败: %v", err)
 	}

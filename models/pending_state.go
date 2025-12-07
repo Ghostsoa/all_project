@@ -205,6 +205,12 @@ func (m *PendingStateManager) Save() error {
 
 func (m *PendingStateManager) saveLocked() error {
 	filePath := filepath.Join(m.dataDir, "pending_states.json")
+
+	// 🔧 确保目录存在
+	if err := os.MkdirAll(m.dataDir, 0755); err != nil {
+		return err
+	}
+
 	data, err := json.MarshalIndent(m.states, "", "  ")
 	if err != nil {
 		return err

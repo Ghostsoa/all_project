@@ -1199,18 +1199,21 @@ async function streamChat(sessionId, message, thinkingId) {
                 
                 if (data.type === 'content') {
                     let content = data.content;
-                    
-                    // 🔧 过滤：如果是第一条内容，去掉开头的\n和纯空白
                     const isFirstContent = assistantMessage === '';
-                    if (isFirstContent && content) {
-                        // 1. 去掉开头的所有\n
-                        while (content.startsWith('\n')) {
-                            content = content.substring(1);
+                    
+                    // 🔧 过滤纯\n和纯空白的content
+                    if (content) {
+                        // 1. 第一条content：去掉开头的所有\n
+                        if (isFirstContent) {
+                            while (content.startsWith('\n')) {
+                                content = content.substring(1);
+                            }
                         }
                         
-                        // 2. 如果去掉\n后只剩空白，清空为""（但继续渲染）
+                        // 2. 任何时候：如果只剩纯\n或纯空白，忽略这条content
                         if (content.trim() === '') {
-                            content = '';
+                            console.log('⚠️ 忽略纯空白content');
+                            return;
                         }
                     }
                     
@@ -1272,32 +1275,31 @@ async function streamChat(sessionId, message, thinkingId) {
                 } else if (data.type === 'reasoning') {
                     // 🔧 如果已有tool_call，忽略后续的reasoning（避免创建重复的thought）
                     if (hasToolCall) {
-                        console.log('⚠️ 忽略tool_call之后的reasoning数据');
                         return;
                     }
                     
                     // 思维链内容
                     let newReasoning = data.reasoning_content || data.content || '';
-                    
-                    // 🔧 过滤：如果是第一条reasoning，去掉开头的\n和纯空白
                     const isFirstReasoning = reasoningContent === '';
-                    if (isFirstReasoning && newReasoning) {
-                        // 1. 去掉开头的所有\n
-                        while (newReasoning.startsWith('\n')) {
-                            newReasoning = newReasoning.substring(1);
+                    
+                    // 🔧 过滤纯\n和纯空白的reasoning
+                    if (newReasoning) {
+                        // 1. 第一条reasoning：去掉开头的所有\n
+                        if (isFirstReasoning) {
+                            while (newReasoning.startsWith('\n')) {
+                                newReasoning = newReasoning.substring(1);
+                            }
                         }
                         
-                        // 2. 如果去掉\n后只剩空白，清空为""（但继续渲染）
+                        // 2. 任何时候：如果只剩纯\n或纯空白，忽略这条reasoning
                         if (newReasoning.trim() === '') {
-                            newReasoning = '';
+                            console.log('⚠️ 忽略纯空白reasoning');
+                            return;
                         }
                     }
                     
                     if (newReasoning) {
                         reasoningContent += newReasoning;
-                    } else if (isFirstReasoning && newReasoning === '') {
-                        // 第一条reasoning是空的，也继续（用于创建消息元素）
-                        reasoningContent = '';
                     } else {
                         console.warn('⚠️ 收到空的reasoning数据:', data);
                         return; // 跳过后续的空内容
@@ -1311,18 +1313,11 @@ async function streamChat(sessionId, message, thinkingId) {
                             const messagesContainer = document.getElementById('aiMessages');
                             messageElement = createMessageElement('assistant', '');
                             messagesContainer.appendChild(messageElement);
-                            console.log('🆕 Reasoning创建新消息元素并添加到DOM');
                         }
                     }
                     
                     // 只有内容不为空时才更新思维链
                     if (reasoningContent) {
-                        // 🔍 添加唯一标识追踪
-                        if (!messageElement.dataset.debugId) {
-                            messageElement.dataset.debugId = 'msg-' + Date.now();
-                        }
-                        console.log('🔍 Reasoning更新，messageElement ID:', messageElement.dataset.debugId);
-                        
                         updateReasoningContent(messageElement, reasoningContent, false, true);
                         scrollToBottom();
                     }
@@ -1344,8 +1339,6 @@ async function streamChat(sessionId, message, thinkingId) {
                         allReasoningHeaders.forEach(header => {
                             header.classList.remove('shimmer-text');
                         });
-                        
-                        console.log('✅ 移除所有流光，reasoning headers:', allReasoningHeaders.length);
                     }
                     
                     // 如果只有reasoning没有content，清除空内容
@@ -1361,19 +1354,12 @@ async function streamChat(sessionId, message, thinkingId) {
                 } else if (data.type === 'tool_call') {
                     // 工具调用
                     console.log('🔧 工具调用:', data);
-                    console.log('🔍 messageElement状态:', {
-                        exists: !!messageElement,
-                        inDOM: messageElement ? document.body.contains(messageElement) : false,
-                        hasParent: messageElement ? !!messageElement.parentElement : false,
-                        debugId: messageElement ? messageElement.dataset.debugId : null
-                    });
                     
                     // 🔧 标记已有tool_call，后续reasoning将被忽略
                     hasToolCall = true;
                     
                     // 如果还没有消息元素，创建一个（从工具开始）
                     if (!messageElement) {
-                        console.error('❌❌❌ BUG: tool_call到来时messageElement不存在！这会创建第二个assistant消息！');
                         if (thinkingId) {
                             // 替换thinking元素
                             const thinkingElement = document.getElementById(thinkingId);
@@ -1388,16 +1374,11 @@ async function streamChat(sessionId, message, thinkingId) {
                             messageElement = createMessageElement('assistant', '');
                             messagesContainer.appendChild(messageElement);
                         }
-                    } else {
-                        console.log('✅ tool_call到来，messageElement已存在，使用现有元素');
                     }
                     
                     // 🔧 修复：在添加工具调用前，如果有思维链div已创建，先折叠它
                     if (messageElement) {
                         const existingReasoningDivs = messageElement.querySelectorAll('.message-reasoning');
-                        console.log('🔍 Tool call到来，reasoning div数量:', existingReasoningDivs.length);
-                        console.log('🔍 messageElement.innerHTML长度:', messageElement.innerHTML.length);
-                        console.log('🔍 contentWrapper子元素:', Array.from(messageElement.querySelector('.message-content-wrapper')?.children || []).map(c => c.className));
                         
                         if (existingReasoningDivs.length > 0) {
                             // 已存在div，折叠并停止流光
@@ -1408,9 +1389,6 @@ async function streamChat(sessionId, message, thinkingId) {
                             allReasoningHeaders.forEach(header => {
                                 header.classList.remove('shimmer-text');
                             });
-                        } else {
-                            // div未创建，说明reasoning还没来得及显示，直接忽略
-                            console.log('⚠️ Reasoning内容存在但div未创建，直接忽略（不创建幽灵div）');
                         }
                     }
                     
@@ -1714,9 +1692,6 @@ function updateReasoningContent(messageElement, reasoning, autoCollapse = false,
     
     if (!reasoningDiv) {
         isNewDiv = true;
-        console.log('🆕 创建新的reasoning div, autoCollapse:', autoCollapse, 'addShimmer:', addShimmer);
-        console.trace('调用堆栈:');
-        
         reasoningDiv = document.createElement('div');
         reasoningDiv.className = 'message-reasoning';
         reasoningDiv.innerHTML = `
@@ -1727,13 +1702,9 @@ function updateReasoningContent(messageElement, reasoning, autoCollapse = false,
             <div class="reasoning-content"></div>
         `;
         const contentWrapper = messageElement.querySelector('.message-content-wrapper');
-        console.log('🔍 contentWrapper存在:', !!contentWrapper, 'messageElement在DOM:', document.body.contains(messageElement));
         if (contentWrapper) {
             // 插入到最后（工具调用之后）
             contentWrapper.appendChild(reasoningDiv);
-            console.log('✅ appendChild完成，当前reasoning divs数量:', messageElement.querySelectorAll('.message-reasoning').length);
-        } else {
-            console.error('❌ 未找到contentWrapper，无法添加reasoning div');
         }
         
         // 第一次创建时添加流光

@@ -90,12 +90,13 @@ func executeCodeSearchSubAgent(args CodeSearchArgs, config *storage.AIConfig, pa
 		},
 	}
 
-	// 多轮迭代（最多5轮）
-	maxIterations := 5
+	// 多轮迭代（最多5轮搜索 + 1轮强制提交）
+	maxSearchIterations := 5
+	maxTotalIterations := 6 // 给LLM一次提交的机会
 	var finalResult string
 
-	for iteration := 0; iteration < maxIterations; iteration++ {
-		log.Printf("🔄 code_search 第%d轮搜索", iteration+1)
+	for iteration := 0; iteration < maxTotalIterations; iteration++ {
+		log.Printf("🔄 code_search 第%d轮", iteration+1)
 
 		// 调用LLM（使用CodeSearchModel）
 		toolCalls, content, err := callCodeSearchLLM(config, messages)
@@ -143,7 +144,13 @@ func executeCodeSearchSubAgent(args CodeSearchArgs, config *storage.AIConfig, pa
 
 			switch functionName {
 			case "search_files":
-				result, execErr = executeSearchFiles(functionArgs, args.SearchFolder, args.ServerID, parentConversationID)
+				// 🔧 第6轮开始，search_files只返回提示，不真正执行
+				if iteration >= maxSearchIterations {
+					result = `{"warning": "已达到搜索轮数上限，请使用 submit_results 提交已找到的代码信息"}`
+					execErr = nil
+				} else {
+					result, execErr = executeSearchFiles(functionArgs, args.SearchFolder, args.ServerID, parentConversationID)
+				}
 			case "submit_results":
 				result, execErr = executeSubmitResults(functionArgs)
 				if execErr == nil {
@@ -172,17 +179,10 @@ func executeCodeSearchSubAgent(args CodeSearchArgs, config *storage.AIConfig, pa
 			return finalResult, nil
 		}
 
-		// 🔧 如果已经是第5轮且没有提交，强制要求模型提交
-		if iteration >= maxIterations-1 {
-			log.Printf("⚠️ 已达到第%d轮搜索上限，要求模型提交结果", iteration+1)
-			messages = append(messages, map[string]interface{}{
-				"role":    "user",
-				"content": "⚠️ 已达到搜索轮数上限（5轮）。请立即使用 submit_results 工具提交你已经筛选出来的最相关的代码信息。即使信息不完整也必须提交。",
-			})
-		}
+		// 🔧 不主动添加user消息，让工具返回值引导LLM
 	}
 
-	return "", fmt.Errorf("code_search超过最大迭代次数（%d轮）且未提交结果", maxIterations)
+	return "", fmt.Errorf("code_search超过最大迭代次数（%d轮）且未提交结果", maxTotalIterations)
 }
 
 // buildCodeSearchSystemPrompt 构建系统提示词
@@ -191,27 +191,23 @@ func buildCodeSearchSystemPrompt(searchFolder, searchQuery string) string {
 
 **CRITICAL: YOU MUST ONLY USE TOOL CALLS. DO NOT OUTPUT ANY TEXT OR MARKDOWN.**
 
-Your task:
-1. Use the "search_files" tool to search code across multiple rounds
-2. Use the "submit_results" tool to submit your final findings
-
 Search target:
 Directory: %s
 Query: %s
 
-Search strategy (5 rounds max):
-Round 1: Broad exploration - grep for keywords, identify key files
-Round 2-3: Focused search - read key files, search specific functions
-Round 4: Verification - confirm relevance, check dependencies  
-Round 5: MUST submit results using "submit_results" tool
+**3-Step Methodology (complete within 5 rounds):**
 
-**RULES (CRITICAL):**
+1. **Explore** - Use grep to search keywords, identify relevant files
+2. **Analyze** - Read identified files, examine specific code sections
+3. **Submit** - Use "submit_results" to return the most relevant code snippets
+
+**RULES:**
 - ⛔ DO NOT output any text, markdown, or JSON. ONLY use tool calls.
-- ✅ Use "search_files" tool with parallel operations
-- ✅ Use "submit_results" tool to finish (required)
+- ✅ Use "search_files" tool with parallel operations (grep/read)
+- ✅ Use "submit_results" tool when you have sufficient information
 - ✅ Submit format: {"file_path": "/path/file.go", "start_line": 45, "end_line": 120}
 - ✅ If whole file is relevant: start_line=0, end_line=0
-- ⚠️ Round 5: MANDATORY submission
+- ⏱️ Aim to complete within 5 rounds - decide when to submit based on search quality
 
 BEGIN SEARCH NOW.`, searchFolder, searchQuery)
 }
@@ -241,39 +237,40 @@ func executeSearchFiles(argsJSON string, baseFolder string, serverID string, con
 			var result string
 			var err error
 
-			// 构建file_operation参数
-			fileOpArgs := map[string]interface{}{
-				"server_id": args.ServerID,
-			}
-
+			// 根据操作类型调用对应的独立工具
 			switch operation.Type {
 			case "grep":
-				fileOpArgs["type"] = "grep"
-				fileOpArgs["query"] = operation.Query
-				fileOpArgs["search_path"] = operation.SearchPath
-				fileOpArgs["is_regex"] = operation.IsRegex
-				if len(operation.Includes) > 0 {
-					fileOpArgs["includes"] = operation.Includes
+				// 构建grep_search参数
+				grepArgs := map[string]interface{}{
+					"server_id":   args.ServerID,
+					"query":       operation.Query,
+					"search_path": operation.SearchPath,
+					"is_regex":    operation.IsRegex,
 				}
+				if len(operation.Includes) > 0 {
+					grepArgs["includes"] = operation.Includes
+				}
+				argsBytes, _ := json.Marshal(grepArgs)
+				result, err = ExecuteGrepSearch(string(argsBytes))
 
 			case "read":
-				fileOpArgs["type"] = "read"
-				fileOpArgs["file_path"] = operation.FilePath
+				// 构建read_file参数
+				readArgs := map[string]interface{}{
+					"server_id": args.ServerID,
+					"file_path": operation.FilePath,
+				}
 				// 支持按行号读取
 				if operation.Offset > 0 {
-					fileOpArgs["offset"] = operation.Offset
+					readArgs["offset"] = operation.Offset
 				}
 				if operation.Limit > 0 {
-					fileOpArgs["limit"] = operation.Limit
+					readArgs["limit"] = operation.Limit
 				}
+				argsBytes, _ := json.Marshal(readArgs)
+				result, err = ExecuteReadFile(string(argsBytes), conversationID)
 
 			default:
 				err = fmt.Errorf("未知操作类型: %s", operation.Type)
-			}
-
-			if err == nil {
-				argsBytes, _ := json.Marshal(fileOpArgs)
-				result, err = ExecuteFileOperation(string(argsBytes), conversationID, "code_search_internal")
 			}
 
 			mu.Lock()

@@ -8,6 +8,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 
 	"github.com/gin-gonic/gin"
@@ -294,6 +295,13 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 
 	// 3. 恢复文件到上一个快照状态
 	for filePath, content := range restoredFiles {
+		// 🔧 确保父目录存在
+		dir := filepath.Dir(filePath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			log.Printf("⚠️ 创建目录失败 %s: %v", dir, err)
+			continue
+		}
+
 		if err := os.WriteFile(filePath, []byte(content), 0644); err != nil {
 			log.Printf("⚠️ 恢复文件失败 %s: %v", filePath, err)
 		} else {
