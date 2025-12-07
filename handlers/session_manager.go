@@ -12,18 +12,21 @@ import (
 type SSHSession struct {
 	SSHClient  *ssh.Client
 	SFTPClient *sftp.Client
+	ServerID   string // 服务器ID
 	LastActive time.Time
 	mu         sync.Mutex
 }
 
 // SessionManager 全局会话管理器
 type SessionManager struct {
-	sessions map[string]*SSHSession
-	mu       sync.RWMutex
+	sessionsByID     map[string]*SSHSession // session_id → Session
+	sessionsByServer map[string]*SSHSession // server_id → Session（最新）
+	mu               sync.RWMutex
 }
 
 var globalSessionManager = &SessionManager{
-	sessions: make(map[string]*SSHSession),
+	sessionsByID:     make(map[string]*SSHSession),
+	sessionsByServer: make(map[string]*SSHSession),
 }
 
 // GetSessionManager 获取全局会话管理器
@@ -32,23 +35,41 @@ func GetSessionManager() *SessionManager {
 }
 
 // AddSession 添加会话
-func (sm *SessionManager) AddSession(sessionID string, sshClient *ssh.Client, sftpClient *sftp.Client) {
+func (sm *SessionManager) AddSession(sessionID string, serverID string, sshClient *ssh.Client, sftpClient *sftp.Client) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	sm.sessions[sessionID] = &SSHSession{
+	session := &SSHSession{
 		SSHClient:  sshClient,
 		SFTPClient: sftpClient,
+		ServerID:   serverID,
 		LastActive: time.Now(),
 	}
+
+	sm.sessionsByID[sessionID] = session
+	sm.sessionsByServer[serverID] = session // 保存最新会话
 }
 
-// GetSession 获取会话
+// GetSession 获取会话（通过session_id）
 func (sm *SessionManager) GetSession(sessionID string) *SSHSession {
 	sm.mu.RLock()
 	defer sm.mu.RUnlock()
 
-	session := sm.sessions[sessionID]
+	session := sm.sessionsByID[sessionID]
+	if session != nil {
+		session.mu.Lock()
+		session.LastActive = time.Now()
+		session.mu.Unlock()
+	}
+	return session
+}
+
+// GetSessionByServerID 获取会话（通过server_id）
+func (sm *SessionManager) GetSessionByServerID(serverID string) *SSHSession {
+	sm.mu.RLock()
+	defer sm.mu.RUnlock()
+
+	session := sm.sessionsByServer[serverID]
 	if session != nil {
 		session.mu.Lock()
 		session.LastActive = time.Now()
@@ -62,13 +83,16 @@ func (sm *SessionManager) RemoveSession(sessionID string) {
 	sm.mu.Lock()
 	defer sm.mu.Unlock()
 
-	if session, ok := sm.sessions[sessionID]; ok {
+	if session, ok := sm.sessionsByID[sessionID]; ok {
 		// 关闭SFTP客户端
 		if session.SFTPClient != nil {
 			session.SFTPClient.Close()
 		}
-		// SSH客户端由WebSocket handler管理，不在这里关闭
-		delete(sm.sessions, sessionID)
+		// 从两个映射中删除
+		delete(sm.sessionsByID, sessionID)
+		if session.ServerID != "" {
+			delete(sm.sessionsByServer, session.ServerID)
+		}
 	}
 }
 
@@ -78,13 +102,16 @@ func (sm *SessionManager) CleanupInactiveSessions(timeout time.Duration) {
 	defer sm.mu.Unlock()
 
 	now := time.Now()
-	for sessionID, session := range sm.sessions {
+	for sessionID, session := range sm.sessionsByID {
 		session.mu.Lock()
 		if now.Sub(session.LastActive) > timeout {
 			if session.SFTPClient != nil {
 				session.SFTPClient.Close()
 			}
-			delete(sm.sessions, sessionID)
+			delete(sm.sessionsByID, sessionID)
+			if session.ServerID != "" {
+				delete(sm.sessionsByServer, session.ServerID)
+			}
 		}
 		session.mu.Unlock()
 	}

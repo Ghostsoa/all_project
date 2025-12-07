@@ -7,11 +7,11 @@ import (
 
 // GetServers 获取所有服务器
 func GetServers() ([]Server, error) {
-	var servers []Server
-	if err := readJSON(serversFile, &servers); err != nil {
-		return nil, err
+	config := GetConfig()
+	if config == nil {
+		return []Server{}, nil
 	}
-	return servers, nil
+	return config.Servers, nil
 }
 
 // GetServer 根据ID获取服务器
@@ -31,31 +31,35 @@ func GetServer(id string) (*Server, error) {
 
 // CreateServer 创建服务器
 func CreateServer(server *Server) error {
-	servers, err := GetServers()
-	if err != nil {
-		return err
+	globalConfigLock.Lock()
+	defer globalConfigLock.Unlock()
+
+	if globalConfig == nil {
+		return fmt.Errorf("配置未加载")
 	}
 
 	server.CreatedAt = time.Now()
 	server.UpdatedAt = time.Now()
-	servers = append(servers, *server)
+	globalConfig.Servers = append(globalConfig.Servers, *server)
 
-	return writeJSON(serversFile, servers)
+	return writeJSON(configFile, globalConfig)
 }
 
 // UpdateServer 更新服务器
 func UpdateServer(server *Server) error {
-	servers, err := GetServers()
-	if err != nil {
-		return err
+	globalConfigLock.Lock()
+	defer globalConfigLock.Unlock()
+
+	if globalConfig == nil {
+		return fmt.Errorf("配置未加载")
 	}
 
 	found := false
-	for i, s := range servers {
+	for i, s := range globalConfig.Servers {
 		if s.ID == server.ID {
 			server.UpdatedAt = time.Now()
 			server.CreatedAt = s.CreatedAt // 保留创建时间
-			servers[i] = *server
+			globalConfig.Servers[i] = *server
 			found = true
 			break
 		}
@@ -65,19 +69,21 @@ func UpdateServer(server *Server) error {
 		return fmt.Errorf("服务器不存在: %s", server.ID)
 	}
 
-	return writeJSON(serversFile, servers)
+	return writeJSON(configFile, globalConfig)
 }
 
 // DeleteServer 删除服务器
 func DeleteServer(id string) error {
-	servers, err := GetServers()
-	if err != nil {
-		return err
+	globalConfigLock.Lock()
+	defer globalConfigLock.Unlock()
+
+	if globalConfig == nil {
+		return fmt.Errorf("配置未加载")
 	}
 
-	newServers := []Server{}
 	found := false
-	for _, s := range servers {
+	newServers := make([]Server, 0)
+	for _, s := range globalConfig.Servers {
 		if s.ID != id {
 			newServers = append(newServers, s)
 		} else {
@@ -89,15 +95,17 @@ func DeleteServer(id string) error {
 		return fmt.Errorf("服务器不存在: %s", id)
 	}
 
-	return writeJSON(serversFile, newServers)
+	globalConfig.Servers = newServers
+	return writeJSON(configFile, globalConfig)
 }
 
 // SearchServers 搜索服务器
 func SearchServers(keyword string) ([]Server, error) {
-	servers, err := GetServers()
-	if err != nil {
-		return nil, err
+	config := GetConfig()
+	if config == nil {
+		return []Server{}, nil
 	}
+	servers := config.Servers
 
 	if keyword == "" {
 		return servers, nil

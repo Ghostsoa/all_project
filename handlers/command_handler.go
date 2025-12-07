@@ -43,10 +43,7 @@ func (h *CommandHandler) GinGetServerCommands(c *gin.Context) {
 		return
 	}
 
-	limitStr := c.DefaultQuery("limit", "100")
-	limit, _ := strconv.Atoi(limitStr)
-
-	commands, err := storage.GetCommandsByServer(serverID, limit)
+	commands, err := storage.GetServerCommands(serverID)
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
@@ -99,7 +96,7 @@ func (h *CommandHandler) GinClearServerCommands(c *gin.Context) {
 		return
 	}
 
-	if err := storage.ClearCommandsByServer(serverID); err != nil {
+	if err := storage.ClearServerCommands(serverID); err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
 		return
 	}

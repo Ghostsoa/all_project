@@ -2,6 +2,16 @@ package storage
 
 import "time"
 
+// Config 统一配置文件结构
+type Config struct {
+	AuthToken  string           `json:"auth_token"`
+	ServerPort string           `json:"server_port"`
+	AIConfig   AIConfig         `json:"ai_config"`
+	Servers    []Server         `json:"servers"`
+	Providers  []Provider       `json:"providers"`
+	Commands   []CommandHistory `json:"commands"`
+}
+
 // Server SSH服务器配置
 type Server struct {
 	ID          string    `json:"id"`

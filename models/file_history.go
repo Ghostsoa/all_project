@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"sync"
 	"time"
+
+	"all_project/storage"
 )
 
 // TurnSnapshot 每轮对话的文件快照
@@ -30,9 +32,8 @@ type ConversationHistory struct {
 
 // FileHistoryManager 管理文件历史
 type FileHistoryManager struct {
-	histories map[string]*ConversationHistory // key=conversationID
+	histories map[string]*ConversationHistory // key=serverID:conversationID
 	mutex     sync.RWMutex
-	dataDir   string
 }
 
 var fileHistoryManagerInstance *FileHistoryManager
@@ -43,30 +44,34 @@ func GetFileHistoryManager() *FileHistoryManager {
 	fileHistoryOnce.Do(func() {
 		manager := &FileHistoryManager{
 			histories: make(map[string]*ConversationHistory),
-			dataDir:   ".file_history",
-		}
-		os.MkdirAll(manager.dataDir, 0755)
-		if err := manager.Load(); err != nil {
-			log.Printf("加载文件历史失败: %v", err)
 		}
 		fileHistoryManagerInstance = manager
 	})
 	return fileHistoryManagerInstance
 }
 
+// getHistoryKey 获取历史key
+func getHistoryKey(serverID, conversationID string) string {
+	if serverID == "" {
+		serverID = "local"
+	}
+	return serverID + ":" + conversationID
+}
+
 // AddSnapshot 添加快照
-func (m *FileHistoryManager) AddSnapshot(conversationID, filePath string, userMessageIndex int, content string) error {
+func (m *FileHistoryManager) AddSnapshot(serverID, conversationID, filePath string, userMessageIndex int, content string) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
 	// 获取或创建会话历史
-	conv, exists := m.histories[conversationID]
+	historyKey := getHistoryKey(serverID, conversationID)
+	conv, exists := m.histories[historyKey]
 	if !exists {
 		conv = &ConversationHistory{
 			ConversationID: conversationID,
 			Files:          make(map[string]*FileHistory),
 		}
-		m.histories[conversationID] = conv
+		m.histories[historyKey] = conv
 	}
 
 	// 获取或创建文件历史
@@ -87,59 +92,42 @@ func (m *FileHistoryManager) AddSnapshot(conversationID, filePath string, userMe
 	}
 	fileHist.Snapshots = append(fileHist.Snapshots, snapshot)
 
-	log.Printf("📸 添加快照 Turn%d: %s (%d字节)", userMessageIndex, filePath, len(content))
+	log.Printf("添加快照: Turn%d %s (%d字节)", userMessageIndex, filePath, len(content))
 
-	return m.saveLocked()
+	return m.saveLocked(serverID, conversationID)
 }
 
-// GetLastSnapshot 获取最后一个快照
-func (m *FileHistoryManager) GetLastSnapshot(conversationID, filePath string) (string, bool) {
+// GetSnapshot 获取指定轮次的快照
+func (m *FileHistoryManager) GetSnapshot(serverID, conversationID, filePath string, userMessageIndex int) (string, bool) {
 	m.mutex.RLock()
 	defer m.mutex.RUnlock()
 
-	conv, exists := m.histories[conversationID]
+	historyKey := getHistoryKey(serverID, conversationID)
+	conv, exists := m.histories[historyKey]
 	if !exists {
 		return "", false
 	}
 
 	fileHist, exists := conv.Files[filePath]
-	if !exists || len(fileHist.Snapshots) == 0 {
+	if !exists {
 		return "", false
-	}
-
-	lastSnapshot := fileHist.Snapshots[len(fileHist.Snapshots)-1]
-	return lastSnapshot.Content, true
-}
-
-// HasSnapshot 检查特定Turn的快照是否存在
-func (m *FileHistoryManager) HasSnapshot(conversationID, filePath string, turnIndex int) bool {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
-
-	conv, exists := m.histories[conversationID]
-	if !exists {
-		return false
-	}
-
-	fileHist, exists := conv.Files[filePath]
-	if !exists {
-		return false
 	}
 
 	for _, snapshot := range fileHist.Snapshots {
-		if snapshot.UserMessageIndex == turnIndex {
-			return true
+		if snapshot.UserMessageIndex == userMessageIndex {
+			return snapshot.Content, true
 		}
 	}
-	return false
+	return "", false
 }
 
-// RemoveSnapshotsFrom 删除从指定messageIndex开始的快照
-func (m *FileHistoryManager) RemoveSnapshotsFrom(conversationID string, fromMessageIndex int) (map[string]string, error) {
+// RemoveSnapshotsFrom 删除从指定messageIndex开始的所有快照
+func (m *FileHistoryManager) RemoveSnapshotsFrom(serverID, conversationID string, fromMessageIndex int) (map[string]string, error) {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	conv, exists := m.histories[conversationID]
+	historyKey := getHistoryKey(serverID, conversationID)
+	conv, exists := m.histories[historyKey]
 	if !exists {
 		return nil, nil
 	}
@@ -156,7 +144,7 @@ func (m *FileHistoryManager) RemoveSnapshotsFrom(conversationID string, fromMess
 		for _, snapshot := range fileHist.Snapshots {
 			if snapshot.UserMessageIndex == fromMessageIndex {
 				restoredFiles[filePath] = snapshot.Content
-				log.Printf("📂 将恢复到Turn%d快照: %s (%d字节)", fromMessageIndex, filePath, len(snapshot.Content))
+				log.Printf("将恢复到Turn%d快照: %s (%d字节)", fromMessageIndex, filePath, len(snapshot.Content))
 				break
 			}
 		}
@@ -182,9 +170,9 @@ func (m *FileHistoryManager) RemoveSnapshotsFrom(conversationID string, fromMess
 		delete(m.histories, conversationID)
 	}
 
-	log.Printf("🗑️ 删除从Turn%d开始的快照，需恢复%d个文件", fromMessageIndex, len(restoredFiles))
+	log.Printf("删除从Turn%d开始的快照，需恢复%d个文件", fromMessageIndex, len(restoredFiles))
 
-	if err := m.saveLocked(); err != nil {
+	if err := m.saveLocked(serverID, conversationID); err != nil {
 		return nil, err
 	}
 
@@ -192,11 +180,12 @@ func (m *FileHistoryManager) RemoveSnapshotsFrom(conversationID string, fromMess
 }
 
 // RemoveSnapshotsAfter 删除初始快照之后的所有快照
-func (m *FileHistoryManager) RemoveSnapshotsAfter(conversationID string, initialMessageIndex int) error {
+func (m *FileHistoryManager) RemoveSnapshotsAfter(serverID, conversationID string, initialMessageIndex int) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	conv, exists := m.histories[conversationID]
+	historyKey := getHistoryKey(serverID, conversationID)
+	conv, exists := m.histories[historyKey]
 	if !exists {
 		return nil
 	}
@@ -219,17 +208,18 @@ func (m *FileHistoryManager) RemoveSnapshotsAfter(conversationID string, initial
 		}
 	}
 
-	log.Printf("🗑️ 删除Turn%d之后的所有快照", initialMessageIndex)
+	log.Printf("删除Turn%d之后的所有快照", initialMessageIndex)
 
-	return m.saveLocked()
+	return m.saveLocked(serverID, conversationID)
 }
 
-// RemoveSnapshot 删除指定Turn的快照（所有文件）
-func (m *FileHistoryManager) RemoveSnapshot(conversationID string, turnIndex int) error {
+// RemoveSnapshot 删除快照
+func (m *FileHistoryManager) RemoveSnapshot(serverID, conversationID string, userMessageIndex int) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	conv, exists := m.histories[conversationID]
+	historyKey := getHistoryKey(serverID, conversationID)
+	conv, exists := m.histories[historyKey]
 	if !exists {
 		return nil
 	}
@@ -240,7 +230,7 @@ func (m *FileHistoryManager) RemoveSnapshot(conversationID string, turnIndex int
 		// 删除指定Turn的快照
 		newSnapshots := []TurnSnapshot{}
 		for _, snapshot := range fileHist.Snapshots {
-			if snapshot.UserMessageIndex != turnIndex {
+			if snapshot.UserMessageIndex != userMessageIndex {
 				newSnapshots = append(newSnapshots, snapshot)
 			} else {
 				deletedCount++
@@ -261,58 +251,44 @@ func (m *FileHistoryManager) RemoveSnapshot(conversationID string, turnIndex int
 	}
 
 	if deletedCount > 0 {
-		log.Printf("🗑️ 删除Turn%d的%d个快照", turnIndex, deletedCount)
+		log.Printf("删除Turn%d的快照: %d个文件", userMessageIndex, deletedCount)
 	}
 
-	return m.saveLocked()
+	return m.saveLocked(serverID, conversationID)
 }
 
 // ClearConversation 清空会话的所有历史
-func (m *FileHistoryManager) ClearConversation(conversationID string) error {
+func (m *FileHistoryManager) ClearConversation(serverID, conversationID string) error {
 	m.mutex.Lock()
 	defer m.mutex.Unlock()
 
-	delete(m.histories, conversationID)
+	historyKey := getHistoryKey(serverID, conversationID)
+	delete(m.histories, historyKey)
 	log.Printf("🗑️ 清空会话历史: %s", conversationID)
 
-	return m.saveLocked()
+	return m.saveLocked(serverID, conversationID)
 }
 
-// Save 保存到文件
-func (m *FileHistoryManager) Save() error {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-	return m.saveLocked()
-}
-
-func (m *FileHistoryManager) saveLocked() error {
-	filePath := filepath.Join(m.dataDir, "history_index.json")
-
-	// 🔧 确保目录存在
-	if err := os.MkdirAll(m.dataDir, 0755); err != nil {
+// saveLocked 保存文件历史到文件
+func (m *FileHistoryManager) saveLocked(serverID, conversationID string) error {
+	// 使用storage包的目录结构
+	dir := storage.GetFileHistoryDir(serverID)
+	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
 
-	data, err := json.MarshalIndent(m.histories, "", "  ")
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(filePath, data, 0644)
-}
+	filePath := filepath.Join(dir, conversationID+".json")
+	historyKey := getHistoryKey(serverID, conversationID)
 
-// Load 从文件加载
-func (m *FileHistoryManager) Load() error {
-	filePath := filepath.Join(m.dataDir, "history_index.json")
-	data, err := os.ReadFile(filePath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil
+	if conv, exists := m.histories[historyKey]; exists {
+		data, err := json.MarshalIndent(conv, "", "  ")
+		if err != nil {
+			return err
 		}
-		return err
+		return os.WriteFile(filePath, data, 0644)
 	}
 
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
-
-	return json.Unmarshal(data, &m.histories)
+	// 如果不存在，删除文件
+	os.Remove(filePath)
+	return nil
 }

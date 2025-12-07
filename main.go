@@ -3,6 +3,7 @@ package main
 import (
 	"all_project/config"
 	"all_project/handlers"
+	"all_project/handlers/tools"
 	"all_project/middleware"
 	"all_project/storage"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/pkg/sftp"
 )
 
 func main() {
@@ -64,6 +66,19 @@ func main() {
 	if err := handlers.InitGlobalLocalTerminal(); err != nil {
 		log.Printf("⚠️ 本地终端初始化失败: %v", err)
 	}
+
+	// 设置SFTP客户端获取器（用于远程文件操作）
+	tools.SetSFTPClientGetter(func(serverID string) (*sftp.Client, error) {
+		session := handlers.GetSessionManager().GetSessionByServerID(serverID)
+		if session == nil {
+			return nil, fmt.Errorf("远程服务器未连接: %s，请先在终端中连接SSH会话", serverID)
+		}
+		if session.SFTPClient == nil {
+			return nil, fmt.Errorf("远程服务器的SFTP客户端未初始化: %s", serverID)
+		}
+		return session.SFTPClient, nil
+	})
+	log.Println("✓ SFTP客户端获取器已初始化")
 
 	// 启动session清理任务
 	middleware.StartCleanupTask()

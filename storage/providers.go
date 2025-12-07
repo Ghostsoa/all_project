@@ -2,42 +2,38 @@ package storage
 
 import (
 	"fmt"
-	"sync"
-)
-
-// 供应商内存缓存（启动时全量加载）
-var (
-	providersCache     []Provider
-	providersCacheLock sync.RWMutex
-	providersLoaded    bool
 )
 
 // LoadProvidersCache 加载供应商到内存（服务器启动时调用一次）
+// 现在直接使用统一配置，保留此函数以兼容
 func LoadProvidersCache() error {
-	providersCacheLock.Lock()
-	defer providersCacheLock.Unlock()
-
-	if err := readJSON(providersFile, &providersCache); err != nil {
-		// 文件不存在，初始化空列表
-		providersCache = []Provider{}
-	}
-
-	providersLoaded = true
+	// 无需操作，配置已在Init中加载
 	return nil
 }
 
 // GetProviders 获取所有供应商（从内存读取）
 func GetProviders() ([]Provider, error) {
-	providersCacheLock.RLock()
-	defer providersCacheLock.RUnlock()
-
-	if !providersLoaded {
+	config := GetConfig()
+	if config == nil {
 		return []Provider{}, nil
 	}
+	return config.Providers, nil
+}
 
-	// 返回副本，避免外部修改
-	result := make([]Provider, len(providersCache))
-	copy(result, providersCache)
+// SearchProviders 搜索供应商
+func SearchProviders(keyword string) ([]Provider, error) {
+	config := GetConfig()
+	if config == nil {
+		return []Provider{}, nil
+	}
+	providers := config.Providers
+
+	var result []Provider
+	for _, p := range providers {
+		if p.Name == keyword || p.ID == keyword {
+			result = append(result, p)
+		}
+	}
 	return result, nil
 }
 
@@ -58,40 +54,37 @@ func GetProvider(id string) (*Provider, error) {
 
 // CreateProvider 创建供应商（操作内存+写文件）
 func CreateProvider(provider *Provider) error {
-	providersCacheLock.Lock()
-	defer providersCacheLock.Unlock()
+	globalConfigLock.Lock()
+	defer globalConfigLock.Unlock()
 
-	if !providersLoaded {
-		return fmt.Errorf("供应商缓存未初始化")
+	if globalConfig == nil {
+		return fmt.Errorf("配置未加载")
 	}
 
 	// 检查ID是否已存在
-	for _, p := range providersCache {
+	for _, p := range globalConfig.Providers {
 		if p.ID == provider.ID {
 			return fmt.Errorf("供应商ID已存在: %s", provider.ID)
 		}
 	}
 
-	// 添加到内存
-	providersCache = append(providersCache, *provider)
-
-	// 写入文件
-	return writeJSON(providersFile, providersCache)
+	globalConfig.Providers = append(globalConfig.Providers, *provider)
+	return writeJSON(configFile, globalConfig)
 }
 
 // UpdateProvider 更新供应商（操作内存+写文件）
 func UpdateProvider(provider *Provider) error {
-	providersCacheLock.Lock()
-	defer providersCacheLock.Unlock()
+	globalConfigLock.Lock()
+	defer globalConfigLock.Unlock()
 
-	if !providersLoaded {
-		return fmt.Errorf("供应商缓存未初始化")
+	if globalConfig == nil {
+		return fmt.Errorf("配置未加载")
 	}
 
 	found := false
-	for i, p := range providersCache {
+	for i, p := range globalConfig.Providers {
 		if p.ID == provider.ID {
-			providersCache[i] = *provider
+			globalConfig.Providers[i] = *provider
 			found = true
 			break
 		}
@@ -101,22 +94,21 @@ func UpdateProvider(provider *Provider) error {
 		return fmt.Errorf("供应商不存在: %s", provider.ID)
 	}
 
-	// 写入文件
-	return writeJSON(providersFile, providersCache)
+	return writeJSON(configFile, globalConfig)
 }
 
-// DeleteProvider 删除供应商（操作内存+写文件）
+// DeleteProvider 删除供应商
 func DeleteProvider(id string) error {
-	providersCacheLock.Lock()
-	defer providersCacheLock.Unlock()
+	globalConfigLock.Lock()
+	defer globalConfigLock.Unlock()
 
-	if !providersLoaded {
-		return fmt.Errorf("供应商缓存未初始化")
+	if globalConfig == nil {
+		return fmt.Errorf("配置未加载")
 	}
 
-	newProviders := []Provider{}
 	found := false
-	for _, p := range providersCache {
+	newProviders := make([]Provider, 0)
+	for _, p := range globalConfig.Providers {
 		if p.ID != id {
 			newProviders = append(newProviders, p)
 		} else {
@@ -128,11 +120,8 @@ func DeleteProvider(id string) error {
 		return fmt.Errorf("供应商不存在: %s", id)
 	}
 
-	// 更新内存
-	providersCache = newProviders
-
-	// 写入文件
-	return writeJSON(providersFile, providersCache)
+	globalConfig.Providers = newProviders
+	return writeJSON(configFile, globalConfig)
 }
 
 // FindProviderByModel 根据模型ID查找供应商

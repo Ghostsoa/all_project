@@ -4,6 +4,7 @@ import (
 	"all_project/models"
 	"all_project/storage"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -19,6 +20,35 @@ type AIEditHandler struct{}
 // NewAIEditHandler 创建编辑处理器
 func NewAIEditHandler() *AIEditHandler {
 	return &AIEditHandler{}
+}
+
+// getAllServerIDs 获取所有有pending或history的server_id
+func getAllServerIDs() []string {
+	serverIDs := []string{"local"} // 总是包含local
+
+	// 扫描.ssh_web_data目录下的所有子目录
+	baseDir, _ := os.UserHomeDir()
+	if baseDir == "" {
+		baseDir = "."
+	}
+	sshDataDir := filepath.Join(baseDir, ".ssh_web_data")
+
+	entries, err := os.ReadDir(sshDataDir)
+	if err != nil {
+		return serverIDs
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			name := entry.Name()
+			// 排除特殊目录
+			if name != "local" && name != "sessions" && name != "config.json" {
+				serverIDs = append(serverIDs, name)
+			}
+		}
+	}
+
+	return serverIDs
 }
 
 // ApplyEditRequest 应用编辑请求
@@ -85,56 +115,74 @@ func (h *AIEditHandler) ApplyEdit(c *gin.Context) {
 	}
 }
 
-// acceptAll 确认所有pending修改
+// acceptAll 确认所有pending修改（支持多服务器）
 func (h *AIEditHandler) acceptAll(conversationID string, pendingManager *models.PendingStateManager, historyManager *models.FileHistoryManager) error {
-	// 1. 获取所有轮次
-	turns := pendingManager.GetTurns(conversationID)
-	if len(turns) == 0 {
-		log.Printf("⚠️ 没有pending修改")
-		return nil
-	}
+	// 获取所有服务器ID
+	serverIDs := getAllServerIDs()
 
-	// 2. 获取所有涉及的文件
-	allFiles := pendingManager.GetAllPendingFiles(conversationID)
-
-	log.Printf("📊 Accept All: %d轮对话，%d个文件", len(turns), len(allFiles))
-
-	// 3. 收集所有tool_call_id（用于更新消息status）
+	// 统计总数
+	totalTurns := 0
+	totalFiles := 0
 	allToolCallIDs := make([]string, 0)
-	for _, turn := range turns {
-		for _, edits := range turn.FileEdits {
-			for _, edit := range edits {
-				allToolCallIDs = append(allToolCallIDs, edit.ToolCallID)
+
+	// 对每个server_id处理
+	for _, serverID := range serverIDs {
+		// 1. 获取该服务器的所有轮次
+		turns := pendingManager.GetTurns(serverID, conversationID)
+		if len(turns) == 0 {
+			continue
+		}
+
+		totalTurns += len(turns)
+
+		// 2. 获取所有涉及的文件
+		allFiles := pendingManager.GetAllPendingFiles(serverID, conversationID)
+		totalFiles += len(allFiles)
+
+		log.Printf("📊 [%s] Accept: %d轮对话，%d个文件", serverID, len(turns), len(allFiles))
+
+		// 3. 收集tool_call_id
+		for _, turn := range turns {
+			for _, edits := range turn.FileEdits {
+				for _, edit := range edits {
+					allToolCallIDs = append(allToolCallIDs, edit.ToolCallID)
+				}
 			}
 		}
-	}
-	log.Printf("📋 收集到%d个tool_call_id", len(allToolCallIDs))
 
-	// 4. 对每个文件：应用edits，生成快照，写入磁盘
-	finalTurnContents := make(map[string]string) // 保存每个文件的最终内容
-	for filePath := range allFiles {
-		finalContent, err := h.acceptFileEdits(conversationID, filePath, turns, historyManager)
-		if err != nil {
-			return fmt.Errorf("处理文件失败 %s: %v", filePath, err)
+		// 4. 对每个文件：应用edits，生成快照，写入磁盘
+		finalTurnContents := make(map[string]string)
+		for filePath := range allFiles {
+			finalContent, err := h.acceptFileEdits(serverID, conversationID, filePath, turns, historyManager)
+			if err != nil {
+				return fmt.Errorf("处理文件失败 %s: %v", filePath, err)
+			}
+			finalTurnContents[filePath] = finalContent
 		}
-		finalTurnContents[filePath] = finalContent
-	}
 
-	// 5. 保存最终Turn的快照（Turn N+1）
-	if len(turns) > 0 {
-		lastTurnIndex := turns[len(turns)-1].UserMessageIndex
-		finalTurnIndex := lastTurnIndex + 1
+		// 5. 保存最终Turn的快照（Turn N+1）
+		if len(turns) > 0 {
+			lastTurnIndex := turns[len(turns)-1].UserMessageIndex
+			finalTurnIndex := lastTurnIndex + 1
 
-		for filePath, finalContent := range finalTurnContents {
-			if err := historyManager.AddSnapshot(conversationID, filePath, finalTurnIndex, finalContent); err != nil {
-				log.Printf("⚠️ 保存Turn%d快照失败: %v", finalTurnIndex, err)
-			} else {
-				log.Printf("✅ 保存Turn%d快照（Accept All最终状态）: %s (%d字节)", finalTurnIndex, filePath, len(finalContent))
+			for filePath, finalContent := range finalTurnContents {
+				if err := historyManager.AddSnapshot(serverID, conversationID, filePath, finalTurnIndex, finalContent); err != nil {
+					log.Printf("⚠️ [%s] 保存Turn%d快照失败: %v", serverID, finalTurnIndex, err)
+				} else {
+					log.Printf("✅ [%s] 保存Turn%d快照: %s (%d字节)", serverID, finalTurnIndex, filePath, len(finalContent))
+				}
 			}
 		}
+
+		// 6. 清空该服务器的pending
+		if err := pendingManager.ClearAll(serverID, conversationID); err != nil {
+			return fmt.Errorf("[%s] 清空pending失败: %v", serverID, err)
+		}
 	}
 
-	// 6. 更新所有tool消息的status为accepted
+	log.Printf("📊 Accept All总计: %d个server, %d轮对话, %d个文件", len(serverIDs), totalTurns, totalFiles)
+
+	// 7. 更新所有tool消息的status为accepted
 	for _, toolCallID := range allToolCallIDs {
 		if err := storage.UpdateToolMessageStatus(toolCallID, "accepted"); err != nil {
 			log.Printf("⚠️ 更新tool消息状态失败 (%s): %v", toolCallID, err)
@@ -142,24 +190,43 @@ func (h *AIEditHandler) acceptAll(conversationID string, pendingManager *models.
 	}
 	log.Printf("✅ 已更新%d个tool消息状态为accepted", len(allToolCallIDs))
 
-	// 7. 清空pending
-	if err := pendingManager.ClearAll(conversationID); err != nil {
-		return fmt.Errorf("清空pending失败: %v", err)
-	}
-
 	return nil
 }
 
-// acceptFileEdits 应用单个文件的所有edits并返回最终内容
-func (h *AIEditHandler) acceptFileEdits(conversationID, filePath string, turns []models.TurnEdits, historyManager *models.FileHistoryManager) (string, error) {
-	// 读取磁盘内容（如果文件不存在，初始为空字符串）
+// acceptFileEdits 应用单个文件的所有edits并返回最终内容（支持本地和远程）
+func (h *AIEditHandler) acceptFileEdits(serverID, conversationID, filePath string, turns []models.TurnEdits, historyManager *models.FileHistoryManager) (string, error) {
+	// 读取文件内容（支持本地和远程）
 	state := ""
-	diskContent, err := os.ReadFile(filePath)
-	if err == nil {
-		state = string(diskContent)
-		log.Printf("📝 处理文件: %s (初始: %d字节)", filePath, len(state))
+	var diskContent []byte
+	var err error
+
+	if serverID == "" || serverID == "local" {
+		// 本地文件
+		diskContent, err = os.ReadFile(filePath)
+		if err == nil {
+			state = string(diskContent)
+			log.Printf("📝 [本地] 处理文件: %s (初始: %d字节)", filePath, len(state))
+		} else {
+			log.Printf("📝 [本地] 新文件: %s", filePath)
+		}
 	} else {
-		log.Printf("📝 处理新文件: %s (文件不存在，将创建)", filePath)
+		// 远程文件（SFTP）
+		session := GetSessionManager().GetSessionByServerID(serverID)
+		if session == nil || session.SFTPClient == nil {
+			return "", fmt.Errorf("远程服务器未连接: %s", serverID)
+		}
+
+		remoteFile, err := session.SFTPClient.Open(filePath)
+		if err == nil {
+			defer remoteFile.Close()
+			diskContent, err = io.ReadAll(remoteFile)
+			if err == nil {
+				state = string(diskContent)
+				log.Printf("📝 [%s] 处理远程文件: %s (初始: %d字节)", serverID, filePath, len(state))
+			}
+		} else {
+			log.Printf("📝 [%s] 新远程文件: %s", serverID, filePath)
+		}
 	}
 
 	// 逐轮应用edits并保存快照
@@ -170,7 +237,7 @@ func (h *AIEditHandler) acceptFileEdits(conversationID, filePath string, turns [
 		}
 
 		// 保存该轮开始前的快照
-		if err := historyManager.AddSnapshot(conversationID, filePath, turn.UserMessageIndex, state); err != nil {
+		if err := historyManager.AddSnapshot(serverID, conversationID, filePath, turn.UserMessageIndex, state); err != nil {
 			return "", fmt.Errorf("保存快照失败: %v", err)
 		}
 		log.Printf("📸 Turn%d快照: %d字节", turn.UserMessageIndex, len(state))
@@ -182,53 +249,94 @@ func (h *AIEditHandler) acceptFileEdits(conversationID, filePath string, turns [
 		log.Printf("✏️ Turn%d应用%d个edit: %d字节", turn.UserMessageIndex, len(edits), len(state))
 	}
 
-	// 写入最终状态到磁盘
-	// 🔧 确保父目录存在
-	dir := filepath.Dir(filePath)
-	if err := os.MkdirAll(dir, 0755); err != nil {
-		return "", fmt.Errorf("创建目录失败: %v", err)
+	// 写入最终状态到磁盘（支持本地和远程）
+	if serverID == "" || serverID == "local" {
+		// 本地文件
+		dir := filepath.Dir(filePath)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return "", fmt.Errorf("创建目录失败: %v", err)
+		}
+
+		if err := os.WriteFile(filePath, []byte(state), 0644); err != nil {
+			return "", fmt.Errorf("写入本地文件失败: %v", err)
+		}
+
+		log.Printf("💾 [本地] 写入磁盘: %s (%d字节)", filePath, len(state))
+	} else {
+		// 远程文件（SFTP）
+		session := GetSessionManager().GetSessionByServerID(serverID)
+		if session == nil || session.SFTPClient == nil {
+			return "", fmt.Errorf("远程服务器未连接: %s", serverID)
+		}
+
+		// 确保远程父目录存在
+		dir := filepath.Dir(filePath)
+		if err := session.SFTPClient.MkdirAll(dir); err != nil {
+			log.Printf("⚠️ [%s] 创建远程目录失败 %s: %v", serverID, dir, err)
+			// 继续尝试写入，目录可能已存在
+		}
+
+		// 写入远程文件
+		remoteFile, err := session.SFTPClient.Create(filePath)
+		if err != nil {
+			return "", fmt.Errorf("创建远程文件失败: %v", err)
+		}
+		defer remoteFile.Close()
+
+		if _, err := remoteFile.Write([]byte(state)); err != nil {
+			return "", fmt.Errorf("写入远程文件失败: %v", err)
+		}
+
+		log.Printf("💾 [%s] 写入远程文件: %s (%d字节)", serverID, filePath, len(state))
 	}
 
-	if err := os.WriteFile(filePath, []byte(state), 0644); err != nil {
-		return "", fmt.Errorf("写入文件失败: %v", err)
-	}
-
-	log.Printf("💾 写入磁盘: %s (%d字节)", filePath, len(state))
 	return state, nil
 }
 
-// rejectAll 取消所有pending修改
+// rejectAll 取消所有pending修改（支持多服务器）
 func (h *AIEditHandler) rejectAll(conversationID string, pendingManager *models.PendingStateManager, historyManager *models.FileHistoryManager) error {
-	// 1. 获取所有轮次
-	turns := pendingManager.GetTurns(conversationID)
-	if len(turns) == 0 {
-		log.Printf("⚠️ 没有pending修改")
-		return nil
-	}
+	// 获取所有服务器ID
+	serverIDs := getAllServerIDs()
 
-	log.Printf("🗑️ Reject All: 删除%d个pending轮次的临时快照", len(turns))
-
-	// 2. 收集所有tool_call_id（用于更新消息status）
+	// 统计总数
+	totalTurns := 0
 	allToolCallIDs := make([]string, 0)
-	for _, turn := range turns {
-		for _, edits := range turn.FileEdits {
-			for _, edit := range edits {
-				allToolCallIDs = append(allToolCallIDs, edit.ToolCallID)
+
+	// 对每个server_id处理
+	for _, serverID := range serverIDs {
+		// 1. 获取该服务器的所有轮次
+		turns := pendingManager.GetTurns(serverID, conversationID)
+		if len(turns) == 0 {
+			continue
+		}
+
+		totalTurns += len(turns)
+		log.Printf("🗑️ [%s] Reject: 删除%d个pending轮次", serverID, len(turns))
+
+		// 2. 收集tool_call_id
+		for _, turn := range turns {
+			for _, edits := range turn.FileEdits {
+				for _, edit := range edits {
+					allToolCallIDs = append(allToolCallIDs, edit.ToolCallID)
+				}
 			}
 		}
-	}
 
-	// 3. 删除每个pending Turn的临时快照（Turn N+1）
-	// 注意：不删除已Accept的快照（Turn N）
-	for _, turn := range turns {
-		turnIndex := turn.UserMessageIndex
-		// 只删除Turn N+1的快照（这是pending的最终状态，还没Accept）
-		if err := historyManager.RemoveSnapshot(conversationID, turnIndex+1); err != nil {
-			log.Printf("⚠️ 删除Turn%d快照失败: %v", turnIndex+1, err)
-		} else {
-			log.Printf("🗑️ 删除Turn%d的临时快照", turnIndex+1)
+		// 3. 删除该服务器的所有轮次快照
+		if len(turns) > 0 {
+			initialTurnIndex := turns[0].UserMessageIndex
+			if err := historyManager.RemoveSnapshotsAfter(serverID, conversationID, initialTurnIndex); err != nil {
+				return fmt.Errorf("[%s] 删除快照失败: %v", serverID, err)
+			}
+		}
+
+		// 4. 清空该服务器的pending
+		if err := pendingManager.ClearAll(serverID, conversationID); err != nil {
+			return fmt.Errorf("[%s] 清空pending失败: %v", serverID, err)
 		}
 	}
+
+	log.Printf("🗑️ Reject All总计: %d个server, %d轮对话", len(serverIDs), totalTurns)
 
 	// 5. 更新所有tool消息的status为rejected
 	for _, toolCallID := range allToolCallIDs {
@@ -237,11 +345,6 @@ func (h *AIEditHandler) rejectAll(conversationID string, pendingManager *models.
 		}
 	}
 	log.Printf("✅ 已更新%d个tool消息状态为rejected", len(allToolCallIDs))
-
-	// 6. 清空pending
-	if err := pendingManager.ClearAll(conversationID); err != nil {
-		return fmt.Errorf("清空pending失败: %v", err)
-	}
 
 	// 注意：磁盘内容不变，因为pending从未写入磁盘
 	log.Printf("✅ Reject完成，磁盘保持不变")

@@ -20,6 +20,35 @@ func NewAISessionsHandler() *AISessionsHandler {
 	return &AISessionsHandler{}
 }
 
+// getAllServerIDsForCleanup 获取所有有pending或history的server_id
+func getAllServerIDsForCleanup() []string {
+	serverIDs := []string{"local"} // 总是包含local
+
+	// 扫描.ssh_web_data目录下的所有子目录
+	baseDir, _ := os.UserHomeDir()
+	if baseDir == "" {
+		baseDir = "."
+	}
+	sshDataDir := filepath.Join(baseDir, ".ssh_web_data")
+
+	entries, err := os.ReadDir(sshDataDir)
+	if err != nil {
+		return serverIDs
+	}
+
+	for _, entry := range entries {
+		if entry.IsDir() {
+			name := entry.Name()
+			// 排除特殊目录
+			if name != "local" && name != "sessions" && name != "config.json" {
+				serverIDs = append(serverIDs, name)
+			}
+		}
+	}
+
+	return serverIDs
+}
+
 // GetSessions 获取所有会话列表
 func (h *AISessionsHandler) GetSessions(c *gin.Context) {
 	sessions, err := storage.GetAllSessions()
@@ -121,16 +150,20 @@ func (h *AISessionsHandler) DeleteSession(c *gin.Context) {
 		return
 	}
 
-	// 1. 清理file_history
-	historyManager := models.GetFileHistoryManager()
-	if err := historyManager.ClearConversation(id); err != nil {
-		log.Printf("⚠️ 清理文件历史失败: %v", err)
-	}
+	// 1. 获取所有服务器ID
+	serverIDs := getAllServerIDsForCleanup()
 
-	// 2. 清理pending_state
+	// 2. 清理所有服务器的file_history和pending_state
+	historyManager := models.GetFileHistoryManager()
 	pendingManager := models.GetPendingStateManager()
-	if err := pendingManager.ClearAll(id); err != nil {
-		log.Printf("⚠️ 清理pending状态失败: %v", err)
+
+	for _, serverID := range serverIDs {
+		if err := historyManager.ClearConversation(serverID, id); err != nil {
+			log.Printf("⚠️ [%s] 清理文件历史失败: %v", serverID, err)
+		}
+		if err := pendingManager.ClearAll(serverID, id); err != nil {
+			log.Printf("⚠️ [%s] 清理pending状态失败: %v", serverID, err)
+		}
 	}
 
 	// 3. 删除会话
@@ -151,16 +184,20 @@ func (h *AISessionsHandler) ClearSession(c *gin.Context) {
 		return
 	}
 
-	// 1. 清理file_history
-	historyManager := models.GetFileHistoryManager()
-	if err := historyManager.ClearConversation(id); err != nil {
-		log.Printf("⚠️ 清理文件历史失败: %v", err)
-	}
+	// 1. 获取所有服务器ID
+	serverIDs := getAllServerIDsForCleanup()
 
-	// 2. 清理pending_state
+	// 2. 清理所有服务器的file_history和pending_state
+	historyManager := models.GetFileHistoryManager()
 	pendingManager := models.GetPendingStateManager()
-	if err := pendingManager.ClearAll(id); err != nil {
-		log.Printf("⚠️ 清理pending状态失败: %v", err)
+
+	for _, serverID := range serverIDs {
+		if err := historyManager.ClearConversation(serverID, id); err != nil {
+			log.Printf("⚠️ [%s] 清理文件历史失败: %v", serverID, err)
+		}
+		if err := pendingManager.ClearAll(serverID, id); err != nil {
+			log.Printf("⚠️ [%s] 清理pending状态失败: %v", serverID, err)
+		}
 	}
 
 	// 3. 清空消息
@@ -280,21 +317,32 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 
 	log.Printf("📊 消息索引%d对应Turn%d（共%d个用户消息）", req.MessageIndex, turnIndex, userMessageCount)
 
-	// 1. 删除从turnIndex开始的pending轮次
-	if err := pendingManager.RemoveTurnsFrom(req.SessionID, turnIndex); err != nil {
-		log.Printf("⚠️ 删除pending失败: %v", err)
-	}
+	// 1. 获取所有服务器ID
+	serverIDs := getAllServerIDsForCleanup()
+	allRestoredFiles := make(map[string]string)
 
-	// 2. 删除从turnIndex开始的快照，并获取需要恢复的文件
-	restoredFiles, err := historyManager.RemoveSnapshotsFrom(req.SessionID, turnIndex)
-	if err != nil {
-		log.Printf("⚠️ 删除快照失败: %v", err)
-		c.JSON(http.StatusInternalServerError, gin.H{"success": false, "error": err.Error()})
-		return
+	// 2. 对每个server_id处理
+	for _, serverID := range serverIDs {
+		// 2.1 删除从turnIndex开始的pending轮次
+		if err := pendingManager.RemoveTurnsFrom(serverID, req.SessionID, turnIndex); err != nil {
+			log.Printf("⚠️ [%s] 删除pending失败: %v", serverID, err)
+		}
+
+		// 2.2 删除从turnIndex开始的快照，并获取需要恢复的文件
+		restoredFiles, err := historyManager.RemoveSnapshotsFrom(serverID, req.SessionID, turnIndex)
+		if err != nil {
+			log.Printf("⚠️ [%s] 删除快照失败: %v", serverID, err)
+			continue
+		}
+
+		// 合并恢复文件
+		for filePath, content := range restoredFiles {
+			allRestoredFiles[filePath] = content
+		}
 	}
 
 	// 3. 恢复文件到上一个快照状态
-	for filePath, content := range restoredFiles {
+	for filePath, content := range allRestoredFiles {
 		// 🔧 确保父目录存在
 		dir := filepath.Dir(filePath)
 		if err := os.MkdirAll(dir, 0755); err != nil {
@@ -316,7 +364,7 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 	}
 
 	log.Printf("========================================")
-	log.Printf("✅ 撤销成功: 恢复了 %d 个文件", len(restoredFiles))
+	log.Printf("✅ 撤销成功: 恢复了 %d 个文件", len(allRestoredFiles))
 
 	c.JSON(http.StatusOK, gin.H{"success": true, "message": "撤销成功"})
 }

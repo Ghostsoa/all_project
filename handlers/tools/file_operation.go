@@ -5,13 +5,37 @@ import (
 	"all_project/storage"
 	"encoding/json"
 	"fmt"
+	"io"
 	"io/fs"
 	"log"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strings"
+
+	"github.com/pkg/sftp"
 )
+
+// ========== SFTP客户端获取辅助函数 ==========
+
+// GetSFTPClientFunc 获取SFTP客户端的函数类型
+type GetSFTPClientFunc func(serverID string) (*sftp.Client, error)
+
+// 全局的SFTP客户端获取器（由tool_executor设置）
+var globalGetSFTPClient GetSFTPClientFunc
+
+// SetSFTPClientGetter 设置SFTP客户端获取器
+func SetSFTPClientGetter(getter GetSFTPClientFunc) {
+	globalGetSFTPClient = getter
+}
+
+// getSFTPClient 获取SFTP客户端
+func getSFTPClient(serverID string) (*sftp.Client, error) {
+	if globalGetSFTPClient == nil {
+		return nil, fmt.Errorf("SFTP客户端获取器未初始化")
+	}
+	return globalGetSFTPClient(serverID)
+}
 
 // ========== 独立工具的参数结构 ==========
 
@@ -199,15 +223,42 @@ type FileInfo struct {
 func readFile(args FileOperationArgs, conversationID string) (string, error) {
 	manager := models.GetPendingStateManager()
 
-	log.Printf("📖 readFile调用: conversationID=%s, filePath=%s, offset=%d, limit=%d",
-		conversationID, args.FilePath, args.Offset, args.Limit)
+	log.Printf("📖 readFile调用: serverID=%s, conversationID=%s, filePath=%s, offset=%d, limit=%d",
+		args.ServerID, conversationID, args.FilePath, args.Offset, args.Limit)
+
+	// 读取文件内容（支持本地和远程）
+	var diskContent []byte
+	var err error
+
+	if args.ServerID == "" || args.ServerID == "local" {
+		// 本地文件
+		diskContent, err = os.ReadFile(args.FilePath)
+		if err != nil {
+			return "", fmt.Errorf("读取本地文件失败: %v", err)
+		}
+	} else {
+		// 远程文件（通过SFTP）
+		sftpClient, err := getSFTPClient(args.ServerID)
+		if err != nil {
+			return "", fmt.Errorf("获取远程服务器连接失败: %v", err)
+		}
+
+		// 使用SFTP读取远程文件
+		remoteFile, err := sftpClient.Open(args.FilePath)
+		if err != nil {
+			return "", fmt.Errorf("读取远程文件失败: %v", err)
+		}
+		defer remoteFile.Close()
+
+		diskContent, err = io.ReadAll(remoteFile)
+		if err != nil {
+			return "", fmt.Errorf("读取远程文件内容失败: %v", err)
+		}
+		log.Printf("✅ 读取远程文件: [%s] %s (%d字节)", args.ServerID, args.FilePath, len(diskContent))
+	}
 
 	// 优先从pending状态读取
-	diskContent, err := os.ReadFile(args.FilePath)
-	if err != nil {
-		return "", fmt.Errorf("读取文件失败: %v", err)
-	}
-	content := manager.GetCurrentContent(conversationID, args.FilePath, string(diskContent))
+	content := manager.GetCurrentContent(args.ServerID, conversationID, args.FilePath, string(diskContent))
 
 	lines := strings.Split(content, "\n")
 	totalLines := len(lines)
@@ -304,9 +355,32 @@ func writeFile(args FileOperationArgs, conversationID string, messageID string) 
 	// 1. 获取当前内容（用于pending和history）
 	oldContent := ""
 	fileExists := false
-	if diskContent, err := os.ReadFile(args.FilePath); err == nil {
+
+	// 读取文件内容（支持本地和远程）
+	var diskContent []byte
+	var readErr error
+	if args.ServerID == "" || args.ServerID == "local" {
+		// 本地文件
+		diskContent, readErr = os.ReadFile(args.FilePath)
+	} else {
+		// 远程文件
+		sftpClient, sftpErr := getSFTPClient(args.ServerID)
+		if sftpErr != nil {
+			readErr = sftpErr
+		} else {
+			remoteFile, openErr := sftpClient.Open(args.FilePath)
+			if openErr == nil {
+				defer remoteFile.Close()
+				diskContent, readErr = io.ReadAll(remoteFile)
+			} else {
+				readErr = openErr
+			}
+		}
+	}
+
+	if readErr == nil {
 		// 文件存在，获取当前内容（可能有pending修改）
-		oldContent = manager.GetCurrentContent(conversationID, args.FilePath, string(diskContent))
+		oldContent = manager.GetCurrentContent(args.ServerID, conversationID, args.FilePath, string(diskContent))
 		fileExists = true
 	}
 
@@ -324,7 +398,7 @@ func writeFile(args FileOperationArgs, conversationID string, messageID string) 
 		OldString:  oldContent, // 空字符串（新建）或旧内容（覆盖）
 		NewString:  args.Content,
 	}
-	if err := manager.AddEdit(conversationID, args.FilePath, messageIndex, writeOp); err != nil {
+	if err := manager.AddEdit(args.ServerID, conversationID, args.FilePath, messageIndex, writeOp); err != nil {
 		return "", fmt.Errorf("保存写入操作失败: %v", err)
 	}
 
@@ -364,11 +438,30 @@ func editFile(args FileOperationArgs, conversationID string, messageID string) (
 	}
 
 	// 1. 获取当前内容（优先从pending读取）
-	diskContent, err := os.ReadFile(args.FilePath)
+	var diskContent []byte
+
+	if args.ServerID == "" || args.ServerID == "local" {
+		// 本地文件
+		diskContent, err = os.ReadFile(args.FilePath)
+	} else {
+		// 远程文件
+		sftpClient, sftpErr := getSFTPClient(args.ServerID)
+		if sftpErr != nil {
+			return "", fmt.Errorf("获取远程服务器连接失败: %v", sftpErr)
+		}
+		remoteFile, openErr := sftpClient.Open(args.FilePath)
+		if openErr != nil {
+			return "", fmt.Errorf("读取远程文件失败: %v", openErr)
+		}
+		defer remoteFile.Close()
+		diskContent, err = io.ReadAll(remoteFile)
+	}
+
 	if err != nil {
 		return "", fmt.Errorf("读取文件失败: %v", err)
 	}
-	currentContent := manager.GetCurrentContent(conversationID, args.FilePath, string(diskContent))
+
+	currentContent := manager.GetCurrentContent(args.ServerID, conversationID, args.FilePath, string(diskContent))
 
 	// 2. 执行替换
 	if !strings.Contains(currentContent, args.OldString) {
@@ -391,7 +484,7 @@ func editFile(args FileOperationArgs, conversationID string, messageID string) (
 		OldString:  args.OldString,
 		NewString:  args.NewString,
 	}
-	if err := manager.AddEdit(conversationID, args.FilePath, messageIndex, editOp); err != nil {
+	if err := manager.AddEdit(args.ServerID, conversationID, args.FilePath, messageIndex, editOp); err != nil {
 		return "", fmt.Errorf("保存编辑失败: %v", err)
 	}
 
@@ -413,6 +506,11 @@ func editFile(args FileOperationArgs, conversationID string, messageID string) (
 
 // listDir 列出目录内容
 func listDir(args FileOperationArgs) (string, error) {
+	// 检查server_id（目前只支持本地）
+	if args.ServerID != "" && args.ServerID != "local" {
+		return "", fmt.Errorf("目录列表操作目前仅支持本地文件系统，不支持远程服务器 [%s]", args.ServerID)
+	}
+
 	// 读取目录
 	entries, err := os.ReadDir(args.FilePath)
 	if err != nil {
@@ -467,6 +565,11 @@ func listDir(args FileOperationArgs) (string, error) {
 
 // grepSearch 搜索文件内容（支持正则表达式和文件类型过滤）
 func grepSearch(args FileOperationArgs) (string, error) {
+	// 检查server_id（目前只支持本地）
+	if args.ServerID != "" && args.ServerID != "local" {
+		return "", fmt.Errorf("文件搜索操作目前仅支持本地文件系统，不支持远程服务器 [%s]", args.ServerID)
+	}
+
 	searchPath := args.SearchPath
 	if searchPath == "" {
 		searchPath = args.FilePath // 兼容旧参数
@@ -599,6 +702,11 @@ func grepSearch(args FileOperationArgs) (string, error) {
 
 // findByName 按文件名搜索（支持通配符和深度限制）
 func findByName(args FileOperationArgs) (string, error) {
+	// 检查server_id（目前只支持本地）
+	if args.ServerID != "" && args.ServerID != "local" {
+		return "", fmt.Errorf("文件查找操作目前仅支持本地文件系统，不支持远程服务器 [%s]", args.ServerID)
+	}
+
 	searchPath := args.SearchPath
 	if searchPath == "" {
 		searchPath = args.FilePath

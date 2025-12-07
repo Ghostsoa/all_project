@@ -79,9 +79,9 @@ func (h *WebSocketHandler) GinHandleWebSocket(c *gin.Context) {
 	sessionID := c.Query("session_id")
 	if sessionID != "" && sftpClient != nil {
 		// 保存到会话管理器
-		GetSessionManager().AddSession(sessionID, sshClient, sftpClient)
+		GetSessionManager().AddSession(sessionID, serverID, sshClient, sftpClient)
 		defer GetSessionManager().RemoveSession(sessionID)
-		log.Printf("会话已保存: %s", sessionID)
+		log.Printf("会话已保存: session=%s, server=%s", sessionID, serverID)
 	}
 
 	// 创建 SSH 会话

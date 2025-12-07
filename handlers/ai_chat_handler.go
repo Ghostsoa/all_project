@@ -303,15 +303,23 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// saveCurrentTurnSnapshot 保存当前轮次的快照到file_history
+// saveCurrentTurnSnapshot 保存当前轮次的快照到file_history（支持多服务器）
 // Turn N: 保存初始快照（磁盘状态）+ 最终快照（pending状态）
 func (h *AIChatHandler) saveCurrentTurnSnapshot(sessionID string) {
 	pendingManager := models.GetPendingStateManager()
 	historyManager := models.GetFileHistoryManager()
 
-	// 获取所有pending文件
-	allFiles := pendingManager.GetAllPendingFiles(sessionID)
-	if len(allFiles) == 0 {
+	// 获取所有服务器ID
+	serverIDs := getAllServerIDsForCleanup()
+
+	// 统计总文件数
+	totalFiles := 0
+	for _, serverID := range serverIDs {
+		allFiles := pendingManager.GetAllPendingFiles(serverID, sessionID)
+		totalFiles += len(allFiles)
+	}
+
+	if totalFiles == 0 {
 		log.Printf("ℹ️ 没有pending修改，跳过快照保存")
 		return
 	}
@@ -338,35 +346,46 @@ func (h *AIChatHandler) saveCurrentTurnSnapshot(sessionID string) {
 
 	currentTurn := userMessageCount - 1 // Turn从0开始（0, 1, 2...）
 
-	log.Printf("📸 保存Turn%d快照，涉及%d个文件（共%d个用户消息）", currentTurn, len(allFiles), userMessageCount)
+	log.Printf("📸 保存Turn%d快照，涉及%d个文件（共%d个用户消息）", currentTurn, totalFiles, userMessageCount)
 
-	// 对每个文件保存快照
-	for filePath := range allFiles {
-		// 读取磁盘内容
-		diskContent, err := os.ReadFile(filePath)
-		if err != nil {
-			log.Printf("⚠️ 读取文件失败 %s: %v", filePath, err)
+	// 对每个server_id处理
+	for _, serverID := range serverIDs {
+		allFiles := pendingManager.GetAllPendingFiles(serverID, sessionID)
+		if len(allFiles) == 0 {
 			continue
 		}
-		diskContentStr := string(diskContent)
 
-		// 1. 保存Turn N快照 = 磁盘初始状态（如果还没保存）
-		if !historyManager.HasSnapshot(sessionID, filePath, currentTurn) {
-			if err := historyManager.AddSnapshot(sessionID, filePath, currentTurn, diskContentStr); err != nil {
-				log.Printf("⚠️ 保存Turn%d快照失败: %v", currentTurn, err)
-			} else {
-				log.Printf("✅ 保存Turn%d快照（初始状态）: %s (%d字节)", currentTurn, filePath, len(diskContentStr))
+		log.Printf("📋 [%s] 处理%d个文件", serverID, len(allFiles))
+
+		// 对每个文件保存快照
+		for filePath := range allFiles {
+			// 读取磁盘内容
+			diskContent, err := os.ReadFile(filePath)
+			if err != nil {
+				log.Printf("⚠️ [%s] 读取文件失败 %s: %v", serverID, filePath, err)
+				continue
 			}
-		} else {
-			log.Printf("ℹ️ Turn%d快照已存在，跳过: %s", currentTurn, filePath)
-		}
+			diskContentStr := string(diskContent)
 
-		// 2. 保存Turn N+1快照 = pending最终状态
-		finalContent := pendingManager.GetCurrentContent(sessionID, filePath, diskContentStr)
-		if err := historyManager.AddSnapshot(sessionID, filePath, currentTurn+1, finalContent); err != nil {
-			log.Printf("⚠️ 保存Turn%d快照失败: %v", currentTurn+1, err)
-		} else {
-			log.Printf("✅ 保存Turn%d快照（最终状态）: %s (%d字节)", currentTurn+1, filePath, len(finalContent))
+			// 1. 保存Turn N快照 = 磁盘初始状态（如果还没保存）
+			_, hasSnapshot := historyManager.GetSnapshot(serverID, sessionID, filePath, currentTurn)
+			if !hasSnapshot {
+				if err := historyManager.AddSnapshot(serverID, sessionID, filePath, currentTurn, diskContentStr); err != nil {
+					log.Printf("⚠️ [%s] 保存Turn%d快照失败: %v", serverID, currentTurn, err)
+				} else {
+					log.Printf("✅ [%s] 保存Turn%d快照（初始）: %s (%d字节)", serverID, currentTurn, filePath, len(diskContentStr))
+				}
+			} else {
+				log.Printf("ℹ️ [%s] Turn%d快照已存在: %s", serverID, currentTurn, filePath)
+			}
+
+			// 2. 保存Turn N+1快照 = pending最终状态
+			finalContent := pendingManager.GetCurrentContent(serverID, sessionID, filePath, diskContentStr)
+			if err := historyManager.AddSnapshot(serverID, sessionID, filePath, currentTurn+1, finalContent); err != nil {
+				log.Printf("⚠️ [%s] 保存Turn%d快照失败: %v", serverID, currentTurn+1, err)
+			} else {
+				log.Printf("✅ [%s] 保存Turn%d快照（最终）: %s (%d字节)", serverID, currentTurn+1, filePath, len(finalContent))
+			}
 		}
 	}
 }
