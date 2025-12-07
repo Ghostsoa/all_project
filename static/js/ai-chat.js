@@ -1831,118 +1831,61 @@ function convertThinkingToMessage(thinkingId) {
     return thinkingDiv;
 }
 
-// 格式化消息内容（完整Markdown支持）
+// 格式化消息内容（使用marked.js）
 function formatMessageContent(content) {
     if (!content) return '';
     
-    let formatted = content;
-    const codeBlocks = [];
-    const inlineCodes = [];
+    // 检查marked是否可用
+    if (typeof marked === 'undefined') {
+        console.warn('⚠️ marked.js未加载，使用简单转义');
+        return escapeHtml(content).replace(/\n/g, '<br>');
+    }
     
-    // 1. 先提取并保护代码块（包括末尾换行）
-    formatted = formatted.replace(/```(\w+)?\n([\s\S]*?)```\n?/g, (match, lang, code) => {
-        const escapedCode = escapeHtml(code.trim());
-        const codeId = 'code-' + Math.random().toString(36).substr(2, 9);
-        const placeholder = `__CODEBLOCK_${codeBlocks.length}__`;
-        const isBash = lang === 'bash' || lang === 'sh' || lang === 'shell';
-        const executeBtn = isBash ? `<button class="code-execute-btn" onclick="executeCode('${codeId}')" title="在终端执行">
-                    <i class="fa-solid fa-play"></i> Run
-                </button>` : '';
-        
-        codeBlocks.push(`<div class="code-block">
-            <div class="code-header">
-                <span class="code-lang">${lang || 'text'}</span>
-                <div class="code-actions">
-                    ${executeBtn}
-                    <button class="code-copy-btn" onclick="copyCode('${codeId}', event)" title="复制代码">
-                        <i class="fa-solid fa-copy"></i> Copy
-                    </button>
+    try {
+        // 1. 先提取并保护代码块（添加执行按钮）
+        const codeBlocks = [];
+        let processedContent = content.replace(/```(\w+)?\n([\s\S]*?)```/g, (match, lang, code) => {
+            const codeId = 'code-' + Math.random().toString(36).substr(2, 9);
+            const placeholder = `__CODEBLOCK_${codeBlocks.length}__`;
+            const isBash = lang === 'bash' || lang === 'sh' || lang === 'shell';
+            const executeBtn = isBash ? `<button class="code-execute-btn" onclick="executeCode('${codeId}')" title="在终端执行">
+                        <i class="fa-solid fa-play"></i> Run
+                    </button>` : '';
+            
+            const escapedCode = escapeHtml(code.trim());
+            codeBlocks.push(`<div class="code-block">
+                <div class="code-header">
+                    <span class="code-lang">${lang || 'text'}</span>
+                    <div class="code-actions">
+                        ${executeBtn}
+                        <button class="code-copy-btn" onclick="copyCode('${codeId}', event)" title="复制代码">
+                            <i class="fa-solid fa-copy"></i> Copy
+                        </button>
+                    </div>
                 </div>
-            </div>
-            <pre><code id="${codeId}" class="language-${lang || 'text'}">${escapedCode}</code></pre>
-        </div>`);
-        return placeholder;
-    });
-    
-    // 2. 提取并保护行内代码
-    formatted = formatted.replace(/`([^`\n]+)`/g, (match, code) => {
-        const placeholder = `__INLINECODE_${inlineCodes.length}__`;
-        inlineCodes.push(`<code>${escapeHtml(code)}</code>`);
-        return placeholder;
-    });
-    
-    // 3. 转义HTML（但保留占位符）
-    formatted = escapeHtml(formatted);
-    
-    // 3.5 预处理：确保标题标记前有换行（修复流式输出中标题粘连问题）
-    // 将 "内容##标题" 转换为 "内容\n##标题"
-    // 修复：使用负向前瞻，避免匹配 ## 中的第一个 #
-    formatted = formatted.replace(/([^\n#])(#{1,3} )/g, '$1\n$2');
-    
-    // 4. 粗体
-    formatted = formatted.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
-    
-    // 5. 斜体
-    formatted = formatted.replace(/\*([^*\n]+)\*/g, '<em>$1</em>');
-    
-    // 6. 分隔线（--- 或 *** 或 ___）
-    formatted = formatted.replace(/^(?:---|\*\*\*|___)\s*$/gm, '<hr>');
-    
-    // 7. 标题（支持流式输出中没有换行的情况）
-    // 修复：不要求必须有行尾，支持 "## 标题" 和 "## 标题\n" 两种情况
-    formatted = formatted.replace(/^### (.+?)(?:\n|$)/gm, '<h3>$1</h3>\n');
-    formatted = formatted.replace(/^## (.+?)(?:\n|$)/gm, '<h2>$1</h2>\n');
-    formatted = formatted.replace(/^# (.+?)(?:\n|$)/gm, '<h1>$1</h1>\n');
-    
-    // 8. 二级无序列表（缩进的列表项）
-    formatted = formatted.replace(/^[ \t]+[-*] (.+)$/gm, '<li class="ul-item-sub">$1</li>');
-    
-    // 9. 一级无序列表（行首的列表项）
-    formatted = formatted.replace(/^[-*] (.+)$/gm, '<li class="ul-item">$1</li>');
-    
-    // 10. 二级有序列表（缩进的列表项）
-    formatted = formatted.replace(/^[ \t]+\d+\. (.+)$/gm, '<li class="ol-item-sub">$1</li>');
-    
-    // 11. 一级有序列表（行首的列表项）
-    formatted = formatted.replace(/^\d+\. (.+)$/gm, '<li class="ol-item">$1</li>');
-    
-    // 12. 合并连续的无序列表项（包括子项，通过class区分层级）
-    formatted = formatted.replace(/(<li class="ul-item(?:-sub)?>[\s\S]*?<\/li>(?:\n*<li class="ul-item(?:-sub)?>[\s\S]*?<\/li>)*)/g, match => {
-        // 保留子项的class标记（用于CSS缩进显示）
-        const cleaned = match.replace(/ class="ul-item"/g, '');
-        return '<ul>' + cleaned + '</ul>';
-    });
-    
-    // 13. 合并连续的有序列表项（包括子项，通过class区分层级）
-    formatted = formatted.replace(/(<li class="ol-item(?:-sub)?>[\s\S]*?<\/li>(?:\n*<li class="ol-item(?:-sub)?>[\s\S]*?<\/li>)*)/g, match => {
-        // 保留子项的class标记（用于CSS缩进显示）
-        const cleaned = match.replace(/ class="ol-item"/g, '');
-        return '<ol>' + cleaned + '</ol>';
-    });
-    
-    // 12. 引用（支持流式输出）
-    formatted = formatted.replace(/^&gt; (.+?)(?:\n|$)/gm, '<blockquote>$1</blockquote>\n');
-    
-    // 10. 链接
-    formatted = formatted.replace(/\[([^\]]+)\]\(([^)]+)\)/g, '<a href="$2" target="_blank">$1</a>');
-    
-    // 11. 清理已处理元素后的多余换行
-    formatted = formatted.replace(/<\/(h[123]|blockquote|ul|ol)>\n/g, '</$1>');
-    
-    // 12. 换行转换
-    formatted = formatted.replace(/\n/g, '<br>');
-    
-    // 13. 恢复行内代码
-    inlineCodes.forEach((code, i) => {
-        formatted = formatted.replace(`__INLINECODE_${i}__`, code);
-    });
-    
-    // 14. 恢复代码块
-    codeBlocks.forEach((block, i) => {
-        formatted = formatted.replace(`__CODEBLOCK_${i}__`, block);
-    });
-    
-    return formatted;
+                <pre><code id="${codeId}" class="language-${lang || 'text'}">${escapedCode}</code></pre>
+            </div>`);
+            return placeholder;
+        });
+        
+        // 2. 使用marked渲染（不包含代码块）
+        let html = marked.parse(processedContent, {
+            breaks: true,  // 支持GFM换行
+            gfm: true,     // GitHub Flavored Markdown
+            sanitize: false, // 不sanitize，我们已经处理了
+        });
+        
+        // 3. 恢复代码块
+        codeBlocks.forEach((block, i) => {
+            html = html.replace(`__CODEBLOCK_${i}__`, block);
+        });
+        
+        return html;
+    } catch (error) {
+        console.error('❌ Markdown渲染失败:', error);
+        // 降级处理
+        return escapeHtml(content).replace(/\n/g, '<br>');
+    }
 }
 
 // 复制代码
