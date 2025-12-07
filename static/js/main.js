@@ -286,6 +286,7 @@ window.switchTab = function(sessionId) {
     const prevSessionId = state.activeSessionId;
     
     console.log(`[切换开始] 从 ${prevSessionId} 切换到 ${sessionId}`);
+    console.log(`[切换前] 所有 terminal-pane:`, Array.from(document.querySelectorAll('.terminal-pane')).map(p => `${p.id}(${p.classList.contains('active') ? 'active' : 'inactive'})`));
     
     // 如果是同一个session，不需要切换
     if (prevSessionId === sessionId) {
@@ -304,8 +305,13 @@ window.switchTab = function(sessionId) {
         
         // 保存当前激活的pane
         if (activeTerminal) {
-            serverActivePane.set(prevSessionId, { type: 'terminal', id: activeTerminal.id });
-            console.log(`[保存状态] ${prevSessionId} → terminal-pane: ${activeTerminal.id}`);
+            // ✅ 验证：确保 activeTerminal 属于 prevSessionId
+            if (activeTerminal.id === prevSessionId) {
+                serverActivePane.set(prevSessionId, { type: 'terminal', id: activeTerminal.id });
+                console.log(`[保存状态] ${prevSessionId} → terminal-pane: ${activeTerminal.id}`);
+            } else {
+                console.warn(`⚠️ activeTerminal.id (${activeTerminal.id}) 不匹配 prevSessionId (${prevSessionId})，跳过保存`);
+            }
         } else if (activeEditor) {
             const tabId = activeEditor.dataset.tabId;
             const path = activeEditor.dataset.path;
@@ -345,13 +351,26 @@ window.switchTab = function(sessionId) {
         const savedActive = serverActivePane.get(sessionId);
         if (savedActive) {
             if (savedActive.type === 'terminal') {
-                // 激活终端
-                const terminalPane = document.getElementById(savedActive.id);
-                if (terminalPane) {
-                    terminalPane.classList.add('active');
-                    console.log(`[激活终端pane] ${savedActive.id}`);
+                // ✅ 验证：terminal id 应该等于 sessionId
+                if (savedActive.id === sessionId) {
+                    const terminalPane = document.getElementById(savedActive.id);
+                    if (terminalPane) {
+                        terminalPane.classList.add('active');
+                        console.log(`[激活终端pane] ${savedActive.id}`);
+                    }
+                    contentTabsList.querySelector('.content-tab-item[data-type="terminal"]')?.classList.add('active');
+                } else {
+                    console.warn(`⚠️ 保存的 terminal id (${savedActive.id}) 不匹配 sessionId (${sessionId})，使用默认激活`);
+                    // 使用正确的 sessionId 激活
+                    const terminalPane = document.getElementById(sessionId);
+                    if (terminalPane) {
+                        terminalPane.classList.add('active');
+                        console.log(`[激活终端pane-修正] ${sessionId}`);
+                    }
+                    contentTabsList.querySelector('.content-tab-item[data-type="terminal"]')?.classList.add('active');
+                    // 更新保存的状态
+                    serverActivePane.set(sessionId, { type: 'terminal', id: sessionId });
                 }
-                contentTabsList.querySelector('.content-tab-item[data-type="terminal"]')?.classList.add('active');
             } else if (savedActive.type === 'editor') {
                 // 激活编辑器
                 const editorPane = document.querySelector(`.editor-pane[data-tab-id="${savedActive.id}"]`);
@@ -388,14 +407,27 @@ window.switchTab = function(sessionId) {
     
     const session = state.terminals.get(sessionId);
     if (session) {
+        const activePaneElement = document.querySelector('.terminal-pane.active');
         console.log(`[切换] sessionId=${sessionId}, pane元素=`, document.getElementById(sessionId));
-        console.log(`[切换] 当前active的pane=`, document.querySelector('.terminal-pane.active'));
-        console.log(`[切换] 所有terminal-pane:`, document.querySelectorAll('.terminal-pane'));
+        console.log(`[切换] 当前active的pane=`, activePaneElement, `id=${activePaneElement?.id}`);
+        console.log(`[切换] 所有terminal-pane:`, Array.from(document.querySelectorAll('.terminal-pane')).map(p => `${p.id}(${p.classList.contains('active') ? 'active' : 'inactive'})`));
+        
+        // ✅ 验证：active pane 必须是当前 sessionId
+        if (activePaneElement && activePaneElement.id !== sessionId) {
+            console.error(`❌ 错误！active pane (${activePaneElement.id}) 不是目标 sessionId (${sessionId})`);
+            // 强制修正
+            activePaneElement.classList.remove('active');
+            const correctPane = document.getElementById(sessionId);
+            if (correctPane) {
+                correctPane.classList.add('active');
+                console.log(`✅ 已修正：激活正确的 pane (${sessionId})`);
+            }
+        }
         
         setTimeout(() => {
             session.fitAddon.fit();
             session.term.focus();  // 强制focus到当前terminal
-            console.log(`[切换] 已focus到terminal:`, sessionId);
+            console.log(`[切换完成] terminal:`, sessionId);
         }, 100);
         
         // 检查是否为本地终端
