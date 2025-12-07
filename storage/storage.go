@@ -159,6 +159,21 @@ func encryptSensitiveData() error {
 
 	needSave := false
 
+	// 🔐 加密Auth Token
+	if globalConfig.AuthToken != "" {
+		log.Println("🔒 加密Auth Token...")
+
+		encrypted, err := Encrypt(globalConfig.AuthToken)
+		if err != nil {
+			log.Printf("❌ 加密失败: %v", err)
+		} else {
+			globalConfig.AuthTokenEncrypted = encrypted
+			globalConfig.AuthToken = "" // 清空明文
+			needSave = true
+			log.Println("✅ Auth Token已加密")
+		}
+	}
+
 	// 🔐 加密服务器密码
 	for i := range globalConfig.Servers {
 		server := &globalConfig.Servers[i]
@@ -216,6 +231,41 @@ func SaveConfig() error {
 	}
 
 	return writeJSON(configFile, globalConfig)
+}
+
+// GetAuthToken 获取认证Token（自动解密）
+func GetAuthToken() string {
+	config := GetConfig()
+	if config == nil {
+		return ""
+	}
+
+	// 如果有明文token，直接返回（兼容旧配置）
+	if config.AuthToken != "" {
+		return config.AuthToken
+	}
+
+	// 解密加密的token
+	if config.AuthTokenEncrypted != "" {
+		token, err := Decrypt(config.AuthTokenEncrypted)
+		if err != nil {
+			log.Printf("⚠️ Token解密失败（密钥可能已更换）: %v", err)
+			log.Printf("💡 建议：请在 ~/.ssh_web_data/config.json 中重新设置 auth_token 明文，系统将自动重新加密")
+			return ""
+		}
+		return token
+	}
+
+	return ""
+}
+
+// GetServerPort 获取服务器端口
+func GetServerPort() string {
+	config := GetConfig()
+	if config != nil && config.ServerPort != "" {
+		return config.ServerPort
+	}
+	return "8080"
 }
 
 // GetConfig 获取配置引用（用于读取）

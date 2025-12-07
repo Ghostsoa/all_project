@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"all_project/config"
+	"all_project/storage"
 	"crypto/rand"
 	"encoding/hex"
 	"net/http"
@@ -163,7 +163,7 @@ func GinLoginHandler(c *gin.Context) {
 	}
 
 	// 验证输入的Token是否等于配置文件中的密码
-	if inputToken != config.GetToken() {
+	if inputToken != storage.GetAuthToken() {
 		c.JSON(http.StatusUnauthorized, gin.H{
 			"success": false,
 			"error":   "Token 错误",

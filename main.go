@@ -28,15 +28,11 @@ func main() {
 	}
 	log.Println("✓ 加密系统初始化成功")
 
-	// 3️⃣ 加载storage配置（此时加密系统已就绪，会自动加密敏感信息）
+	// 3️⃣ 加载统一配置（此时加密系统已就绪，会自动加密敏感信息）
 	if err := storage.LoadConfig(); err != nil {
-		log.Fatalf("❌ Storage配置加载失败: %v", err)
+		log.Fatalf("❌ 配置加载失败: %v", err)
 	}
-
-	// 4️⃣ 加载项目配置文件（此时加密系统已就绪）
-	if err := config.LoadConfig("./config.json"); err != nil {
-		log.Fatalf("❌ 项目配置加载失败: %v", err)
-	}
+	log.Println("✓ 统一配置加载完成")
 
 	// 加载命令历史到内存（启动时只读取一次）
 	if err := storage.LoadCommandsCache(); err != nil {

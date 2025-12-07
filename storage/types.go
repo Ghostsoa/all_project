@@ -4,12 +4,13 @@ import "time"
 
 // Config 统一配置文件结构
 type Config struct {
-	AuthToken  string           `json:"auth_token"`
-	ServerPort string           `json:"server_port"`
-	AIConfig   AIConfig         `json:"ai_config"`
-	Servers    []Server         `json:"servers"`
-	Providers  []Provider       `json:"providers"`
-	Commands   []CommandHistory `json:"commands"`
+	AuthToken          string           `json:"auth_token"`           // 明文token（启动后自动加密并清空）
+	AuthTokenEncrypted string           `json:"auth_token_encrypted"` // 加密后的token（持久化存储）
+	ServerPort         string           `json:"server_port"`
+	AIConfig           AIConfig         `json:"ai_config"`
+	Servers            []Server         `json:"servers"`
+	Providers          []Provider       `json:"providers"`
+	Commands           []CommandHistory `json:"commands"`
 }
 
 // Server SSH服务器配置
