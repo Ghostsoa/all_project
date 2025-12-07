@@ -1879,11 +1879,6 @@ function formatMessageContent(content) {
     // 修复：使用负向前瞻，避免匹配 ## 中的第一个 #
     formatted = formatted.replace(/([^\n#])(#{1,3} )/g, '$1\n$2');
     
-    // 3.6 预处理：移除缩进的列表标记（它们会打断主列表）
-    // 将 "   - xxx" 或 "   1. xxx" 转换为 "   xxx"（移除列表标记，保留内容）
-    formatted = formatted.replace(/^[ \t]+[-*] (.+)$/gm, '   $1');
-    formatted = formatted.replace(/^[ \t]+\d+\. (.+)$/gm, '   $1');
-    
     // 4. 粗体
     formatted = formatted.replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>');
     
@@ -1899,22 +1894,28 @@ function formatMessageContent(content) {
     formatted = formatted.replace(/^## (.+?)(?:\n|$)/gm, '<h2>$1</h2>\n');
     formatted = formatted.replace(/^# (.+?)(?:\n|$)/gm, '<h1>$1</h1>\n');
     
-    // 8. 无序列表（贪婪匹配到行尾，捕获完整内容）
+    // 8. 二级无序列表（缩进的列表项）
+    formatted = formatted.replace(/^[ \t]+[-*] (.+)$/gm, '<li class="ul-item-sub">$1</li>');
+    
+    // 9. 一级无序列表（行首的列表项）
     formatted = formatted.replace(/^[-*] (.+)$/gm, '<li class="ul-item">$1</li>');
     
-    // 9. 有序列表（贪婪匹配到行尾，捕获完整内容）
+    // 10. 二级有序列表（缩进的列表项）
+    formatted = formatted.replace(/^[ \t]+\d+\. (.+)$/gm, '<li class="ol-item-sub">$1</li>');
+    
+    // 11. 一级有序列表（行首的列表项）
     formatted = formatted.replace(/^\d+\. (.+)$/gm, '<li class="ol-item">$1</li>');
     
-    // 10. 合并连续的无序列表项（保留列表项间的换行避免内容粘连）
-    formatted = formatted.replace(/(<li class="ul-item">[\s\S]*?<\/li>(?:\n*<li class="ul-item">[\s\S]*?<\/li>)*)/g, match => {
-        // 移除类标记，但保留</li>和<li>之间的换行
+    // 12. 合并连续的无序列表项（包括子项，通过class区分层级）
+    formatted = formatted.replace(/(<li class="ul-item(?:-sub)?>[\s\S]*?<\/li>(?:\n*<li class="ul-item(?:-sub)?>[\s\S]*?<\/li>)*)/g, match => {
+        // 保留子项的class标记（用于CSS缩进显示）
         const cleaned = match.replace(/ class="ul-item"/g, '');
         return '<ul>' + cleaned + '</ul>';
     });
     
-    // 11. 合并连续的有序列表项（保留列表项间的换行避免内容粘连）
-    formatted = formatted.replace(/(<li class="ol-item">[\s\S]*?<\/li>(?:\n*<li class="ol-item">[\s\S]*?<\/li>)*)/g, match => {
-        // 移除类标记，但保留</li>和<li>之间的换行
+    // 13. 合并连续的有序列表项（包括子项，通过class区分层级）
+    formatted = formatted.replace(/(<li class="ol-item(?:-sub)?>[\s\S]*?<\/li>(?:\n*<li class="ol-item(?:-sub)?>[\s\S]*?<\/li>)*)/g, match => {
+        // 保留子项的class标记（用于CSS缩进显示）
         const cleaned = match.replace(/ class="ol-item"/g, '');
         return '<ol>' + cleaned + '</ol>';
     });

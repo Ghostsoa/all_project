@@ -830,6 +830,17 @@
     list-style-type: decimal;
 }
 
+/* 二级列表项（缩进显示） */
+.message-content li.ul-item-sub {
+    margin-left: 20px;
+    list-style-type: circle;
+}
+
+.message-content li.ol-item-sub {
+    margin-left: 20px;
+    list-style-type: lower-alpha;
+}
+
 /* 引用 */
 .message-content blockquote {
     margin: 8px 0;
