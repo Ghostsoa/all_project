@@ -763,21 +763,19 @@
     display: block;
 }
 
-/* GitHub Markdown 样式自定义覆盖 */
-.message-content .markdown-body {
+/* Drake Dark 主题适配 */
+.message-content .markdown-body,
+.message-content #write {
     font-size: 14px;
     line-height: 1.6;
     background: transparent !important;
     padding: 0 !important;
     margin: 0 !important;
+    color: rgba(255, 255, 255, 0.9) !important;
 }
 
-/* 覆盖 GitHub CSS 的代码块，使用我们的自定义代码块样式 */
-.message-content .markdown-body pre {
-    all: unset;
-}
-
-.message-content .markdown-body .code-block {
+.message-content .markdown-body .code-block,
+.message-content #write .code-block {
     margin: 12px 0;
 }
 
