@@ -80,6 +80,19 @@ func main() {
 	})
 	log.Println("✓ SFTP客户端获取器已初始化")
 
+	// 设置SSH客户端获取器（用于执行远程命令）
+	tools.SetSSHClientGetter(func(serverID string) (interface{}, error) {
+		session := handlers.GetSessionManager().GetSessionByServerID(serverID)
+		if session == nil {
+			return nil, fmt.Errorf("远程服务器未连接: %s，请先在终端中连接SSH会话", serverID)
+		}
+		if session.SSHClient == nil {
+			return nil, fmt.Errorf("远程服务器的SSH客户端未初始化: %s", serverID)
+		}
+		return session.SSHClient, nil
+	})
+	log.Println("✓ SSH客户端获取器已初始化")
+
 	// 启动session清理任务
 	middleware.StartCleanupTask()
 	log.Println("✓ Session清理任务已启动")

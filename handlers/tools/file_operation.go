@@ -21,12 +21,23 @@ import (
 // GetSFTPClientFunc 获取SFTP客户端的函数类型
 type GetSFTPClientFunc func(serverID string) (*sftp.Client, error)
 
+// GetSSHClientFunc 获取SSH客户端的函数类型
+type GetSSHClientFunc func(serverID string) (interface{}, error) // 返回*ssh.Client
+
 // 全局的SFTP客户端获取器（由tool_executor设置）
 var globalGetSFTPClient GetSFTPClientFunc
+
+// 全局的SSH客户端获取器（用于执行命令）
+var globalGetSSHClient GetSSHClientFunc
 
 // SetSFTPClientGetter 设置SFTP客户端获取器
 func SetSFTPClientGetter(getter GetSFTPClientFunc) {
 	globalGetSFTPClient = getter
+}
+
+// SetSSHClientGetter 设置SSH客户端获取器
+func SetSSHClientGetter(getter GetSSHClientFunc) {
+	globalGetSSHClient = getter
 }
 
 // getSFTPClient 获取SFTP客户端
@@ -35,6 +46,14 @@ func getSFTPClient(serverID string) (*sftp.Client, error) {
 		return nil, fmt.Errorf("SFTP客户端获取器未初始化")
 	}
 	return globalGetSFTPClient(serverID)
+}
+
+// getSSHClient 获取SSH客户端（返回interface{}需要类型断言）
+func getSSHClient(serverID string) (interface{}, error) {
+	if globalGetSSHClient == nil {
+		return nil, fmt.Errorf("SSH客户端获取器未初始化")
+	}
+	return globalGetSSHClient(serverID)
 }
 
 // ========== 独立工具的参数结构 ==========
@@ -593,13 +612,8 @@ func listDir(args FileOperationArgs) (string, error) {
 	return string(resultJSON), nil
 }
 
-// grepSearch 搜索文件内容（支持正则表达式和文件类型过滤）
+// grepSearch 搜索文件内容（支持正则表达式和文件类型过滤，支持本地和远程）
 func grepSearch(args FileOperationArgs) (string, error) {
-	// 检查server_id（目前只支持本地）
-	if args.ServerID != "" && args.ServerID != "local" {
-		return "", fmt.Errorf("文件搜索操作目前仅支持本地文件系统，不支持远程服务器 [%s]", args.ServerID)
-	}
-
 	searchPath := args.SearchPath
 	if searchPath == "" {
 		searchPath = args.FilePath // 兼容旧参数
@@ -623,97 +637,177 @@ func grepSearch(args FileOperationArgs) (string, error) {
 	}
 
 	matches := []GrepMatch{}
-	matchCount := 0
 
-	// 遍历目录
-	err = filepath.WalkDir(searchPath, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil // 忽略错误，继续搜索
-		}
-
-		// 跳过目录
-		if d.IsDir() {
-			// 跳过常见的忽略目录
-			name := d.Name()
-			if name == ".git" || name == "node_modules" || name == ".idea" || name == "__pycache__" {
-				return filepath.SkipDir
+	if args.ServerID == "" || args.ServerID == "local" {
+		// 本地搜索（支持递归）
+		err = filepath.WalkDir(searchPath, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil // 忽略错误，继续搜索
 			}
-			return nil
-		}
 
-		// 文件类型过滤
-		if len(args.Includes) > 0 {
-			matched := false
-			for _, pattern := range args.Includes {
-				m, _ := filepath.Match(pattern, filepath.Base(path))
-				if m {
-					matched = true
-					break
+			// 跳过目录
+			if d.IsDir() {
+				// 跳过常见的忽略目录
+				name := d.Name()
+				if name == ".git" || name == "node_modules" || name == ".idea" || name == "__pycache__" {
+					return filepath.SkipDir
 				}
-			}
-			if !matched {
 				return nil
 			}
-		}
 
-		// 读取文件内容
-		content, err := os.ReadFile(path)
-		if err != nil {
-			return nil // 跳过无法读取的文件
-		}
-
-		lines := strings.Split(string(content), "\n")
-
-		// 搜索每一行
-		for i, line := range lines {
-			var found bool
-			if args.IsRegex {
-				found = pattern.MatchString(line)
-			} else {
-				found = strings.Contains(line, args.Query)
+			// 文件类型过滤
+			if len(args.Includes) > 0 {
+				matched := false
+				for _, pattern := range args.Includes {
+					m, _ := filepath.Match(pattern, filepath.Base(path))
+					if m {
+						matched = true
+						break
+					}
+				}
+				if !matched {
+					return nil
+				}
 			}
 
-			if found {
-				matchCount++
+			// 读取文件内容
+			content, err := os.ReadFile(path)
+			if err != nil {
+				return nil // 跳过无法读取的文件
+			}
 
-				// 🔧 截断匹配行（限制1000字符）
-				truncatedLine := line
-				if len(line) > 1000 {
-					truncatedLine = truncateLine(line, 1000)
+			lines := strings.Split(string(content), "\n")
+
+			// 搜索每一行
+			for i, line := range lines {
+				var found bool
+				if args.IsRegex {
+					found = pattern.MatchString(line)
+				} else {
+					found = strings.Contains(line, args.Query)
 				}
 
-				// 获取上下文（前后各2行）
-				context := []string{}
-				for j := max(0, i-2); j < min(len(lines), i+3); j++ {
-					if j != i {
-						contextLine := lines[j]
-						// 🔧 截断上下文行（限制500字符）
-						if len(contextLine) > 500 {
-							contextLine = truncateLine(contextLine, 500)
-						}
-						context = append(context, contextLine)
+				if found {
+					// 🔧 截断匹配行（限制1000字符）
+					truncatedLine := line
+					if len(line) > 1000 {
+						truncatedLine = truncateLine(line, 1000)
 					}
+
+					// 获取上下文（前后各2行）
+					context := []string{}
+					for j := max(0, i-2); j < min(len(lines), i+3); j++ {
+						if j != i {
+							contextLine := lines[j]
+							// 🔧 截断上下文行（限制500字符）
+							if len(contextLine) > 500 {
+								contextLine = truncateLine(contextLine, 500)
+							}
+							context = append(context, contextLine)
+						}
+					}
+
+					matches = append(matches, GrepMatch{
+						FilePath: path,
+						Line:     i + 1, // 1-indexed
+						Content:  truncatedLine,
+						Context:  context,
+					})
+
+					// 🔧 限制结果数量（避免上下文溢出）
+					if len(matches) >= 20 {
+						return filepath.SkipAll // 停止搜索
+					}
+				}
+			}
+
+			return nil
+		})
+
+		if err != nil && err != filepath.SkipAll {
+			return "", fmt.Errorf("搜索失败: %v", err)
+		}
+	} else {
+		// 远程搜索（通过SSH执行grep命令）⚡ 性能最优！
+		sshClientInterface, err := getSSHClient(args.ServerID)
+		if err != nil {
+			return "", fmt.Errorf("获取SSH客户端失败: %v", err)
+		}
+
+		// 类型断言为SSH客户端
+		type SSHClient interface {
+			NewSession() (interface{}, error)
+		}
+		sshClient := sshClientInterface.(SSHClient)
+
+		// 构建grep命令
+		cmd := fmt.Sprintf("grep -rn")
+		if args.IsRegex {
+			cmd += " -E" // 扩展正则
+		}
+		cmd += fmt.Sprintf(" '%s'", strings.ReplaceAll(args.Query, "'", "'\\''")) // 转义单引号
+
+		// 添加文件类型过滤
+		if len(args.Includes) > 0 {
+			for _, include := range args.Includes {
+				cmd += fmt.Sprintf(" --include='%s'", include)
+			}
+		}
+
+		cmd += " " + searchPath
+		cmd += " 2>/dev/null" // 忽略错误输出
+		cmd += " | head -20"  // 限制结果数量
+
+		log.Printf("🔍 [%s] 执行SSH命令: %s", args.ServerID, cmd)
+
+		// 执行SSH命令
+		sshSessionInterface, err := sshClient.NewSession()
+		if err != nil {
+			return "", fmt.Errorf("创建SSH会话失败: %v", err)
+		}
+
+		// 类型断言为SSH会话
+		type SSHSession interface {
+			CombinedOutput(string) ([]byte, error)
+			Close() error
+		}
+		sshSession := sshSessionInterface.(SSHSession)
+		defer sshSession.Close()
+
+		output, err := sshSession.CombinedOutput(cmd)
+		if err != nil {
+			// grep未找到匹配时返回非0，不算错误
+			if len(output) == 0 {
+				log.Printf("🔍 [%s] grep未找到匹配", args.ServerID)
+			}
+		}
+
+		// 解析grep输出（格式: 文件名:行号:内容）
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			if line == "" {
+				continue
+			}
+			parts := strings.SplitN(line, ":", 3)
+			if len(parts) >= 3 {
+				filePath := parts[0]
+				lineNum := 0
+				fmt.Sscanf(parts[1], "%d", &lineNum)
+				content := parts[2]
+
+				if len(content) > 1000 {
+					content = truncateLine(content, 1000)
 				}
 
 				matches = append(matches, GrepMatch{
-					FilePath: path,
-					Line:     i + 1, // 1-indexed
-					Content:  truncatedLine,
-					Context:  context,
+					FilePath: filePath,
+					Line:     lineNum,
+					Content:  content,
 				})
-
-				// 🔧 限制结果数量（避免上下文溢出）
-				if len(matches) >= 20 {
-					return filepath.SkipAll // 停止搜索
-				}
 			}
 		}
 
-		return nil
-	})
-
-	if err != nil && err != filepath.SkipAll {
-		return "", fmt.Errorf("搜索失败: %v", err)
+		log.Printf("✅ [%s] grep搜索完成: 找到%d个匹配", args.ServerID, len(matches))
 	}
 
 	truncated := len(matches) >= 20
@@ -730,12 +824,8 @@ func grepSearch(args FileOperationArgs) (string, error) {
 	return string(resultJSON), nil
 }
 
-// findByName 按文件名搜索（支持通配符和深度限制）
+// findByName 按文件名搜索（支持通配符和深度限制，支持本地和远程）
 func findByName(args FileOperationArgs) (string, error) {
-	// 检查server_id（目前只支持本地）
-	if args.ServerID != "" && args.ServerID != "local" {
-		return "", fmt.Errorf("文件查找操作目前仅支持本地文件系统，不支持远程服务器 [%s]", args.ServerID)
-	}
 
 	searchPath := args.SearchPath
 	if searchPath == "" {
@@ -754,64 +844,141 @@ func findByName(args FileOperationArgs) (string, error) {
 
 	results := []FileInfo{}
 
-	err := filepath.WalkDir(searchPath, func(path string, d fs.DirEntry, err error) error {
-		if err != nil {
-			return nil
-		}
+	if args.ServerID == "" || args.ServerID == "local" {
+		// 本地查找（支持递归）
+		err := filepath.WalkDir(searchPath, func(path string, d fs.DirEntry, err error) error {
+			if err != nil {
+				return nil
+			}
 
-		// 检查深度限制
-		if args.MaxDepth > 0 {
-			relPath, _ := filepath.Rel(searchPath, path)
-			depth := len(strings.Split(relPath, string(os.PathSeparator)))
-			if depth > args.MaxDepth {
+			// 检查深度限制
+			if args.MaxDepth > 0 {
+				relPath, _ := filepath.Rel(searchPath, path)
+				depth := len(strings.Split(relPath, string(os.PathSeparator)))
+				if depth > args.MaxDepth {
+					if d.IsDir() {
+						return filepath.SkipDir
+					}
+					return nil
+				}
+			}
+
+			// 检查排除列表
+			name := d.Name()
+			if excludeSet[name] {
 				if d.IsDir() {
 					return filepath.SkipDir
 				}
 				return nil
 			}
-		}
 
-		// 检查排除列表
-		name := d.Name()
-		if excludeSet[name] {
-			if d.IsDir() {
-				return filepath.SkipDir
+			// 匹配文件名
+			matched, _ := filepath.Match(args.Pattern, name)
+			if matched {
+				info, _ := d.Info()
+				size := int64(0)
+				if info != nil {
+					size = info.Size()
+				}
+
+				// 🔧 截断路径（避免极长路径）
+				truncatedPath := path
+				if len(path) > 500 {
+					truncatedPath = truncateLine(path, 500)
+				}
+
+				results = append(results, FileInfo{
+					Path:  truncatedPath,
+					IsDir: d.IsDir(),
+					Size:  size,
+				})
 			}
+
+			// 限制结果数量（避免上下文溢出）
+			if len(results) >= 50 {
+				return filepath.SkipAll
+			}
+
 			return nil
+		})
+
+		if err != nil {
+			return "", fmt.Errorf("查找失败: %v", err)
+		}
+	} else {
+		// 远程查找（通过SSH执行find命令）⚡ 性能最优！
+		sshClientInterface, err := getSSHClient(args.ServerID)
+		if err != nil {
+			return "", fmt.Errorf("获取SSH客户端失败: %v", err)
 		}
 
-		// 匹配文件名
-		matched, _ := filepath.Match(args.Pattern, name)
-		if matched {
-			info, _ := d.Info()
-			size := int64(0)
-			if info != nil {
-				size = info.Size()
+		// 类型断言为SSH客户端
+		type SSHClient interface {
+			NewSession() (interface{}, error)
+		}
+		sshClient := sshClientInterface.(SSHClient)
+
+		// 构建find命令
+		cmd := fmt.Sprintf("find %s -type f -name '%s'", searchPath, args.Pattern)
+
+		// 添加深度限制
+		if args.MaxDepth > 0 {
+			cmd += fmt.Sprintf(" -maxdepth %d", args.MaxDepth)
+		}
+
+		// 添加排除条件
+		for _, exclude := range args.Excludes {
+			cmd += fmt.Sprintf(" -not -path '*/%s/*'", exclude)
+		}
+		// 默认排除
+		cmd += " -not -path '*/.git/*' -not -path '*/node_modules/*' -not -path '*/__pycache__/*'"
+
+		cmd += " 2>/dev/null" // 忽略错误
+		cmd += " | head -50"  // 限制结果
+
+		log.Printf("🔍 [%s] 执行SSH命令: %s", args.ServerID, cmd)
+
+		// 执行SSH命令
+		sshSessionInterface, err := sshClient.NewSession()
+		if err != nil {
+			return "", fmt.Errorf("创建SSH会话失败: %v", err)
+		}
+
+		// 类型断言为SSH会话
+		type SSHSession interface {
+			CombinedOutput(string) ([]byte, error)
+			Close() error
+		}
+		sshSession := sshSessionInterface.(SSHSession)
+		defer sshSession.Close()
+
+		output, err := sshSession.CombinedOutput(cmd)
+		if err != nil {
+			if len(output) == 0 {
+				log.Printf("🔍 [%s] find未找到匹配文件", args.ServerID)
+			}
+		}
+
+		// 解析find输出（每行一个文件路径）
+		lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+		for _, line := range lines {
+			if line == "" {
+				continue
 			}
 
-			// 🔧 截断路径（避免极长路径）
-			truncatedPath := path
-			if len(path) > 500 {
-				truncatedPath = truncateLine(path, 500)
+			truncatedPath := line
+			if len(line) > 500 {
+				truncatedPath = truncateLine(line, 500)
 			}
 
 			results = append(results, FileInfo{
 				Path:  truncatedPath,
-				IsDir: d.IsDir(),
-				Size:  size,
+				IsDir: false,
+				Size:  0, // find命令不返回大小
 			})
 		}
 
-		// 限制结果数量（避免上下文溢出）
-		if len(results) >= 50 {
-			return filepath.SkipAll
-		}
-
-		return nil
-	})
-
-	if err != nil {
-		return "", fmt.Errorf("查找失败: %v", err)
+		log.Printf("✅ [%s] find查找完成: 找到%d个文件", args.ServerID, len(results))
 	}
 
 	truncated := len(results) >= 50
