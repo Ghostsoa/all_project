@@ -16,23 +16,28 @@ import (
 )
 
 func main() {
-	// 加载配置文件
-	if err := config.LoadConfig("./config.json"); err != nil {
-		log.Fatalf("❌ 配置文件加载失败: %v", err)
-	}
-
-	// 初始化存储
+	// 1️⃣ 初始化存储（创建目录）
 	if err := storage.Init(); err != nil {
 		log.Fatalf("❌ 存储初始化失败: %v", err)
 	}
 	log.Println("✓ 存储系统初始化成功")
 
-	// 🔐 初始化加密系统（生成或加载密钥）
+	// 2️⃣ 初始化加密系统（生成或加载密钥）
 	dataDir := storage.GetServerDataDir("") // 获取根目录
 	if err := storage.InitEncryption(dataDir); err != nil {
 		log.Fatalf("❌ 加密系统初始化失败: %v", err)
 	}
 	log.Println("✓ 加密系统初始化成功")
+
+	// 3️⃣ 加载storage配置（此时加密系统已就绪，会自动加密敏感信息）
+	if err := storage.LoadConfig(); err != nil {
+		log.Fatalf("❌ Storage配置加载失败: %v", err)
+	}
+
+	// 4️⃣ 加载项目配置文件（此时加密系统已就绪）
+	if err := config.LoadConfig("./config.json"); err != nil {
+		log.Fatalf("❌ 项目配置加载失败: %v", err)
+	}
 
 	// 加载命令历史到内存（启动时只读取一次）
 	if err := storage.LoadCommandsCache(); err != nil {

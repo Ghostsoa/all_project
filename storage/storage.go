@@ -75,12 +75,8 @@ func Init() error {
 		return err
 	}
 
-	// 加载配置到内存
-	if err := LoadConfig(); err != nil {
-		return err
-	}
-
 	log.Printf("✅ 数据目录初始化完成: %s", baseDir)
+	// 注意：LoadConfig() 需要在 InitEncryption() 之后调用，因此不在这里调用
 	return nil
 }
 
