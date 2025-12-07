@@ -556,7 +556,11 @@ class AIToolsManager {
     renderToolCallCompleted(toolData, argsObj) {
         const { name } = toolData;
         
-        if (name !== 'file_operation') {
+        // 文件操作工具列表
+        const fileOperationTools = ['read_file', 'write_file', 'edit_file', 'list_directory', 'grep_search', 'find_files'];
+        
+        // 非文件操作工具，显示简单样式
+        if (!fileOperationTools.includes(name)) {
             return `
                 <div class="tool-call">
                     <div class="tool-simple completed">
@@ -567,7 +571,18 @@ class AIToolsManager {
             `;
         }
 
-        const { type, file_path } = argsObj;
+        // 从工具名提取type
+        const typeMap = {
+            'read_file': 'read',
+            'write_file': 'write',
+            'edit_file': 'edit',
+            'list_directory': 'list',
+            'grep_search': 'grep',
+            'find_files': 'find'
+        };
+        const type = typeMap[name];
+        
+        const { file_path, directory_path } = argsObj;
 
         if (type === 'read') {
             const fileName = file_path.split('/').pop();
@@ -580,7 +595,7 @@ class AIToolsManager {
                 </div>
             `;
         } else if (type === 'list') {
-            const dirName = file_path.split('/').pop() || file_path;
+            const dirName = (directory_path || file_path).split('/').pop() || '/';
             return `
                 <div class="tool-call">
                     <div class="tool-simple completed">
@@ -648,7 +663,11 @@ class AIToolsManager {
     renderExecutingTool(toolData) {
         const { name, arguments: args } = toolData;
         
-        if (name !== 'file_operation') {
+        // 文件操作工具列表
+        const fileOperationTools = ['read_file', 'write_file', 'edit_file', 'list_directory', 'grep_search', 'find_files'];
+        
+        // 非文件操作工具，显示简单样式
+        if (!fileOperationTools.includes(name)) {
             return `
                 <div class="tool-call">
                     <div class="tool-simple executing">
@@ -660,7 +679,19 @@ class AIToolsManager {
         }
 
         const argsObj = JSON.parse(args);
-        const { type, file_path, search_path, query, pattern } = argsObj;
+        
+        // 从工具名提取type
+        const typeMap = {
+            'read_file': 'read',
+            'write_file': 'write',
+            'edit_file': 'edit',
+            'list_directory': 'list',
+            'grep_search': 'grep',
+            'find_files': 'find'
+        };
+        const type = typeMap[name];
+        
+        const { file_path, directory_path, search_path, query, pattern } = argsObj;
 
         if (type === 'read' || type === 'list' || type === 'grep' || type === 'find') {
             let icon, action, displayText;
@@ -671,10 +702,10 @@ class AIToolsManager {
                 action = 'Reading';
                 displayText = fileName;
             } else if (type === 'list') {
-                const fileName = file_path.split('/').pop();
+                const dirName = (directory_path || file_path).split('/').pop() || '/';
                 icon = 'folder-open';
                 action = 'Listing';
-                displayText = fileName;
+                displayText = dirName;
             } else if (type === 'grep') {
                 icon = 'magnifying-glass';
                 action = 'Searching';
