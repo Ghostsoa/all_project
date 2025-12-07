@@ -763,22 +763,6 @@
     display: block;
 }
 
-/* 代码行样式 */
-.code-block .code-line {
-    display: block;
-}
-
-/* 行号样式 */
-.code-block .line-number {
-    display: inline-block;
-    width: 2.5em;
-    margin-right: 1em;
-    text-align: right;
-    color: rgba(255, 255, 255, 0.3);
-    user-select: none;
-    font-size: 11px;
-}
-
 /* GitHub Markdown 样式自定义覆盖 */
 .message-content .markdown-body {
     font-size: 14px;

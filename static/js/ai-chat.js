@@ -1851,19 +1851,14 @@ function formatMessageContent(content) {
             const lang = langMatch ? langMatch[1] : 'text';
             
             // 判断是否为可执行的 shell 代码
-            const isBash = lang === 'bash' || lang === 'sh' || lang === 'shell';
+            const isBash = ['bash', 'sh', 'shell', 'zsh', 'powershell', 'cmd'].includes(lang.toLowerCase());
             const executeBtn = isBash ? 
-                `<button class="code-execute-btn" onclick="executeCode('${codeId}')" title="在终端执行">
+                `<button class="code-execute-btn" onclick="executeCode('${codeId}', event)" title="在终端执行">
                     <i class="fa-solid fa-play"></i> Run
                 </button>` : '';
             
-            // 获取代码内容并添加行号
+            // 获取代码内容
             const code = codeElement.textContent;
-            const lines = code.split('\n');
-            const numberedCode = lines.map((line, index) => {
-                const lineNum = index + 1;
-                return `<span class="code-line"><span class="line-number">${lineNum}</span>${escapeHtml(line)}</span>`;
-            }).join('\n');
             
             // 创建自定义代码块
             const customBlock = document.createElement('div');
@@ -1878,7 +1873,7 @@ function formatMessageContent(content) {
                         </button>
                     </div>
                 </div>
-                <pre><code id="${codeId}" class="language-${lang}">${numberedCode}</code></pre>
+                <pre><code id="${codeId}" class="language-${lang}">${escapeHtml(code)}</code></pre>
             `;
             
             // 替换原来的 pre 元素
@@ -1898,15 +1893,7 @@ window.copyCode = function(codeId, event) {
     const codeElement = document.getElementById(codeId);
     if (!codeElement) return;
     
-    // 获取所有代码行，排除行号
-    const lines = Array.from(codeElement.querySelectorAll('.code-line'));
-    const text = lines.map(line => {
-        // 克隆节点并移除行号
-        const clone = line.cloneNode(true);
-        const lineNumber = clone.querySelector('.line-number');
-        if (lineNumber) lineNumber.remove();
-        return clone.textContent;
-    }).join('\n');
+    const text = codeElement.textContent;
     
     navigator.clipboard.writeText(text).then(() => {
         // 显示复制成功提示
@@ -1930,18 +1917,16 @@ window.copyCode = function(codeId, event) {
 /**
  * 执行代码到终端
  */
-window.executeCode = function(codeId) {
+window.executeCode = function(codeId, event) {
     const codeElement = document.getElementById(codeId);
     if (!codeElement) return;
     
-    // 获取所有代码行，排除行号
-    const lines = Array.from(codeElement.querySelectorAll('.code-line'));
-    const command = lines.map(line => {
-        const clone = line.cloneNode(true);
-        const lineNumber = clone.querySelector('.line-number');
-        if (lineNumber) lineNumber.remove();
-        return clone.textContent;
-    }).join('\n').trim();
+    const command = codeElement.textContent.trim();
+    
+    if (!command) {
+        showToast('代码为空', 'warning');
+        return;
+    }
     
     // 获取当前激活的终端
     const activeTerminal = document.querySelector('.terminal-pane.active');
@@ -1961,10 +1946,23 @@ window.executeCode = function(codeId) {
     // 发送命令到终端
     session.ws.send(command + '\r');
     
-    // 视觉反馈
+    // 视觉反馈 - 按钮变化
+    if (event) {
+        const btn = event.target.closest('.code-execute-btn');
+        if (btn) {
+            const originalHTML = btn.innerHTML;
+            btn.innerHTML = '<i class="fa-solid fa-check"></i> 已执行';
+            btn.style.color = '#10b981';
+            setTimeout(() => {
+                btn.innerHTML = originalHTML;
+                btn.style.color = '';
+            }, 2000);
+        }
+    }
+    
     console.log('✅ 已执行命令:', command);
     
-    // 可选：切换到终端标签
+    // 自动切换到终端标签
     const terminalTab = document.querySelector(`.content-tab-item[data-session-id="${sessionId}"]`);
     if (terminalTab && window.switchToTerminal) {
         window.switchToTerminal(sessionId);
