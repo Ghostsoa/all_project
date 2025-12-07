@@ -494,26 +494,13 @@
     <!-- GitHub Markdown CSS (美观的样式) -->
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/github-markdown-css@5.5.0/github-markdown-dark.min.css">
     <!-- Marked.js 官方推荐CDN -->
-    <script src="https://cdn.jsdelivr.net/npm/marked/lib/marked.umd.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked/lib/marked.umd.js" onload="if(typeof marked !== 'undefined'){window.marked = marked; console.log('✅ marked已加载:', typeof marked.parse);}"></script>
     <script>
-        // 等待DOM加载完成后检查依赖
-        window.addEventListener('DOMContentLoaded', function() {
-            // 检查hljs
-            if (typeof hljs !== 'undefined') {
-                window.hljs = hljs;
-                console.log('✅ hljs已加载并暴露到window');
-            } else {
-                console.warn('⚠️ hljs未加载');
-            }
-            
-            // 检查marked
-            if (typeof marked !== 'undefined' && typeof marked.parse === 'function') {
-                window.marked = marked;
-                console.log('✅ marked已加载并可用');
-            } else {
-                console.error('❌ marked未加载！');
-            }
-        });
+        // 检查hljs
+        if (typeof hljs !== 'undefined') {
+            window.hljs = hljs;
+            console.log('✅ hljs已加载并暴露到window');
+        }
     </script>
     <script type="module" src="/static/js/main.js"></script>
 </body>
