@@ -1835,9 +1835,14 @@ function convertThinkingToMessage(thinkingId) {
 function formatMessageContent(content) {
     if (!content) return '';
     
-    // 检查marked是否可用
-    if (typeof marked === 'undefined') {
-        console.warn('⚠️ marked.js未加载，使用简单转义');
+    // 检查marked是否可用（从window对象获取）
+    const markedLib = window.marked;
+    if (!markedLib || typeof markedLib.parse !== 'function') {
+        console.warn('⚠️ marked.js未加载，使用简单转义', {
+            markedExists: !!window.marked,
+            markedType: typeof window.marked,
+            parseExists: window.marked ? typeof window.marked.parse : 'N/A'
+        });
         return escapeHtml(content).replace(/\n/g, '<br>');
     }
     
@@ -1869,7 +1874,7 @@ function formatMessageContent(content) {
         });
         
         // 2. 使用marked渲染（不包含代码块）
-        let html = marked.parse(processedContent, {
+        let html = markedLib.parse(processedContent, {
             breaks: true,  // 支持GFM换行
             gfm: true,     // GitHub Flavored Markdown
             sanitize: false, // 不sanitize，我们已经处理了
