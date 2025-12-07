@@ -27,6 +27,13 @@ func main() {
 	}
 	log.Println("✓ 存储系统初始化成功")
 
+	// 🔐 初始化加密系统（生成或加载密钥）
+	dataDir := storage.GetServerDataDir("") // 获取根目录
+	if err := storage.InitEncryption(dataDir); err != nil {
+		log.Fatalf("❌ 加密系统初始化失败: %v", err)
+	}
+	log.Println("✓ 加密系统初始化成功")
+
 	// 加载命令历史到内存（启动时只读取一次）
 	if err := storage.LoadCommandsCache(); err != nil {
 		log.Printf("⚠️  命令历史加载失败: %v", err)

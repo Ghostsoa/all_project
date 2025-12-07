@@ -402,6 +402,12 @@ func callCodeSearchLLM(config *storage.AIConfig, messages []map[string]interface
 		provider = &providers[0]
 	}
 
+	// 🔐 获取解密后的API Key
+	apiKey, err := storage.GetProviderAPIKey(provider.ID)
+	if err != nil {
+		return nil, "", fmt.Errorf("获取API Key失败: %v", err)
+	}
+
 	// 构建请求体（非流式）
 	requestBody := map[string]interface{}{
 		"model":       config.CodeSearchModel,
@@ -432,7 +438,7 @@ func callCodeSearchLLM(config *storage.AIConfig, messages []map[string]interface
 	}
 
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("Authorization", "Bearer "+provider.APIKey)
+	req.Header.Set("Authorization", "Bearer "+apiKey) // ✅ 使用解密后的API Key
 
 	// 发送请求
 	client := &http.Client{Timeout: 2 * time.Minute}

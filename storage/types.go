@@ -14,25 +14,27 @@ type Config struct {
 
 // Server SSH服务器配置
 type Server struct {
-	ID          string    `json:"id"`
-	Name        string    `json:"name"`
-	Host        string    `json:"host"`
-	Port        int       `json:"port"`
-	Username    string    `json:"username"`
-	Password    string    `json:"password"`
-	Description string    `json:"description"`
-	Tags        []string  `json:"tags"`
-	CreatedAt   time.Time `json:"created_at"`
-	UpdatedAt   time.Time `json:"updated_at"`
+	ID                string    `json:"id"`
+	Name              string    `json:"name"`
+	Host              string    `json:"host"`
+	Port              int       `json:"port"`
+	Username          string    `json:"username"`
+	Password          string    `json:"password"`           // 明文密码（启动后自动加密并清空）
+	PasswordEncrypted string    `json:"password_encrypted"` // 加密后的密码（持久化存储）
+	Description       string    `json:"description"`
+	Tags              []string  `json:"tags"`
+	CreatedAt         time.Time `json:"created_at"`
+	UpdatedAt         time.Time `json:"updated_at"`
 }
 
 // Provider AI供应商配置
 type Provider struct {
-	ID      string  `json:"id"`
-	Name    string  `json:"name"`
-	BaseURL string  `json:"base_url"`
-	APIKey  string  `json:"api_key"`
-	Models  []Model `json:"models"`
+	ID              string  `json:"id"`
+	Name            string  `json:"name"`
+	BaseURL         string  `json:"base_url"`
+	APIKey          string  `json:"api_key"`           // 明文API Key（启动后自动加密并清空）
+	APIKeyEncrypted string  `json:"api_key_encrypted"` // 加密后的API Key（持久化存储）
+	Models          []Model `json:"models"`
 }
 
 // Model AI模型

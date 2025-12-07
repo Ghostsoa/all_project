@@ -136,6 +136,72 @@ func LoadConfig() error {
 
 	globalConfig = &config
 	log.Printf("✅ 配置加载完成: %d servers, %d providers", len(config.Servers), len(config.Providers))
+
+	// 🔐 自动加密敏感信息（异步执行，不阻塞启动）
+	go func() {
+		if err := encryptSensitiveData(); err != nil {
+			log.Printf("⚠️  加密敏感信息失败: %v", err)
+		}
+	}()
+
+	return nil
+}
+
+// encryptSensitiveData 加密所有明文敏感信息
+func encryptSensitiveData() error {
+	globalConfigLock.Lock()
+	defer globalConfigLock.Unlock()
+
+	if globalConfig == nil {
+		return nil
+	}
+
+	needSave := false
+
+	// 🔐 加密服务器密码
+	for i := range globalConfig.Servers {
+		server := &globalConfig.Servers[i]
+		if server.Password != "" {
+			log.Printf("🔒 加密服务器密码: [%s] %s", server.ID, server.Name)
+
+			encrypted, err := Encrypt(server.Password)
+			if err != nil {
+				log.Printf("❌ 加密失败: %v", err)
+				continue
+			}
+
+			server.PasswordEncrypted = encrypted
+			server.Password = "" // 清空明文
+			needSave = true
+		}
+	}
+
+	// 🔐 加密Provider API Key
+	for i := range globalConfig.Providers {
+		provider := &globalConfig.Providers[i]
+		if provider.APIKey != "" {
+			log.Printf("🔒 加密Provider API Key: %s", provider.Name)
+
+			encrypted, err := Encrypt(provider.APIKey)
+			if err != nil {
+				log.Printf("❌ 加密失败: %v", err)
+				continue
+			}
+
+			provider.APIKeyEncrypted = encrypted
+			provider.APIKey = "" // 清空明文
+			needSave = true
+		}
+	}
+
+	// 保存配置
+	if needSave {
+		if err := writeJSON(configFile, globalConfig); err != nil {
+			return err
+		}
+		log.Println("✅ 敏感信息已加密并保存")
+	}
+
 	return nil
 }
 

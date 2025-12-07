@@ -147,13 +147,23 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 			"content": userContent,
 		})
 
+		// 🔐 获取解密后的API Key
+		apiKey, err := storage.GetProviderAPIKey(provider.ID)
+		if err != nil {
+			ws.WriteJSON(map[string]interface{}{
+				"type":  "error",
+				"error": fmt.Sprintf("获取API Key失败: %v", err),
+			})
+			return
+		}
+
 		// 工具调用循环（最多20轮）
 		maxIterations := 20
 		for iteration := 0; iteration < maxIterations; iteration++ {
 			// 调用OpenAI API (流式，支持工具调用)
 			toolCalls, assistantContent, reasoningContent, err := h.streamChatWithTools(
 				provider.BaseURL,
-				provider.APIKey,
+				apiKey, // ✅ 使用解密后的API Key
 				modelID,
 				messages,
 				aiConfig,

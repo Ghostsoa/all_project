@@ -190,10 +190,21 @@ func (h *WebSocketHandler) GinHandleWebSocket(c *gin.Context) {
 
 // connectSSH 连接 SSH 服务器
 func connectSSH(server *storage.Server) (*ssh.Client, error) {
+	// 🔐 获取解密后的密码
+	password := server.Password
+	if password == "" && server.PasswordEncrypted != "" {
+		// 解密密码
+		decrypted, err := storage.Decrypt(server.PasswordEncrypted)
+		if err != nil {
+			return nil, fmt.Errorf("密码解密失败: %v", err)
+		}
+		password = decrypted
+	}
+
 	config := &ssh.ClientConfig{
 		User: server.Username,
 		Auth: []ssh.AuthMethod{
-			ssh.Password(server.Password),
+			ssh.Password(password),
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
 		Timeout:         10 * time.Second,        // 连接超时10秒

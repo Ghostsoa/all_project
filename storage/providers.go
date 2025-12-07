@@ -39,17 +39,42 @@ func SearchProviders(keyword string) ([]Provider, error) {
 
 // GetProvider 根据ID获取供应商
 func GetProvider(id string) (*Provider, error) {
-	providers, err := GetProviders()
-	if err != nil {
-		return nil, err
+	config := GetConfig()
+	if config == nil {
+		return nil, fmt.Errorf("配置未加载")
 	}
 
-	for _, p := range providers {
+	for _, p := range config.Providers {
 		if p.ID == id {
 			return &p, nil
 		}
 	}
-	return nil, fmt.Errorf("供应商不存在: %s", id)
+
+	return nil, fmt.Errorf("provider不存在: %s", id)
+}
+
+// GetProviderAPIKey 获取provider的解密后的API Key
+func GetProviderAPIKey(providerID string) (string, error) {
+	provider, err := GetProvider(providerID)
+	if err != nil {
+		return "", err
+	}
+
+	// 如果有明文API Key，直接返回（兼容旧配置）
+	if provider.APIKey != "" {
+		return provider.APIKey, nil
+	}
+
+	// 解密加密的API Key
+	if provider.APIKeyEncrypted != "" {
+		apiKey, err := Decrypt(provider.APIKeyEncrypted)
+		if err != nil {
+			return "", fmt.Errorf("API Key解密失败: %v", err)
+		}
+		return apiKey, nil
+	}
+
+	return "", fmt.Errorf("API Key未配置")
 }
 
 // CreateProvider 创建供应商（操作内存+写文件）
