@@ -68,6 +68,30 @@ document.addEventListener('DOMContentLoaded', async function() {
     checkAuthStatus();
     initFileTree(); // 初始化文件树
     initDragUpload(); // 初始化拖拽上传
+    
+    // 等待marked加载完成后再初始化AI聊天
+    const waitForMarked = () => {
+        return new Promise((resolve) => {
+            if (window.markedLoaded) {
+                resolve();
+            } else {
+                const checkInterval = setInterval(() => {
+                    if (window.markedLoaded) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    }
+                }, 50);
+                // 超时保护：3秒后无论如何都初始化
+                setTimeout(() => {
+                    clearInterval(checkInterval);
+                    console.warn('⚠️ marked加载超时，继续初始化');
+                    resolve();
+                }, 3000);
+            }
+        });
+    };
+    
+    await waitForMarked();
     await initAIChat(); // 初始化AI对话功能
     
     // 加载命令历史（统一时间线，不依赖终端）
