@@ -1857,8 +1857,13 @@ function formatMessageContent(content) {
                     <i class="fa-solid fa-play"></i> Run
                 </button>` : '';
             
-            // 获取代码内容
+            // 获取代码内容并添加行号
             const code = codeElement.textContent;
+            const lines = code.split('\n');
+            const numberedCode = lines.map((line, index) => {
+                const lineNum = index + 1;
+                return `<span class="code-line"><span class="line-number">${lineNum}</span>${escapeHtml(line)}</span>`;
+            }).join('\n');
             
             // 创建自定义代码块
             const customBlock = document.createElement('div');
@@ -1873,7 +1878,7 @@ function formatMessageContent(content) {
                         </button>
                     </div>
                 </div>
-                <pre><code id="${codeId}" class="language-${lang}">${escapeHtml(code)}</code></pre>
+                <pre><code id="${codeId}" class="language-${lang}">${numberedCode}</code></pre>
             `;
             
             // 替换原来的 pre 元素
@@ -1893,7 +1898,16 @@ window.copyCode = function(codeId, event) {
     const codeElement = document.getElementById(codeId);
     if (!codeElement) return;
     
-    const text = codeElement.textContent;
+    // 获取所有代码行，排除行号
+    const lines = Array.from(codeElement.querySelectorAll('.code-line'));
+    const text = lines.map(line => {
+        // 克隆节点并移除行号
+        const clone = line.cloneNode(true);
+        const lineNumber = clone.querySelector('.line-number');
+        if (lineNumber) lineNumber.remove();
+        return clone.textContent;
+    }).join('\n');
+    
     navigator.clipboard.writeText(text).then(() => {
         // 显示复制成功提示
         if (event) {
@@ -1920,7 +1934,14 @@ window.executeCode = function(codeId) {
     const codeElement = document.getElementById(codeId);
     if (!codeElement) return;
     
-    const command = codeElement.textContent.trim();
+    // 获取所有代码行，排除行号
+    const lines = Array.from(codeElement.querySelectorAll('.code-line'));
+    const command = lines.map(line => {
+        const clone = line.cloneNode(true);
+        const lineNumber = clone.querySelector('.line-number');
+        if (lineNumber) lineNumber.remove();
+        return clone.textContent;
+    }).join('\n').trim();
     
     // 获取当前激活的终端
     const activeTerminal = document.querySelector('.terminal-pane.active');

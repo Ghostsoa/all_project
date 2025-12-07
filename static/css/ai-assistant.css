@@ -687,17 +687,17 @@
     margin: 8px 0;
     border-radius: 6px;
     overflow: hidden;
-    background: rgba(30, 30, 30, 0.6);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: #1a1d24;
+    border: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .code-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 4px 8px;
-    background: rgba(0, 0, 0, 0.3);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    padding: 6px 12px;
+    background: transparent;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 .code-lang {
@@ -749,7 +749,7 @@
 
 .code-block pre {
     margin: 0;
-    padding: 10px;
+    padding: 12px;
     background: transparent;
     overflow-x: auto;
 }
@@ -759,8 +759,24 @@
     color: rgba(255, 255, 255, 0.9);
     padding: 0;
     font-size: 12px;
-    line-height: 1.5;
+    line-height: 1.6;
     display: block;
+}
+
+/* 代码行样式 */
+.code-block .code-line {
+    display: block;
+}
+
+/* 行号样式 */
+.code-block .line-number {
+    display: inline-block;
+    width: 2.5em;
+    margin-right: 1em;
+    text-align: right;
+    color: rgba(255, 255, 255, 0.3);
+    user-select: none;
+    font-size: 11px;
 }
 
 /* GitHub Markdown 样式自定义覆盖 */
@@ -772,10 +788,28 @@
     margin: 0 !important;
 }
 
-
-
 .message-content .markdown-body .code-block {
     margin: 12px 0;
+}
+
+/* 任务列表样式 - 绿色勾选 */
+.message-content .markdown-body input[type="checkbox"] {
+    accent-color: #10b981;
+    width: 16px;
+    height: 16px;
+    cursor: pointer;
+}
+
+.message-content .markdown-body input[type="checkbox"]:checked {
+    accent-color: #10b981;
+}
+
+/* 高亮文本样式 - 紫色背景 */
+.message-content .markdown-body mark {
+    background-color: rgba(168, 85, 247, 0.3);
+    color: #e9d5ff;
+    padding: 2px 4px;
+    border-radius: 3px;
 }
 
 /* 思维链样式 */
