@@ -1876,7 +1876,8 @@ function formatMessageContent(content) {
     
     // 3.5 预处理：确保标题标记前有换行（修复流式输出中标题粘连问题）
     // 将 "内容##标题" 转换为 "内容\n##标题"
-    formatted = formatted.replace(/([^\n])(#{1,3} )/g, '$1\n$2');
+    // 修复：使用负向前瞻，避免匹配 ## 中的第一个 #
+    formatted = formatted.replace(/([^\n#])(#{1,3} )/g, '$1\n$2');
     
     // 3.6 预处理：移除缩进的列表标记（它们会打断主列表）
     // 将 "   - xxx" 或 "   1. xxx" 转换为 "   xxx"（移除列表标记，保留内容）
