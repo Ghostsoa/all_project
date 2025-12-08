@@ -196,19 +196,26 @@ class AIToolsManager {
      * 渲染 read 工具
      */
     renderReadTool(result) {
-        const { file_path, size, start_line, end_line, total_lines } = result;
+        const { file_path, size, offset, limit, lines_read, total_lines } = result;
         const fileName = file_path.split('/').pop();
+        
+        // 计算行号范围（兼容两种格式）
+        let startLine = result.start_line || offset;
+        let endLine = result.end_line || (offset && lines_read ? offset + lines_read - 1 : null);
         
         // 构建行号范围显示
         let lineRange = '';
-        if (start_line && end_line) {
-            if (start_line === 1 && end_line === total_lines) {
+        if (startLine && endLine) {
+            if (startLine === 1 && endLine === total_lines) {
                 // 读取整个文件
-                lineRange = ` (${total_lines} lines)`;
+                lineRange = ` <span style="color: rgba(255,255,255,0.5);">(${total_lines} lines)</span>`;
             } else {
                 // 读取部分行
-                lineRange = ` <span style="color: rgba(255,255,255,0.5);">#L${start_line}-${end_line}</span>`;
+                lineRange = ` <span style="color: rgba(255,255,255,0.5);">#${startLine}-${endLine}</span>`;
             }
+        } else if (total_lines) {
+            // 只有总行数
+            lineRange = ` <span style="color: rgba(255,255,255,0.5);">(${total_lines} lines)</span>`;
         }
         
         return `
