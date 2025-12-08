@@ -498,6 +498,12 @@ func (h *AIChatHandler) streamChatWithTools(
 		"tools":       GetToolsDefinition(config), // 添加工具定义（根据配置动态加载）
 	}
 
+	// GLM-4.6 特殊支持：启用工具流式输出
+	if strings.Contains(strings.ToLower(model), "glm-4.6") {
+		requestBody["tool_stream"] = true
+		log.Printf("🔧 检测到 GLM-4.6 模型，已启用 tool_stream 参数")
+	}
+
 	if config.FrequencyPenalty != 0 {
 		requestBody["frequency_penalty"] = config.FrequencyPenalty
 	}
@@ -621,6 +627,7 @@ func (h *AIChatHandler) streamChatWithTools(
 				}
 
 				currentTC := toolCalls[idx].(map[string]interface{})
+				isNewToolCall := currentTC["id"] == ""
 
 				// 更新id和type
 				if id, ok := tcMap["id"].(string); ok && id != "" {
@@ -633,11 +640,45 @@ func (h *AIChatHandler) streamChatWithTools(
 				// 累积function数据
 				if funcData, ok := tcMap["function"].(map[string]interface{}); ok {
 					currentFunc := currentTC["function"].(map[string]interface{})
+					sendProgress := false
+					argsChunk := ""
+
 					if name, ok := funcData["name"].(string); ok && name != "" {
 						currentFunc["name"] = name
+						sendProgress = true
 					}
 					if args, ok := funcData["arguments"].(string); ok {
 						currentFunc["arguments"] = currentFunc["arguments"].(string) + args
+						argsChunk = args
+						sendProgress = true
+					}
+
+					// 🎯 流式发送工具调用进度给前端
+					if sendProgress {
+						toolCallID := currentTC["id"].(string)
+						functionName := currentFunc["name"].(string)
+						currentArgs := currentFunc["arguments"].(string)
+
+						// 如果是新工具调用（有了name），发送 tool_call_start
+						if isNewToolCall && functionName != "" {
+							ws.WriteJSON(map[string]interface{}{
+								"type":         "tool_call_start",
+								"tool_call_id": toolCallID,
+								"index":        idx,
+								"name":         functionName,
+							})
+						} else if !isNewToolCall && argsChunk != "" {
+							// 否则发送参数更新进度（可选，避免过多消息）
+							// 每累积一定字符才发送一次更新，或者遇到结束符
+							if len(currentArgs)%50 == 0 || argsChunk == "}" {
+								ws.WriteJSON(map[string]interface{}{
+									"type":         "tool_call_progress",
+									"tool_call_id": toolCallID,
+									"index":        idx,
+									"arguments":    currentArgs,
+								})
+							}
+						}
 					}
 				}
 			}

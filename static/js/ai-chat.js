@@ -1362,17 +1362,15 @@ async function streamChat(sessionId, message, thinkingId) {
                     
                     resolve();
                     
-                } else if (data.type === 'tool_call') {
-                    // 工具调用
-                    console.log('🔧 工具调用:', data);
+                } else if (data.type === 'tool_call_start') {
+                    // 🎯 工具调用开始（流式）- 立即显示loading状态
+                    console.log('🎯 工具调用开始:', data);
                     
-                    // 🔧 标记已有tool_call，后续reasoning将被忽略
                     hasToolCall = true;
                     
-                    // 如果还没有消息元素，创建一个（从工具开始）
+                    // 确保有消息元素
                     if (!messageElement) {
                         if (thinkingId) {
-                            // 替换thinking元素
                             const thinkingElement = document.getElementById(thinkingId);
                             if (thinkingElement) {
                                 messageElement = createMessageElement('assistant', '');
@@ -1380,30 +1378,61 @@ async function streamChat(sessionId, message, thinkingId) {
                                 thinkingId = null;
                             }
                         } else {
-                            // 创建新消息元素并添加到DOM
                             const messagesContainer = document.getElementById('aiMessages');
                             messageElement = createMessageElement('assistant', '');
                             messagesContainer.appendChild(messageElement);
                         }
                     }
                     
-                    // 🔧 修复：在添加工具调用前，如果有思维链div已创建，先折叠它
-                    if (messageElement) {
-                        const existingReasoningDivs = messageElement.querySelectorAll('.message-reasoning');
-                        
-                        if (existingReasoningDivs.length > 0) {
-                            // 已存在div，折叠并停止流光
-                            updateReasoningContent(messageElement, reasoningContent, true, false);
-                            
-                            // 停止所有思维链header的流光
-                            const allReasoningHeaders = messageElement.querySelectorAll('.reasoning-header');
-                            allReasoningHeaders.forEach(header => {
-                                header.classList.remove('shimmer-text');
-                            });
+                    // 折叠思维链
+                    const existingReasoningDivs = messageElement.querySelectorAll('.message-reasoning');
+                    if (existingReasoningDivs.length > 0) {
+                        updateReasoningContent(messageElement, reasoningContent, true, false);
+                        messageElement.querySelectorAll('.reasoning-header').forEach(header => {
+                            header.classList.remove('shimmer-text');
+                        });
+                    }
+                    
+                    // 显示loading状态的工具卡片
+                    appendToolCallLoading(messageElement, data);
+                    scrollToBottom();
+                    
+                } else if (data.type === 'tool_call_progress') {
+                    // 🎯 工具调用进度更新（可选显示）
+                    console.log('📝 工具参数更新:', data.tool_call_id, data.arguments?.length, '字符');
+                    // 可选：更新工具卡片显示参数构建进度
+                    updateToolCallProgress(messageElement, data);
+                    
+                } else if (data.type === 'tool_call') {
+                    // 工具调用（兼容旧格式）
+                    console.log('🔧 工具调用:', data);
+                    
+                    hasToolCall = true;
+                    
+                    if (!messageElement) {
+                        if (thinkingId) {
+                            const thinkingElement = document.getElementById(thinkingId);
+                            if (thinkingElement) {
+                                messageElement = createMessageElement('assistant', '');
+                                thinkingElement.replaceWith(messageElement);
+                                thinkingId = null;
+                            }
+                        } else {
+                            const messagesContainer = document.getElementById('aiMessages');
+                            messageElement = createMessageElement('assistant', '');
+                            messagesContainer.appendChild(messageElement);
                         }
                     }
                     
-                    // 保存tool_call参数到全局变量，供后续 updateToolResult 使用
+                    const existingReasoningDivs = messageElement.querySelectorAll('.message-reasoning');
+                    if (existingReasoningDivs.length > 0) {
+                        updateReasoningContent(messageElement, reasoningContent, true, false);
+                        messageElement.querySelectorAll('.reasoning-header').forEach(header => {
+                            header.classList.remove('shimmer-text');
+                        });
+                    }
+                    
+                    // 保存tool_call参数
                     if (!window.currentToolCalls) {
                         window.currentToolCalls = {};
                     }
@@ -1417,9 +1446,8 @@ async function streamChat(sessionId, message, thinkingId) {
                     
                     appendToolCall(messageElement, data);
                     
-                    // 重置当前块，准备接收工具后的文本
                     currentBlockText = '';
-                    currentContentDiv = null;  // 下次收到content会创建新的div
+                    currentContentDiv = null;
                     
                     scrollToBottom();
                     
@@ -2376,6 +2404,59 @@ export async function initAIChat() {
 }
 
 // ========== 工具调用相关 ==========
+
+/**
+ * 🎯 添加工具调用loading状态（流式开始）
+ * @param {HTMLElement} messageElement 
+ * @param {Object} toolData - {tool_call_id, name, index}
+ */
+function appendToolCallLoading(messageElement, toolData) {
+    const contentWrapper = messageElement.querySelector('.message-content-wrapper');
+    if (!contentWrapper) {
+        console.error('未找到 .message-content-wrapper');
+        return;
+    }
+    
+    const { tool_call_id, name, index } = toolData;
+    
+    // 创建loading状态的工具卡片
+    const toolHTML = `
+        <div class="tool-call tool-loading" data-tool-call-id="${tool_call_id}">
+            <div class="tool-simple executing">
+                <i class="fa-solid fa-spinner fa-spin tool-simple-icon"></i>
+                <span class="tool-simple-text">${name}</span>
+                <span class="tool-loading-dots">构建参数中...</span>
+            </div>
+        </div>
+    `;
+    
+    const tempDiv = document.createElement('div');
+    tempDiv.innerHTML = toolHTML;
+    const toolElement = tempDiv.querySelector('.tool-call');
+    
+    contentWrapper.appendChild(toolElement);
+}
+
+/**
+ * 🎯 更新工具调用进度（流式构建参数）
+ * @param {HTMLElement} messageElement 
+ * @param {Object} toolData - {tool_call_id, arguments}
+ */
+function updateToolCallProgress(messageElement, toolData) {
+    if (!messageElement) return;
+    
+    const { tool_call_id, arguments: currentArgs } = toolData;
+    
+    // 找到对应的工具卡片
+    const toolElement = messageElement.querySelector(`[data-tool-call-id="${tool_call_id}"]`);
+    if (!toolElement) return;
+    
+    // 更新显示的参数（可选，显示字符数）
+    const dotsElement = toolElement.querySelector('.tool-loading-dots');
+    if (dotsElement && currentArgs) {
+        dotsElement.textContent = `构建参数中... (${currentArgs.length} 字符)`;
+    }
+}
 
 /**
  * 添加工具调用（执行中状态）
