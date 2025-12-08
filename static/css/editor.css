@@ -314,3 +314,20 @@
     max-width: 100%;
     height: auto;
 }
+
+/* ========== Monaco Diff Editor 内联模式优化 ========== */
+/* 隐藏原始编辑器的行号列，只保留修改后的行号 */
+.monaco-diff-editor .original-in-monaco-diff-editor .margin,
+.monaco-diff-editor .original-in-monaco-diff-editor .line-numbers {
+    display: none !important;
+}
+
+/* 调整内联 diff 的行号显示 */
+.monaco-diff-editor.inline-diff .original-in-monaco-diff-editor {
+    width: 0 !important;
+}
+
+/* 确保修改后的编辑器占据全部空间 */
+.monaco-diff-editor .modified-in-monaco-diff-editor {
+    width: 100% !important;
+}

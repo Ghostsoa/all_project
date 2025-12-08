@@ -522,7 +522,11 @@ function initializeDiffEditor(tabId, filePath, originalContent, modifiedContent,
         glyphMargin: false,
         folding: false,
         lineDecorationsWidth: 10,
-        lineNumbersMinChars: 3
+        lineNumbersMinChars: 3,
+        renderLineHighlight: 'none',  // 禁用行高亮避免视觉混乱
+        // 只显示修改后的行号（隐藏原始行号列）
+        originalEditable: false,
+        enableSplitViewResizing: false
     });
     
     const originalModel = monaco.editor.createModel(originalContent, language);
