@@ -226,7 +226,7 @@ export async function openFileEditor(filePath, serverID, sessionID, fileSize = 0
         
         if (!data.success) {
             showToast('读取文件失败: ' + data.error, 'error');
-            closeEditorTab(tabId);
+            window.closeContentTab(tabId);
             // 显示错误状态
             if (window.updateGlobalStatus) {
                 window.updateGlobalStatus('error');
@@ -234,16 +234,24 @@ export async function openFileEditor(filePath, serverID, sessionID, fileSize = 0
             return;
         }
         
+        // 🔧 检查是否有 pending edits，准备好数据
+        let originalContent = data.content;
+        let modifiedContent = data.content;
+        
+        if (!isMarkdown && window.aiToolsManager) {
+            const hasPending = window.aiToolsManager.hasPendingEditsForFile(filePath);
+            if (hasPending) {
+                // 应用所有 pending edits 得到最终内容
+                modifiedContent = await window.aiToolsManager.applyAllPendingEdits(filePath, originalContent);
+                console.log(`📝 文件 ${filePath} 有 pending edits，准备显示 Diff`);
+            }
+        }
+        
         // 加载成功，创建编辑器
         if (isMarkdown) {
             await initializeMarkdownEditor(tabId, filePath, data.content);
         } else {
-            initializeEditor(tabId, filePath, data.content);
-        }
-        
-        // 通知AI工具管理器（检查是否有pending edit）
-        if (window.aiToolsManager) {
-            window.aiToolsManager.onFileOpened(filePath, serverID);
+            initializeEditor(tabId, filePath, originalContent, modifiedContent);
         }
         
         // 显示成功状态
@@ -253,7 +261,7 @@ export async function openFileEditor(filePath, serverID, sessionID, fileSize = 0
     } catch (error) {
         console.error('打开文件失败:', error);
         showToast('打开文件失败', 'error');
-        closeEditorTab(tabId);
+        window.closeContentTab(tabId);
         // 显示错误状态
         if (window.updateGlobalStatus) {
             window.updateGlobalStatus('error');
@@ -466,7 +474,7 @@ window.switchMarkdownMode = function(tabId, mode) {
     }
 };
 
-function initializeEditor(tabId, filePath, content) {
+function initializeEditor(tabId, filePath, originalContent, modifiedContent) {
     const container = document.getElementById(tabId);
     container.classList.remove('loading');
     container.innerHTML = ''; // 清空加载提示
@@ -480,45 +488,47 @@ function initializeEditor(tabId, filePath, content) {
     const saveBtn = document.querySelector(`[data-tab-id="${tabId}"] .editor-save-btn`);
     if (saveBtn) saveBtn.disabled = false;
     
-    // 🔧 统一使用 Diff Editor
+    // 🔧 统一使用 Diff Editor，数据已经准备好
     const fileName = filePath.split('/').pop();
     require(['vs/editor/editor.main'], function() {
-        initializeDiffEditor(tabId, filePath, content, fileName);
+        initializeDiffEditor(tabId, filePath, originalContent, modifiedContent, fileName);
     });
 }
 
 // 初始化 Diff Editor（统一用于所有文本文件）
-async function initializeDiffEditor(tabId, filePath, originalContent, fileName) {
+function initializeDiffEditor(tabId, filePath, originalContent, modifiedContent, fileName) {
     const container = document.getElementById(tabId);
-    
-    // 获取应用所有 pending edits 后的最终内容
-    let finalContent = originalContent;
-    if (window.aiToolsManager) {
-        finalContent = await window.aiToolsManager.applyAllPendingEdits(filePath, originalContent);
-    }
-    
     const language = getLanguage(fileName);
     
     // 创建 Inline Diff Editor
     const diffEditor = monaco.editor.createDiffEditor(container, {
         theme: 'vs-dark',
-        renderSideBySide: false,  // Inline 模式
+        renderSideBySide: false,  // ✅ Inline 模式（统一显示）
         readOnly: false,  // 可编辑
         automaticLayout: true,
         fontSize: 13,
         minimap: { enabled: false },
         scrollBeyondLastLine: false,
-        renderOverviewRuler: false,
+        renderOverviewRuler: false,  // 隐藏右侧概览
+        renderIndicators: true,  // 显示变更指示器
+        ignoreTrimWhitespace: false,  // 不忽略空格差异
+        renderMarginRevertIcon: false,  // 不显示还原图标
+        diffWordWrap: 'on',  // 自动换行
         scrollbar: {
             vertical: 'auto',
             horizontal: 'auto',
             verticalScrollbarSize: 10,
             horizontalScrollbarSize: 10
-        }
+        },
+        // 修改编辑器的边距，移除左侧空白
+        glyphMargin: false,
+        folding: false,
+        lineDecorationsWidth: 10,
+        lineNumbersMinChars: 3
     });
     
     const originalModel = monaco.editor.createModel(originalContent, language);
-    const modifiedModel = monaco.editor.createModel(finalContent, language);
+    const modifiedModel = monaco.editor.createModel(modifiedContent, language);
     
     diffEditor.setModel({
         original: originalModel,
@@ -542,7 +552,7 @@ async function initializeDiffEditor(tabId, filePath, originalContent, fileName) 
         }, 100);
     });
     
-    console.log('✅ Diff Editor 已初始化:', { tabId, filePath, hasDiff: originalContent !== finalContent });
+    console.log('✅ Diff Editor 已初始化:', { tabId, filePath, hasDiff: originalContent !== modifiedContent });
 }
 
 function createEditorTab(filePath, serverID, sessionID, content) {
