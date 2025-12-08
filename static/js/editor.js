@@ -537,6 +537,16 @@ function initializeDiffEditor(tabId, filePath, originalContent, modifiedContent,
         modified: modifiedModel
     });
     
+    // 🔧 直接配置原始编辑器：禁用行号显示
+    const originalEditor = diffEditor.getOriginalEditor();
+    originalEditor.updateOptions({
+        lineNumbers: 'off',  // 关闭原始编辑器行号
+        glyphMargin: false,
+        folding: false,
+        lineDecorationsWidth: 0,
+        lineNumbersMinChars: 0
+    });
+    
     // 保存 diff editor 实例
     editorInstances.set(tabId, diffEditor.getModifiedEditor());  // 保存可编辑的部分
     
