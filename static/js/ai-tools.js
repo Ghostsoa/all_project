@@ -1249,6 +1249,9 @@ class AIToolsManager {
                 
                 console.log('✅ Monaco Editor 已加载');
                 
+                // 设置暗色主题
+                monaco.editor.setTheme('vs-dark');
+                
                 // 获取文件语言
                 const ext = filePath.split('.').pop();
                 const languageMap = {
@@ -1267,6 +1270,7 @@ class AIToolsManager {
                 
                 // 创建 Monaco Diff Editor
                 const diffEditor = monaco.editor.createDiffEditor(container, {
+                    theme: 'vs-dark',  // 暗色主题
                     enableSplitViewResizing: true,
                     renderSideBySide: true,
                     readOnly: true,
