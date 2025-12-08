@@ -1215,9 +1215,12 @@ class AIToolsManager {
             tab.classList.remove('active');
         });
         
+        // 获取文件图标（使用 editor.js 的函数）
+        const fileIcon = window.getFileIconHTML ? window.getFileIconHTML(fileName) : '📊';
+        
         const tabHTML = `
             <div class="content-tab-item active" data-tab-id="${tabId}" data-path="${filePath}" onclick="window.switchContentTab('${tabId}')">
-                <span class="tab-icon">📊</span>
+                <span class="tab-icon">${fileIcon}</span>
                 <span class="tab-name">[Diff] ${fileName}</span>
                 <span class="tab-close" onclick="event.stopPropagation(); window.closeContentTab('${tabId}')">×</span>
             </div>
@@ -1273,7 +1276,14 @@ class AIToolsManager {
                     renderSideBySide: false,  // ✅ Inline 模式！
                     readOnly: true,
                     automaticLayout: true,
-                    minimap: { enabled: false }
+                    minimap: { enabled: false },
+                    renderOverviewRuler: false,  // 隐藏右侧滚动条缩略图
+                    scrollbar: {
+                        vertical: 'auto',
+                        horizontal: 'auto',
+                        verticalScrollbarSize: 10,
+                        horizontalScrollbarSize: 10
+                    }
                 });
                 
                 const originalModel = monaco.editor.createModel(originalContent, language);
@@ -1283,6 +1293,12 @@ class AIToolsManager {
                     original: originalModel,
                     modified: modifiedModel
                 });
+                
+                // 保存 diff editor 实例到全局，以便关闭时销毁
+                if (!window.diffEditorInstances) {
+                    window.diffEditorInstances = new Map();
+                }
+                window.diffEditorInstances.set(tabId, diffEditor);
                 
                 console.log('✅ Diff Tab 已创建:', tabId);
             });

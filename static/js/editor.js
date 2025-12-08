@@ -799,7 +799,40 @@ window.closeContentTab = async function(id) {
                 window.switchContentTab(targetTab.id);
             }
         }
-    } 
+    }
+    // 如果是 Diff 标签
+    else if (id.startsWith('diff-')) {
+        // 如果关闭的是当前激活的标签，找到要切换到的标签
+        let targetTab = null;
+        if (isCurrentlyActive) {
+            targetTab = findAdjacentTab(id);
+        }
+        
+        const tab = document.querySelector(`.content-tab-item[data-tab-id="${id}"]`);
+        const pane = document.getElementById(id);
+        
+        tab?.remove();
+        pane?.remove();
+        
+        // 销毁 diff editor 实例
+        if (window.diffEditorInstances && window.diffEditorInstances.has(id)) {
+            const diffEditor = window.diffEditorInstances.get(id);
+            diffEditor.dispose();
+            window.diffEditorInstances.delete(id);
+            console.log('✅ Diff Editor 实例已销毁:', id);
+        }
+        
+        console.log('✅ Diff Tab 已关闭:', id);
+        
+        // 如果关闭的是当前标签，切换到相邻标签
+        if (isCurrentlyActive && targetTab) {
+            if (targetTab.isTerminal && window.switchToTerminal) {
+                window.switchToTerminal(targetTab.id);
+            } else {
+                window.switchContentTab(targetTab.id);
+            }
+        }
+    }
     // 如果是终端标签（不允许关闭）
     else {
         // 终端标签不可关闭

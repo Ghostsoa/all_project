@@ -638,3 +638,31 @@
     height: 100%;
     overflow: hidden;
 }
+
+/* Inline Diff 模式下隐藏原始文件的行号列（只保留修改后的行号） */
+.diff-editor-wrapper .monaco-diff-editor .editor.original {
+    display: none !important;
+}
+
+/* 优化滚动条样式 */
+.diff-editor-wrapper ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+}
+
+.diff-editor-wrapper ::-webkit-scrollbar-track {
+    background: #1e1e1e;
+}
+
+.diff-editor-wrapper ::-webkit-scrollbar-thumb {
+    background: #424242;
+    border-radius: 5px;
+}
+
+.diff-editor-wrapper ::-webkit-scrollbar-thumb:hover {
+    background: #4e4e4e;
+}
+
+.diff-editor-wrapper ::-webkit-scrollbar-corner {
+    background: #1e1e1e;
+}
