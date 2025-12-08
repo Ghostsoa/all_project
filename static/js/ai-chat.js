@@ -1123,6 +1123,9 @@ async function streamChat(sessionId, message, thinkingId) {
         let currentBlockText = '';      // 当前块的文本（工具前后分开）
         let hasToolCall = false;         // 🔧 标记是否已有tool_call（避免后续reasoning重复更新）
         
+        // 清空上一轮的 tool_call 参数
+        window.currentToolCalls = {};
+        
         // 收集上下文信息
         const terminalInfo = window.getTerminalBuffer(200);  // 终端200行
         const editorInfo = window.getEditorContext(100);     // 编辑器前后100行
@@ -1397,6 +1400,18 @@ async function streamChat(sessionId, message, thinkingId) {
                             allReasoningHeaders.forEach(header => {
                                 header.classList.remove('shimmer-text');
                             });
+                        }
+                    }
+                    
+                    // 保存tool_call参数到全局变量，供后续 updateToolResult 使用
+                    if (!window.currentToolCalls) {
+                        window.currentToolCalls = {};
+                    }
+                    if (data.tool_call_id && data.arguments) {
+                        try {
+                            window.currentToolCalls[data.tool_call_id] = JSON.parse(data.arguments);
+                        } catch (e) {
+                            console.error('解析tool_call参数失败:', e);
                         }
                     }
                     

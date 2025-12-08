@@ -1206,14 +1206,63 @@ class AIToolsManager {
 
         console.log('✅ 获取到编辑器实例');
         const decorations = [];
-        const model = editor.getModel();
+        console.log('✅ 获取到编辑器实例');
         
         console.log('📝 处理operations:', operations.length, '个操作');
+        
+        // 转换 operations 格式：从 {old_string, new_string} 转为 {type, start_line, end_line, old_text, new_text}
+        const normalizedOperations = operations.map((op, index) => {
+            // 如果已经是标准格式，直接返回
+            if (op.type && op.start_line !== undefined) {
+                return op;
+            }
+            
+            // 如果是 edit_file 格式 (old_string/new_string)，需要转换
+            if (op.old_string !== undefined || op.new_string !== undefined) {
+                const oldString = op.old_string || '';
+                const newString = op.new_string || '';
+                
+                console.log(`  🔄 转换操作 ${index + 1}:`, { 
+                    old_len: oldString.length, 
+                    new_len: newString.length 
+                });
+                
+                // 在编辑器中搜索 old_string 的位置
+                const model = editor.getModel();
+                const fullText = model.getValue();
+                const oldIndex = fullText.indexOf(oldString);
+                
+                if (oldIndex === -1) {
+                    console.warn(`⚠️ 未找到 old_string:`, oldString.substring(0, 50));
+                    return null;
+                }
+                
+                // 计算起始行号
+                const textBeforeOld = fullText.substring(0, oldIndex);
+                const startLine = (textBeforeOld.match(/\n/g) || []).length + 1;
+                const endLine = startLine + (oldString.match(/\n/g) || []).length;
+                
+                console.log(`  ✅ 找到位置: 行 ${startLine}-${endLine}`);
+                
+                return {
+                    type: 'replace',
+                    start_line: startLine,
+                    end_line: endLine,
+                    old_text: oldString,
+                    new_text: newString
+                };
+            }
+            
+            console.warn(`  ⚠️ 未知的操作格式:`, op);
+            return null;
+        }).filter(op => op !== null);
+        
+        console.log('📝 标准化后的operations:', normalizedOperations.length, '个操作');
         
         // 收集zone widgets
         const zoneWidgets = [];
         
-        operations.forEach((op, index) => {
+        normalizedOperations.forEach((op, index) => {
             const { type, start_line, end_line, old_text, new_text } = op;
             console.log(`  操作 ${index + 1}:`, { type, start_line, end_line, old_text, new_text });
             
