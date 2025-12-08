@@ -186,11 +186,24 @@ func ExecuteGrepSearch(argsJSON string) (string, error) {
 	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
 		return "", fmt.Errorf("解析参数失败: %v", err)
 	}
+
+	// 默认启用正则表达式（更灵活）
+	isRegex := true
+	// 如果JSON中明确传了is_regex字段且为false，则使用字面量搜索
+	// 注意：由于Go的bool零值是false，我们无法区分"未设置"和"设置为false"
+	// 因此默认行为是启用正则
+	if argsJSON != "" {
+		// 简单检查：如果明确包含 "is_regex":false，则禁用正则
+		if strings.Contains(argsJSON, `"is_regex":false`) {
+			isRegex = false
+		}
+	}
+
 	return grepSearch(FileOperationArgs{
 		Query:      args.Query,
 		SearchPath: args.SearchPath,
 		ServerID:   args.ServerID,
-		IsRegex:    args.IsRegex,
+		IsRegex:    isRegex,
 		Includes:   args.Includes,
 	})
 }
@@ -268,11 +281,19 @@ func readFile(args FileOperationArgs, conversationID string) (string, error) {
 	var diskContent []byte
 	var err error
 
+	fileExists := true
 	if args.ServerID == "" || args.ServerID == "local" {
 		// 本地文件
 		diskContent, err = os.ReadFile(args.FilePath)
 		if err != nil {
-			return "", fmt.Errorf("读取本地文件失败: %v", err)
+			// 文件不存在时，不立即报错，检查 pending 状态
+			if os.IsNotExist(err) {
+				diskContent = []byte("") // 空内容
+				fileExists = false
+				log.Printf("📝 文件不存在，检查pending状态: %s", args.FilePath)
+			} else {
+				return "", fmt.Errorf("读取本地文件失败: %v", err)
+			}
 		}
 	} else {
 		// 远程文件（通过SFTP）
@@ -284,19 +305,31 @@ func readFile(args FileOperationArgs, conversationID string) (string, error) {
 		// 使用SFTP读取远程文件
 		remoteFile, err := sftpClient.Open(args.FilePath)
 		if err != nil {
-			return "", fmt.Errorf("读取远程文件失败: %v", err)
+			// 文件不存在时，检查 pending 状态
+			if os.IsNotExist(err) {
+				diskContent = []byte("")
+				fileExists = false
+				log.Printf("📝 远程文件不存在，检查pending状态: [%s] %s", args.ServerID, args.FilePath)
+			} else {
+				return "", fmt.Errorf("读取远程文件失败: %v", err)
+			}
+		} else {
+			defer remoteFile.Close()
+			diskContent, err = io.ReadAll(remoteFile)
+			if err != nil {
+				return "", fmt.Errorf("读取远程文件内容失败: %v", err)
+			}
+			log.Printf("✅ 读取远程文件: [%s] %s (%d字节)", args.ServerID, args.FilePath, len(diskContent))
 		}
-		defer remoteFile.Close()
-
-		diskContent, err = io.ReadAll(remoteFile)
-		if err != nil {
-			return "", fmt.Errorf("读取远程文件内容失败: %v", err)
-		}
-		log.Printf("✅ 读取远程文件: [%s] %s (%d字节)", args.ServerID, args.FilePath, len(diskContent))
 	}
 
-	// 优先从pending状态读取
+	// 优先从pending状态读取（可能返回新创建的文件内容）
 	content := manager.GetCurrentContent(args.ServerID, conversationID, args.FilePath, string(diskContent))
+
+	// 如果文件不存在且 pending 中也没有内容，返回错误
+	if !fileExists && content == "" {
+		return "", fmt.Errorf("文件不存在: %s", args.FilePath)
+	}
 
 	lines := strings.Split(content, "\n")
 	totalLines := len(lines)

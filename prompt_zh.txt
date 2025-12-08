@@ -49,8 +49,9 @@
 - 每个目录限制100项
 
 ### grep_search - 搜索内容
-- 参数：`query`, `search_path`, `server_id`, `is_regex`（可选）, `includes`（可选）
-- 通过 `is_regex=true` 支持正则表达式
+- 参数：`query`, `search_path`, `server_id`, `is_regex`（可选，默认true）, `includes`（可选）
+- **默认支持正则表达式**，可以直接使用 `|`、`.*`、`\w+` 等正则语法
+- 如需字面量搜索，设置 `is_regex: false`
 - 使用 `includes` 按文件类型过滤（例如 ["*.go", "*.js"]）
 - 返回匹配行及前后各2行上下文
 - 匹配行截断至1000字符，上下文截断至500字符

@@ -104,16 +104,30 @@ class AIToolsManager {
         
         // 如果status是pending，需要从toolCallArgs获取完整参数
         if (status === 'pending' && toolCallArgs) {
+            console.log('🔍 合并参数:', { type, toolCallArgs });
             // 合并tool结果和tool_calls参数
             toolResult = { ...toolResult, ...toolCallArgs, type };
             
             // 对于 edit_file，需要将 old_string/new_string 包装成 operations 数组
             if (type === 'edit' && toolCallArgs.old_string && toolCallArgs.new_string) {
+                console.log('✅ 添加operations:', { 
+                    has_old: !!toolCallArgs.old_string, 
+                    has_new: !!toolCallArgs.new_string 
+                });
                 toolResult.operations = [{
                     old_string: toolCallArgs.old_string,
                     new_string: toolCallArgs.new_string
                 }];
+            } else if (type === 'edit') {
+                console.warn('⚠️ edit_file但缺少参数:', { 
+                    type, 
+                    hasOld: !!toolCallArgs.old_string,
+                    hasNew: !!toolCallArgs.new_string,
+                    toolCallArgs 
+                });
             }
+        } else {
+            console.log('ℹ️ 不满足合并条件:', { status, hasArgs: !!toolCallArgs });
         }
         
         // 渲染pending状态（可交互）

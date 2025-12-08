@@ -49,8 +49,9 @@ You have access to the following tools:
 - Limited to 100 items per directory
 
 ### grep_search - Search Content
-- Parameters: `query`, `search_path`, `server_id`, `is_regex` (optional), `includes` (optional)
-- Supports regex with `is_regex=true`
+- Parameters: `query`, `search_path`, `server_id`, `is_regex` (optional, default true), `includes` (optional)
+- **Regex enabled by default** - use `|`, `.*`, `\w+` and other regex syntax directly
+- Set `is_regex: false` for literal string search
 - Filter by file types using `includes` (e.g., ["*.go", "*.js"])
 - Returns matching lines with 2-line context (before/after)
 - Matching lines truncated at 1000 chars, context at 500 chars
