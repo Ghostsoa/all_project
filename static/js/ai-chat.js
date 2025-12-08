@@ -2426,22 +2426,43 @@ function appendToolCallLoading(messageElement, toolData) {
     }
     
     const { tool_call_id, name } = toolData;
+    let toolHTML = '';
     
-    // 渲染更紧凑的Loading状态
-    const toolHTML = `
-        <div class="tool-call tool-loading" data-tool-call-id="${tool_call_id}">
-            <div class="tool-simple executing" style="display: flex; justify-content: space-between; align-items: center;">
-                <div style="display: flex; align-items: center; overflow: hidden; flex: 1;">
-                    <i class="fa-solid fa-code tool-simple-icon"></i>
-                    <span class="tool-simple-text" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 8px;">${name}</span>
-                </div>
-                <div class="tool-status" style="display: flex; align-items: center; font-size: 0.9em; opacity: 0.8; flex-shrink: 0;">
-                    <i class="fa-solid fa-circle-notch fa-spin" style="margin-right: 6px; font-size: 11px;"></i>
-                    <span class="tool-progress-text">准备中...</span>
+    // 🎯 针对 edit/write 类工具，使用特殊的卡片容器样式
+    if (name.includes('edit') || name.includes('write')) {
+        toolHTML = `
+            <div class="tool-call tool-loading" data-tool-call-id="${tool_call_id}">
+                <div class="tool-result-expandable" style="padding: 10px; background: rgba(30, 30, 30, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <i class="fa-solid fa-file-pen" style="color: #60a5fa;"></i>
+                            <span class="tool-simple-text" style="font-family: monospace; font-weight: bold; color: #e2e8f0;">${name}</span>
+                        </div>
+                        <div class="tool-status" style="display: flex; align-items: center; font-size: 0.9em; color: rgba(255,255,255,0.7);">
+                            <i class="fa-solid fa-circle-notch fa-spin" style="margin-right: 8px; color: #60a5fa;"></i>
+                            <span class="tool-progress-text">准备中...</span>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
-    `;
+        `;
+    } else {
+        // 其他简单工具（如 read, ls, grep），使用紧凑样式
+        toolHTML = `
+            <div class="tool-call tool-loading" data-tool-call-id="${tool_call_id}">
+                <div class="tool-simple executing" style="display: flex; justify-content: space-between; align-items: center;">
+                    <div style="display: flex; align-items: center; overflow: hidden; flex: 1;">
+                        <i class="fa-solid fa-code tool-simple-icon"></i>
+                        <span class="tool-simple-text" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 8px;">${name}</span>
+                    </div>
+                    <div class="tool-status" style="display: flex; align-items: center; font-size: 0.9em; opacity: 0.8; flex-shrink: 0;">
+                        <i class="fa-solid fa-circle-notch fa-spin" style="margin-right: 6px; font-size: 11px;"></i>
+                        <span class="tool-progress-text">准备中...</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
     
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = toolHTML;
@@ -2464,26 +2485,25 @@ function updateToolCallProgress(messageElement, toolData) {
     const toolElement = messageElement.querySelector(`[data-tool-call-id="${tool_call_id}"]`);
     if (!toolElement) return;
     
-    const toolName = toolElement.querySelector('.tool-simple-text')?.textContent.split(' ')[0] || '';
+    const textEl = toolElement.querySelector('.tool-simple-text');
+    const toolName = textEl?.textContent.split(' ')[0] || '';
     
     // 1. 尝试从参数中提取文件名（更新标题）
-    // 匹配 "path": "xxx" 或 "file_path": "xxx"
     const match = currentArgs.match(/"(?:file_)?path":\s*"([^"]+)/);
     if (match) {
         const fullPath = match[1];
         const fileName = fullPath.split(/[/\\]/).pop(); // 只取文件名
         
-        const textEl = toolElement.querySelector('.tool-simple-text');
         if (textEl && fileName && !textEl.textContent.includes(fileName)) {
+            // 对于 edit 类工具，保持原有样式但添加文件名
             textEl.textContent = `${toolName} ${fileName}`;
-            textEl.title = fullPath; // 鼠标悬停显示全路径
+            textEl.title = fullPath;
         }
     }
     
     // 2. 更新右侧进度文字
     const progressEl = toolElement.querySelector('.tool-progress-text');
     if (progressEl && currentArgs) {
-        // 只有 edit/write 类工具显示字符数，read类显示简洁信息
         if (toolName.includes('edit') || toolName.includes('write')) {
             progressEl.textContent = `生成中... (${currentArgs.length} 字符)`;
         } else {
