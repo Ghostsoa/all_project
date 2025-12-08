@@ -208,40 +208,41 @@ class AIToolsManager {
         let startLine = result.start_line || offset;
         let endLine = result.end_line || (offset && lines_read ? offset + lines_read - 1 : null);
         
-        // 构建行号范围显示
-        let lineRange = '';
+        // 构建显示内容
+        let displayText = '';
         let clickableClass = '';
         
         if (startLine && endLine) {
             if (startLine === 1 && endLine === total_lines) {
-                // 读取整个文件
-                lineRange = ` <span style="color: rgba(255,255,255,0.5);">(${total_lines} lines)</span>`;
-            } else {
-                // 读取部分行 - 可点击跳转
-                lineRange = ` <span class="file-line-range" style="color: #3b82f6; cursor: pointer; text-decoration: underline;" 
+                // 读取整个文件 - 文件名可点击
+                displayText = `<strong class="file-name-link" style="color: #3b82f6; cursor: pointer; text-decoration: underline;" 
                     onclick="aiToolsManager.openFileAtLine('${file_path.replace(/\\/g, '\\\\')}', '${server_id || 'local'}', ${startLine}, ${endLine})"
-                    title="点击跳转到第 ${startLine}-${endLine} 行"
-                >#${startLine}-${endLine}</span>`;
+                    title="点击打开文件">
+                    ${fileName}
+                </strong> <span style="color: rgba(255,255,255,0.5);">(${total_lines} lines)</span>`;
+                clickableClass = ' file-clickable';
+            } else {
+                // 读取部分行 - 文件名+行号作为整体可点击
+                displayText = `<strong class="file-name-link" style="color: #3b82f6; cursor: pointer; text-decoration: underline;" 
+                    onclick="aiToolsManager.openFileAtLine('${file_path.replace(/\\/g, '\\\\')}', '${server_id || 'local'}', ${startLine}, ${endLine})"
+                    title="点击跳转到第 ${startLine}-${endLine} 行">
+                    ${fileName} #${startLine}-${endLine}
+                </strong>`;
                 clickableClass = ' file-clickable';
             }
         } else if (total_lines) {
-            // 只有总行数
-            lineRange = ` <span style="color: rgba(255,255,255,0.5);">(${total_lines} lines)</span>`;
+            // 只有总行数，无行号范围
+            displayText = `<strong>${fileName}</strong> <span style="color: rgba(255,255,255,0.5);">(${total_lines} lines)</span>`;
+        } else {
+            // 无任何行数信息
+            displayText = `<strong>${fileName}</strong>`;
         }
-        
-        // 文件名也可点击
-        const fileNameHTML = startLine && endLine ? 
-            `<strong class="file-name-link" style="color: #3b82f6; cursor: pointer; text-decoration: underline;" 
-                onclick="aiToolsManager.openFileAtLine('${file_path.replace(/\\/g, '\\\\')}', '${server_id || 'local'}', ${startLine}, ${endLine})"
-                title="点击打开文件并跳转"
-            >${fileName}</strong>` : 
-            `<strong>${fileName}</strong>`;
         
         return `
             <div class="tool-call">
                 <div class="tool-simple completed${clickableClass}">
                     <i class="fa-solid fa-book-open tool-simple-icon"></i>
-                    Read ${fileNameHTML}${lineRange}
+                    Read ${displayText}
                 </div>
             </div>
         `;
