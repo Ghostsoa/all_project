@@ -1222,8 +1222,8 @@ class AIToolsManager {
         };
         document.addEventListener('keydown', this.diffModalEscHandler);
         
-        // 等待 DOM 渲染
-        setTimeout(() => {
+        // 等待 DOM 渲染和 Monaco 加载
+        const initDiffEditor = () => {
             const container = document.getElementById('diffEditorContainer');
             if (!container) {
                 console.error('❌ diffEditorContainer not found');
@@ -1231,11 +1231,13 @@ class AIToolsManager {
             }
             
             // 检查 Monaco 是否加载
-            if (typeof monaco === 'undefined') {
-                console.error('❌ Monaco Editor 未加载');
-                this.showToast('编辑器未加载完成', 'error');
+            if (typeof monaco === 'undefined' || typeof window.monaco === 'undefined') {
+                console.log('⏳ Monaco Editor 尚未加载，等待中...');
+                setTimeout(initDiffEditor, 200);  // 200ms 后重试
                 return;
             }
+            
+            console.log('✅ Monaco Editor 已加载');
             
             // 获取文件语言
             const ext = filePath.split('.').pop();
@@ -1274,7 +1276,10 @@ class AIToolsManager {
             
             this.currentDiffEditor = diffEditor;
             console.log('✅ Diff Editor 已创建');
-        }, 100);
+        };
+        
+        // 开始初始化
+        setTimeout(initDiffEditor, 100);
     }
     
     /**
