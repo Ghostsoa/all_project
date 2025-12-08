@@ -494,39 +494,38 @@
     white-space: pre;
 }
 
-/* ==================== Diff Editor 样式（统一编辑器）==================== */
+/* ==================== 编辑器 Diff 装饰样式 ==================== */
 
-/* Monaco Diff Editor inline 模式优化 */
-.editor-container .monaco-diff-editor.inline-view {
-    background: #1e1e1e;
+/* 新增的行 */
+.diff-line-inserted {
+    background: rgba(16, 185, 129, 0.15) !important;
 }
 
-/* 确保 inline 模式下原始编辑器完全隐藏（如果还有残留） */
-.editor-container .monaco-diff-editor.inline-view .editor.original {
-    width: 0 !important;
-    display: none !important;
+.diff-glyph-inserted {
+    background: rgba(16, 185, 129, 0.4);
+    width: 5px !important;
+    margin-left: 3px;
 }
 
-/* 让修改后的编辑器占满整个宽度 */
-.editor-container .monaco-diff-editor.inline-view .editor.modified {
-    width: 100% !important;
+.diff-line-decoration-inserted {
+    background: rgba(16, 185, 129, 0.6);
+    width: 3px !important;
 }
 
-/* 优化 diff 装饰的颜色 */
-.editor-container .monaco-diff-editor .line-insert {
-    background-color: rgba(16, 185, 129, 0.15) !important;
+/* 修改的行 */
+.diff-line-modified {
+    background: rgba(250, 176, 5, 0.15) !important;
 }
 
-.editor-container .monaco-diff-editor .line-delete {
-    background-color: rgba(239, 68, 68, 0.15) !important;
+.diff-glyph-modified {
+    background: rgba(250, 176, 5, 0.6);
+    width: 5px !important;
+    margin-left: 3px;
 }
 
-.editor-container .monaco-diff-editor .char-insert {
-    background-color: rgba(16, 185, 129, 0.3) !important;
-}
-
-.editor-container .monaco-diff-editor .char-delete {
-    background-color: rgba(239, 68, 68, 0.3) !important;
+.diff-line-decoration-modified {
+    background: rgba(250, 176, 5, 0.8);
+    width: 3px !important;
 }
 
 /* 优化滚动条样式 */
