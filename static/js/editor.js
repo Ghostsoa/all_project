@@ -495,101 +495,64 @@ function initializeEditor(tabId, filePath, originalContent, modifiedContent) {
     });
 }
 
-// 初始化编辑器（统一用于所有文本文件，带 diff 装饰）
+// 初始化 Diff Editor（统一用于所有文本文件）
 function initializeDiffEditor(tabId, filePath, originalContent, modifiedContent, fileName) {
     const container = document.getElementById(tabId);
     const language = getLanguage(fileName);
     
-    // 🔧 使用普通编辑器 + 手动 diff 装饰（真正的单列）
-    const editor = monaco.editor.create(container, {
-        value: modifiedContent,  // 显示修改后的内容
-        language: language,
+    // 创建 Inline Diff Editor
+    const diffEditor = monaco.editor.createDiffEditor(container, {
         theme: 'vs-dark',
+        renderSideBySide: false,  // ✅ Inline 模式（统一显示）
+        readOnly: false,  // 可编辑
         automaticLayout: true,
         fontSize: 13,
         minimap: { enabled: false },
         scrollBeyondLastLine: false,
-        wordWrap: 'on',
-        glyphMargin: true,  // 显示左侧装饰
-        folding: true,
-        lineDecorationsWidth: 10,
-        lineNumbersMinChars: 3,
+        renderOverviewRuler: false,  // 隐藏右侧概览
+        renderIndicators: true,  // 显示变更指示器
+        ignoreTrimWhitespace: false,  // 不忽略空格差异
+        renderMarginRevertIcon: false,  // 不显示还原图标
+        diffWordWrap: 'on',  // 自动换行
         scrollbar: {
             vertical: 'auto',
             horizontal: 'auto',
             verticalScrollbarSize: 10,
             horizontalScrollbarSize: 10
-        }
+        },
+        // 修改编辑器的边距，移除左侧空白
+        glyphMargin: false,
+        folding: false,
+        lineDecorationsWidth: 10,
+        lineNumbersMinChars: 3
     });
     
-    // 如果有 diff，应用装饰
-    if (originalContent !== modifiedContent) {
-        applyDiffDecorations(editor, originalContent, modifiedContent);
-    }
+    const originalModel = monaco.editor.createModel(originalContent, language);
+    const modifiedModel = monaco.editor.createModel(modifiedContent, language);
     
-    // 保存编辑器实例
-    editorInstances.set(tabId, editor);
+    diffEditor.setModel({
+        original: originalModel,
+        modified: modifiedModel
+    });
+    
+    // 保存 diff editor 实例
+    editorInstances.set(tabId, diffEditor.getModifiedEditor());  // 保存可编辑的部分
     
     // Ctrl+S保存
-    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
+    diffEditor.getModifiedEditor().addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
         window.saveFile(tabId);
     });
     
     // 监听内容变化
     let changeTimeout;
-    editor.getModel().onDidChangeContent(() => {
+    diffEditor.getModifiedEditor().getModel().onDidChangeContent(() => {
         clearTimeout(changeTimeout);
         changeTimeout = setTimeout(() => {
             markAsModified(tabId);
         }, 100);
     });
     
-    console.log('✅ Editor 已初始化:', { tabId, filePath, hasDiff: originalContent !== modifiedContent });
-}
-
-// 应用 diff 装饰到编辑器
-function applyDiffDecorations(editor, originalContent, modifiedContent) {
-    // 简单的逐行 diff
-    const originalLines = originalContent.split('\n');
-    const modifiedLines = modifiedContent.split('\n');
-    
-    const decorations = [];
-    const maxLines = Math.max(originalLines.length, modifiedLines.length);
-    
-    for (let i = 0; i < modifiedLines.length; i++) {
-        const lineNumber = i + 1;
-        const originalLine = originalLines[i];
-        const modifiedLine = modifiedLines[i];
-        
-        if (originalLine === undefined) {
-            // 新增的行（原文件没有这行）
-            decorations.push({
-                range: new monaco.Range(lineNumber, 1, lineNumber, 1),
-                options: {
-                    isWholeLine: true,
-                    className: 'diff-line-inserted',
-                    glyphMarginClassName: 'diff-glyph-inserted',
-                    linesDecorationsClassName: 'diff-line-decoration-inserted'
-                }
-            });
-        } else if (originalLine !== modifiedLine) {
-            // 修改的行
-            decorations.push({
-                range: new monaco.Range(lineNumber, 1, lineNumber, 1),
-                options: {
-                    isWholeLine: true,
-                    className: 'diff-line-modified',
-                    glyphMarginClassName: 'diff-glyph-modified',
-                    linesDecorationsClassName: 'diff-line-decoration-modified'
-                }
-            });
-        }
-    }
-    
-    // 应用装饰
-    editor.deltaDecorations([], decorations);
-    
-    console.log(`📝 应用了 ${decorations.length} 个 diff 装饰`);
+    console.log('✅ Diff Editor 已初始化:', { tabId, filePath, hasDiff: originalContent !== modifiedContent });
 }
 
 function createEditorTab(filePath, serverID, sessionID, content) {
