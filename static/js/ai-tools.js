@@ -1200,12 +1200,15 @@ class AIToolsManager {
      * 显示内联 Diff（降级方案）
      */
     showInlineDiff(filePath, originalContent, finalContent) {
-        // 使用主编辑器区域的中间位置显示 diff
-        const editorContainer = document.querySelector('.editor-pane') || document.querySelector('#editor-container');
+        // 使用主内容容器显示 diff
+        const editorContainer = document.getElementById('contentContainer');
         if (!editorContainer) {
             console.error('❌ 找不到编辑器容器');
             return;
         }
+        
+        // 清空容器中的现有内容（可选：保留终端）
+        // editorContainer.innerHTML = '';
         
         // 创建 Diff 容器
         const diffContainer = document.createElement('div');
