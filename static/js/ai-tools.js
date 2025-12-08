@@ -1197,35 +1197,53 @@ class AIToolsManager {
     }
     
     /**
-     * 显示内联 Diff（降级方案）
+     * 显示内联 Diff（作为 Tab）
      */
     showInlineDiff(filePath, originalContent, finalContent) {
-        // 使用主内容容器显示 diff
-        const editorContainer = document.getElementById('contentContainer');
-        if (!editorContainer) {
-            console.error('❌ 找不到编辑器容器');
+        const fileName = filePath.split('/').pop();
+        const tabId = 'diff-' + Date.now();
+        
+        // 1. 创建 Tab 标签
+        const tabsList = document.getElementById('contentTabsList');
+        if (!tabsList) {
+            console.error('❌ 找不到标签栏');
             return;
         }
         
-        // 清空容器中的现有内容（可选：保留终端）
-        // editorContainer.innerHTML = '';
+        // 取消所有其他标签的激活状态
+        tabsList.querySelectorAll('.content-tab-item').forEach(tab => {
+            tab.classList.remove('active');
+        });
         
-        // 创建 Diff 容器
-        const diffContainer = document.createElement('div');
-        diffContainer.className = 'inline-diff-container';
-        diffContainer.innerHTML = `
-            <div class="inline-diff-header">
-                <h3>📝 ${filePath.split('/').pop()} - Diff Preview</h3>
-                <button class="btn btn-secondary" onclick="this.closest('.inline-diff-container').remove()">
-                    <i class="fa-solid fa-times"></i> 关闭
-                </button>
+        const tabHTML = `
+            <div class="content-tab-item active" data-tab-id="${tabId}" data-path="${filePath}" onclick="window.switchContentTab('${tabId}')">
+                <span class="tab-icon">📊</span>
+                <span class="tab-name">[Diff] ${fileName}</span>
+                <span class="tab-close" onclick="event.stopPropagation(); window.closeContentTab('${tabId}')">×</span>
             </div>
-            <div class="inline-diff-editor" id="inlineDiffEditor"></div>
         `;
+        tabsList.insertAdjacentHTML('beforeend', tabHTML);
         
-        editorContainer.appendChild(diffContainer);
+        // 2. 创建编辑器容器
+        const contentContainer = document.getElementById('contentContainer');
+        if (!contentContainer) {
+            console.error('❌ 找不到内容容器');
+            return;
+        }
         
-        // 使用 require 加载 Monaco
+        // 隐藏其他内容
+        contentContainer.querySelectorAll('.editor-pane, .terminal-pane').forEach(pane => {
+            pane.classList.remove('active');
+        });
+        
+        const editorHTML = `
+            <div class="editor-pane active" id="${tabId}" data-path="${filePath}">
+                <div class="diff-editor-wrapper" id="${tabId}-diff"></div>
+            </div>
+        `;
+        contentContainer.insertAdjacentHTML('beforeend', editorHTML);
+        
+        // 3. 使用 require 加载 Monaco
         setTimeout(() => {
             if (typeof require === 'undefined') {
                 console.error('❌ AMD 加载器未就绪');
@@ -1233,8 +1251,11 @@ class AIToolsManager {
             }
             
             require(['vs/editor/editor.main'], (monaco) => {
-                const container = document.getElementById('inlineDiffEditor');
-                if (!container) return;
+                const container = document.getElementById(`${tabId}-diff`);
+                if (!container) {
+                    console.error('❌ 找不到 diff 容器');
+                    return;
+                }
                 
                 monaco.editor.setTheme('vs-dark');
                 
@@ -1263,7 +1284,7 @@ class AIToolsManager {
                     modified: modifiedModel
                 });
                 
-                console.log('✅ Inline Diff Editor 已创建');
+                console.log('✅ Diff Tab 已创建:', tabId);
             });
         }, 100);
     }
