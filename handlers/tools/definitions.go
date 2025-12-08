@@ -10,7 +10,7 @@ func GetReadFileDefinition() map[string]interface{} {
 		"type": "function",
 		"function": map[string]interface{}{
 			"name":        "read_file",
-			"description": "读取文件内容。支持读取整个文件或指定行范围。",
+			"description": "读取文件内容。支持读取整个文件或指定行范围。指定行范围时，limit 必须至少 100 行，最多 500 行。",
 			"parameters": map[string]interface{}{
 				"type": "object",
 				"properties": map[string]interface{}{
@@ -28,7 +28,7 @@ func GetReadFileDefinition() map[string]interface{} {
 					},
 					"limit": map[string]interface{}{
 						"type":        "integer",
-						"description": "读取行数（可选，最大1000行）",
+						"description": "读取行数（可选，范围：100-500 行。如果小于 100 会自动调整为 100，大于 500 会自动调整为 500）",
 					},
 				},
 				"required": []string{"file_path", "server_id"},
@@ -335,6 +335,35 @@ func GetCodeSearchDefinition(config *storage.AIConfig) map[string]interface{} {
 					},
 				},
 				"required": []string{"search_folder", "search_query", "server_id"},
+			},
+		},
+	}
+}
+
+// GetFindMethodDefinition 查找方法定义工具
+func GetFindMethodDefinition() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "function",
+		"function": map[string]interface{}{
+			"name":        "find_method",
+			"description": "搜索方法/函数定义并返回完整代码。自动识别顶层函数并提取完整方法体（包括括号匹配）。支持 Go、Python、Java、JavaScript 等语言。",
+			"parameters": map[string]interface{}{
+				"type": "object",
+				"properties": map[string]interface{}{
+					"method_name": map[string]interface{}{
+						"type":        "string",
+						"description": "方法/函数名（精确匹配）",
+					},
+					"directory": map[string]interface{}{
+						"type":        "string",
+						"description": "搜索目录的绝对路径",
+					},
+					"server_id": map[string]interface{}{
+						"type":        "string",
+						"description": "服务器ID（local=本地）",
+					},
+				},
+				"required": []string{"method_name", "directory", "server_id"},
 			},
 		},
 	}

@@ -50,6 +50,10 @@ func (te *ToolExecutor) Execute(toolName string, argsJSON string, conversationID
 	case "read_url_content":
 		return tools.ExecuteReadURLContent(argsJSON)
 
+	// 方法定义查找
+	case "find_method":
+		return tools.ExecuteFindMethod(argsJSON)
+
 	default:
 		return "", fmt.Errorf("未知工具: %s", toolName)
 	}
@@ -81,6 +85,9 @@ func GetToolsDefinition(config *storage.AIConfig) []map[string]interface{} {
 
 	// 添加URL内容读取工具
 	toolDefs = append(toolDefs, tools.GetReadURLContentDefinition())
+
+	// 添加方法定义查找工具
+	toolDefs = append(toolDefs, tools.GetFindMethodDefinition())
 
 	return toolDefs
 }

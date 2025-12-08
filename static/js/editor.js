@@ -173,10 +173,46 @@ const NON_EDITABLE_EXTENSIONS = new Set([
 // 大文件阈值（5MB）
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
 
-export async function openFileEditor(filePath, serverID, sessionID, fileSize = 0) {
+// 滚动到指定行并高亮
+function scrollToLineAndHighlight(tabId, startLine, endLine = null) {
+    const editor = editorInstances.get(tabId);
+    if (!editor) {
+        console.warn('编辑器实例不存在:', tabId);
+        return;
+    }
+    
+    // 滚动到起始行
+    editor.revealLineInCenter(startLine);
+    
+    // 高亮行范围
+    const range = new monaco.Range(
+        startLine, 1,
+        endLine || startLine, 1
+    );
+    
+    // 设置选中区域（高亮效果）
+    editor.setSelection(range);
+    editor.focus();
+    
+    console.log(`✅ 跳转到行 ${startLine}${endLine ? `-${endLine}` : ''}`);
+}
+
+// 暴露到全局
+window.scrollToLineAndHighlight = scrollToLineAndHighlight;
+
+export async function openFileEditor(filePath, serverID, sessionID, fileSize = 0, options = {}) {
     // 如果文件已打开，切换到该标签
     if (openFiles.has(filePath)) {
         switchToTab(filePath);
+        // 如果指定了行号，跳转并高亮
+        if (options.startLine) {
+            const fileInfo = openFiles.get(filePath);
+            if (fileInfo && fileInfo.tabId) {
+                setTimeout(() => {
+                    scrollToLineAndHighlight(fileInfo.tabId, options.startLine, options.endLine);
+                }, 100);
+            }
+        }
         return;
     }
     
@@ -252,6 +288,13 @@ export async function openFileEditor(filePath, serverID, sessionID, fileSize = 0
             await initializeMarkdownEditor(tabId, filePath, data.content);
         } else {
             initializeEditor(tabId, filePath, originalContent, modifiedContent);
+        }
+        
+        // 如果指定了行号，跳转并高亮
+        if (options.startLine) {
+            setTimeout(() => {
+                scrollToLineAndHighlight(tabId, options.startLine, options.endLine);
+            }, 200);
         }
         
         // 显示成功状态

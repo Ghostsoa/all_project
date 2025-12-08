@@ -132,6 +132,18 @@ func ExecuteReadFile(argsJSON string, conversationID string) (string, error) {
 	if err := json.Unmarshal([]byte(argsJSON), &args); err != nil {
 		return "", fmt.Errorf("解析参数失败: %v", err)
 	}
+
+	// 🔧 参数校验：如果指定了 offset 和 limit（行范围读取）
+	if args.Offset > 0 && args.Limit > 0 {
+		// 强制最少 100 行，最多 500 行
+		if args.Limit < 100 {
+			args.Limit = 100
+		}
+		if args.Limit > 500 {
+			args.Limit = 500
+		}
+	}
+
 	// 转换为FileOperationArgs复用现有逻辑
 	return readFile(FileOperationArgs{
 		FilePath: args.FilePath,

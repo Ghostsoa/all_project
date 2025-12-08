@@ -69,6 +69,11 @@ class AIToolsManager {
             return this.renderReadURLContentTool(toolResult, toolCallId);
         }
         
+        // find_method特殊处理
+        if (toolName === 'find_method') {
+            return this.renderFindMethodTool(toolResult, toolCallId);
+        }
+        
         // 文件操作工具列表
         const fileOperationTools = ['read_file', 'write_file', 'edit_file', 'list_directory', 'grep_search', 'find_files'];
         
@@ -196,7 +201,7 @@ class AIToolsManager {
      * 渲染 read 工具
      */
     renderReadTool(result) {
-        const { file_path, size, offset, limit, lines_read, total_lines } = result;
+        const { file_path, size, offset, limit, lines_read, total_lines, server_id } = result;
         const fileName = file_path.split('/').pop();
         
         // 计算行号范围（兼容两种格式）
@@ -205,24 +210,38 @@ class AIToolsManager {
         
         // 构建行号范围显示
         let lineRange = '';
+        let clickableClass = '';
+        
         if (startLine && endLine) {
             if (startLine === 1 && endLine === total_lines) {
                 // 读取整个文件
                 lineRange = ` <span style="color: rgba(255,255,255,0.5);">(${total_lines} lines)</span>`;
             } else {
-                // 读取部分行
-                lineRange = ` <span style="color: rgba(255,255,255,0.5);">#${startLine}-${endLine}</span>`;
+                // 读取部分行 - 可点击跳转
+                lineRange = ` <span class="file-line-range" style="color: #3b82f6; cursor: pointer; text-decoration: underline;" 
+                    onclick="aiToolsManager.openFileAtLine('${file_path.replace(/\\/g, '\\\\')}', '${server_id || 'local'}', ${startLine}, ${endLine})"
+                    title="点击跳转到第 ${startLine}-${endLine} 行"
+                >#${startLine}-${endLine}</span>`;
+                clickableClass = ' file-clickable';
             }
         } else if (total_lines) {
             // 只有总行数
             lineRange = ` <span style="color: rgba(255,255,255,0.5);">(${total_lines} lines)</span>`;
         }
         
+        // 文件名也可点击
+        const fileNameHTML = startLine && endLine ? 
+            `<strong class="file-name-link" style="color: #3b82f6; cursor: pointer; text-decoration: underline;" 
+                onclick="aiToolsManager.openFileAtLine('${file_path.replace(/\\/g, '\\\\')}', '${server_id || 'local'}', ${startLine}, ${endLine})"
+                title="点击打开文件并跳转"
+            >${fileName}</strong>` : 
+            `<strong>${fileName}</strong>`;
+        
         return `
             <div class="tool-call">
-                <div class="tool-simple completed">
+                <div class="tool-simple completed${clickableClass}">
                     <i class="fa-solid fa-book-open tool-simple-icon"></i>
-                    Read <strong>${fileName}</strong>${lineRange}
+                    Read ${fileNameHTML}${lineRange}
                 </div>
             </div>
         `;
@@ -559,6 +578,108 @@ class AIToolsManager {
                     </div>
                     <div class="tool-result-content" id="${resultId}">
                         ${filesHTML}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    /**
+     * 渲染find_method工具结果（方法定义搜索）
+     */
+    renderFindMethodTool(result, toolCallId) {
+        // 解析结果
+        let resultData;
+        try {
+            resultData = typeof result === 'string' ? JSON.parse(result) : result;
+        } catch (e) {
+            console.error('❌ 解析find_method结果失败:', e);
+            return `
+                <div class="tool-call">
+                    <div class="tool-simple completed">
+                        <i class="fa-solid fa-code tool-simple-icon"></i>
+                        find_method: 解析结果失败
+                    </div>
+                </div>
+            `;
+        }
+        
+        const { success, results = [], count, error } = resultData;
+        
+        // 如果失败
+        if (!success || error) {
+            return `
+                <div class="tool-call">
+                    <div class="tool-simple completed">
+                        <i class="fa-solid fa-code tool-simple-icon"></i>
+                        find_method: ${error || '执行失败'}
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 如果没有结果
+        if (count === 0 || results.length === 0) {
+            return `
+                <div class="tool-call">
+                    <div class="tool-simple completed">
+                        <i class="fa-solid fa-code tool-simple-icon"></i>
+                        find_method: 未找到方法定义
+                    </div>
+                </div>
+            `;
+        }
+        
+        // 渲染方法列表
+        const resultId = `find-method-${toolCallId}`;
+        const methodsHTML = results.map((method) => {
+            const fileName = method.file_path.split('/').pop() || method.file_path;
+            const fileIcon = this.getFileIconHTML(fileName);
+            const lineCount = method.end_line - method.start_line + 1;
+            
+            // 语言图标
+            const langIcons = {
+                'go': '🔵',
+                'python': '🐍',
+                'java': '☕',
+                'javascript': '💛'
+            };
+            const langIcon = langIcons[method.language] || '📄';
+            
+            return `
+                <div class="grep-match-item">
+                    <div class="grep-match-header">
+                        <i class="${fileIcon} grep-match-icon"></i>
+                        <span class="grep-match-path" 
+                            onclick="aiToolsManager.openFileAtLine('${method.file_path.replace(/\\/g, '\\\\')}', 'local', ${method.start_line}, ${method.end_line})"
+                            style="cursor: pointer; color: #3b82f6; text-decoration: underline;"
+                            title="点击跳转到文件">
+                            ${this.escapeHtml(method.file_path)}
+                        </span>
+                        <span class="grep-match-line">${langIcon} #${method.start_line}-${method.end_line} (${lineCount} lines)</span>
+                    </div>
+                    <div class="grep-match-context">
+                        <div class="grep-context-line" style="color: rgba(255,255,255,0.7);">
+                            ${this.escapeHtml(method.signature)}
+                        </div>
+                    </div>
+                </div>
+            `;
+        }).join('');
+        
+        return `
+            <div class="tool-call">
+                <div class="tool-result-expandable expanded">
+                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
+                        <i class="fa-solid fa-code tool-result-icon"></i>
+                        <span class="tool-result-title">
+                            find_method "<strong>${results[0]?.method_name || 'unknown'}</strong>"
+                        </span>
+                        <span class="tool-result-count">${count} definitions</span>
+                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
+                    </div>
+                    <div class="tool-result-content" id="${resultId}">
+                        ${methodsHTML}
                     </div>
                 </div>
             </div>
@@ -1597,6 +1718,30 @@ class AIToolsManager {
         } catch (error) {
             console.error('Reject All失败:', error);
             this.showToast('Reject All失败: ' + error.message, 'error');
+        }
+    }
+
+    /**
+     * 打开文件并跳转到指定行
+     * @param {string} filePath - 文件路径
+     * @param {string} serverId - 服务器ID
+     * @param {number} startLine - 起始行号
+     * @param {number} endLine - 结束行号
+     */
+    async openFileAtLine(filePath, serverId, startLine, endLine = null) {
+        console.log(`🎯 打开文件并跳转: ${filePath} #${startLine}${endLine ? `-${endLine}` : ''}`);
+        
+        // 获取当前 session ID
+        const sessionId = this.getCurrentSessionId();
+        
+        // 调用 openFileEditor 并传递行号选项
+        if (window.openFile) {
+            await window.openFile(filePath, serverId, sessionId, 0, {
+                startLine: startLine,
+                endLine: endLine
+            });
+        } else {
+            console.error('❌ openFile 函数不存在');
         }
     }
 }

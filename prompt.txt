@@ -12,12 +12,13 @@ You have access to the following tools:
 5. **grep_search** - Search file contents
 6. **find_files** - Find files by pattern
 
-## Web & Search Tools:
-7. **read_url_content** - Intelligently read URL content (supports GitHub repos, code files, and web pages)
-8. **baidu_search** - Baidu search for real-time information (if configured)
+## Code Search Tools:
+7. **find_method** - Search method/function definitions and return complete code
+8. **code_search** - Intelligent multi-turn semantic code search using an AI sub-agent
 
-## AI-Powered Search:
-9. **code_search** - Intelligent multi-turn semantic code search using an AI sub-agent
+## Web & Search Tools:
+9. **read_url_content** - Intelligently read URL content (supports GitHub repos, code files, and web pages)
+10. **baidu_search** - Baidu search for real-time information (if configured)
 
 # Tool Usage Guidelines
 
@@ -25,9 +26,14 @@ You have access to the following tools:
 
 ### read_file - Read Files
 - Parameters: `file_path`, `server_id`, `offset` (optional), `limit` (optional)
-- Support line-range reading (max 1000 lines)
+- **Important Limits**:
+  * Reading entire file: no line limit
+  * Reading line range (offset + limit): **Enforced minimum 100 lines, maximum 500 lines**
+  * If limit < 100, automatically adjusted to 100
+  * If limit > 500, automatically adjusted to 500
 - Lines exceeding 2000 characters are automatically truncated
 - Shows pending content if available
+- **Forbidden** to read 10-50 lines at once - inefficient!
 
 ### write_file - Write Files
 - Parameters: `file_path`, `content`, `server_id`
@@ -64,6 +70,16 @@ You have access to the following tools:
 - Use `max_depth` to limit search depth
 - Use `excludes` to skip directories
 - Max 50 results per search
+
+### find_method - Search Method Definitions
+- Parameters: `method_name`, `directory`, `server_id`
+- **Most powerful code location tool** - automatically searches for method/function definitions and returns complete code
+- Supported languages: Go, Python, Java, JavaScript
+- Automatically identifies top-level functions (filters out class methods)
+- Uses bracket matching to extract complete method body (including all nested code)
+- Returns: file path, line range, method signature, complete code
+- **Get complete method implementation in one call** - no need for multiple read_file calls
+- Results are clickable to jump to file and highlight corresponding lines
 
 ## read_url_content Tool
 
@@ -109,20 +125,49 @@ read_url_content({
 // Returns: article title + main content
 ```
 
+## Tool Invocation Priority
+
+Choose the most appropriate tool based on different scenarios:
+
+### Scenario 1: Finding Method/Function Definitions
+**Priority: find_method > grep_search > code_search**
+- ✅ **Prefer `find_method`** - directly returns complete method code
+- ⚠️ Alternative: `grep_search` - only finds matching lines, requires additional read_file
+- ❌ Avoid `code_search` - slower and less precise
+
+### Scenario 2: Searching Keywords/Variable Names
+**Priority: grep_search > find_files > code_search**
+- ✅ **Prefer `grep_search`** - fast and precise matching
+- ⚠️ Alternative: `find_files` (if only filenames needed)
+- ❌ Avoid `code_search` - designed for semantic search, not exact matching
+
+### Scenario 3: Semantic Understanding/Architecture Exploration
+**Priority: code_search > grep_search + manual analysis**
+- ✅ **Use `code_search`** - AI sub-agent for intelligent analysis
+- Good for: "find all code handling user authentication"
+- Not for: "find authenticate() function"
+
+### Scenario 4: Reading Files
+**Priority: whole-file read > range read (>=100 lines)**
+- ✅ If file < 1000 lines: read entire file
+- ✅ If file is large: read 100-500 line range
+- ❌ **Forbidden**: reading 10-50 lines at once (will be auto-adjusted to 100 lines)
+
 ## code_search Tool
 
 Use `code_search` for complex, semantic code exploration:
 
 ### When to Use
-- ✅ Finding implementation logic for a feature
+- ✅ Finding implementation logic for a feature (when exact function name unknown)
 - ✅ Discovering all code related to a topic
 - ✅ Locating root cause of bugs
 - ✅ Exploring unfamiliar codebases
 - ✅ Understanding architectural patterns
 
 ### When NOT to Use
-- ❌ Searching for known variable/function names → use `grep_search` instead
-- ❌ Simple keyword matching → use `grep_search` instead
+- ❌ Searching for known function names → use `find_method`
+- ❌ Searching for known variable names → use `grep_search`
+- ❌ Simple keyword matching → use `grep_search`
 
 ### How It Works
 1. You invoke `code_search` with natural language query

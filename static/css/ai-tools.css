@@ -518,3 +518,22 @@
 .editor-container ::-webkit-scrollbar-corner {
     background: #1e1e1e;
 }
+
+/* ==================== 文件链接跳转样式 ==================== */
+.file-name-link,
+.file-line-range {
+    transition: all 0.2s ease;
+}
+
+.file-name-link:hover,
+.file-line-range:hover {
+    color: #60a5fa !important;
+    text-decoration: underline !important;
+    filter: brightness(1.2);
+}
+
+.file-name-link:active,
+.file-line-range:active {
+    color: #93c5fd !important;
+    transform: scale(0.98);
+}
