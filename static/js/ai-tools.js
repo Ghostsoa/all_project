@@ -1104,15 +1104,15 @@ class AIToolsManager {
                 return;
             }
             
-            // Edit 工具：使用 Diff Editor 显示
+            // Edit 工具：在主编辑器中显示 Diff
             if (!operations || operations.length === 0) {
                 console.warn('⚠️ 没有operations数据，无法显示diff');
                 this.showToast('无diff数据', 'warning');
                 return;
             }
             
-            // 直接打开 Diff Editor 模态框
-            this.openDiffEditorModal(file_path, server_id, toolCallId);
+            // 在主编辑器区域打开 Diff Tab
+            this.openDiffInEditor(file_path, server_id, toolCallId);
             
         } catch (error) {
             console.error('打开Diff Editor失败:', error);
@@ -1121,10 +1121,152 @@ class AIToolsManager {
     }
 
     /**
-     * 打开 Diff Editor 模态框
+     * 在主编辑器中打开 Diff Tab
      * @param {string} filePath 
      * @param {string} serverId 
      * @param {string} toolCallId 
+     */
+    async openDiffInEditor(filePath, serverId, toolCallId) {
+        console.log('🎨 openDiffInEditor:', { filePath, serverId, toolCallId });
+        
+        // 创建虚拟的 Diff 文件路径
+        const diffPath = `[Diff] ${filePath}`;
+        
+        // 收集该文件的所有 pending edits
+        const allPendingEdits = [];
+        for (const [tid, edit] of this.pendingEdits.entries()) {
+            if (edit.file_path === filePath && edit.status === 'pending' && edit.type === 'edit' && edit.operations) {
+                allPendingEdits.push({ toolCallId: tid, edit });
+            }
+        }
+        console.log(`📋 该文件有 ${allPendingEdits.length} 个pending edits`);
+        
+        // 读取原始文件内容
+        let originalContent = '';
+        try {
+            const isLocal = !serverId || serverId === 'local';
+            const endpoint = isLocal ? '/api/local/files/read' : '/api/files/read';
+            
+            let url = `${endpoint}?path=${encodeURIComponent(filePath)}`;
+            if (!isLocal) {
+                const sessionId = this.getSessionIdByServerId(serverId);
+                url = `${endpoint}?session_id=${sessionId}&path=${encodeURIComponent(filePath)}`;
+            }
+            
+            const response = await fetch(url);
+            const data = await response.json();
+            if (data.success) {
+                originalContent = data.content;
+            } else {
+                throw new Error(data.error || '读取文件失败');
+            }
+        } catch (error) {
+            console.error('读取文件失败:', error);
+            this.showToast('无法读取文件内容', 'error');
+            return;
+        }
+        
+        // 链式应用所有 pending edits 得到最终内容
+        let finalContent = originalContent;
+        console.log(`🔄 开始链式应用 ${allPendingEdits.length} 个pending edits...`);
+        
+        for (const { toolCallId: tid, edit } of allPendingEdits) {
+            console.log(`  📝 应用 edit: ${tid}`);
+            for (const op of edit.operations) {
+                if (op.old_string !== undefined && op.new_string !== undefined) {
+                    const idx = finalContent.indexOf(op.old_string);
+                    if (idx !== -1) {
+                        finalContent = finalContent.substring(0, idx) + op.new_string + finalContent.substring(idx + op.old_string.length);
+                        console.log(`    ✅ 替换: ${op.old_string.length} → ${op.new_string.length} 字符`);
+                    } else {
+                        console.warn(`    ⚠️ 未找到 old_string（前50字符）:`, op.old_string.substring(0, 50));
+                    }
+                }
+            }
+        }
+        
+        console.log(`📄 原始: ${originalContent.length} 字符, 最终: ${finalContent.length} 字符`);
+        
+        // 在主编辑器中打开 Diff Tab
+        if (window.createDiffTab) {
+            window.createDiffTab(diffPath, filePath, originalContent, finalContent);
+        } else {
+            // 降级：如果没有专用的 diff tab 功能，使用简化的显示
+            this.showInlineDiff(filePath, originalContent, finalContent);
+        }
+    }
+    
+    /**
+     * 显示内联 Diff（降级方案）
+     */
+    showInlineDiff(filePath, originalContent, finalContent) {
+        // 使用主编辑器区域的中间位置显示 diff
+        const editorContainer = document.querySelector('.editor-pane') || document.querySelector('#editor-container');
+        if (!editorContainer) {
+            console.error('❌ 找不到编辑器容器');
+            return;
+        }
+        
+        // 创建 Diff 容器
+        const diffContainer = document.createElement('div');
+        diffContainer.className = 'inline-diff-container';
+        diffContainer.innerHTML = `
+            <div class="inline-diff-header">
+                <h3>📝 ${filePath.split('/').pop()} - Diff Preview</h3>
+                <button class="btn btn-secondary" onclick="this.closest('.inline-diff-container').remove()">
+                    <i class="fa-solid fa-times"></i> 关闭
+                </button>
+            </div>
+            <div class="inline-diff-editor" id="inlineDiffEditor"></div>
+        `;
+        
+        editorContainer.appendChild(diffContainer);
+        
+        // 使用 require 加载 Monaco
+        setTimeout(() => {
+            if (typeof require === 'undefined') {
+                console.error('❌ AMD 加载器未就绪');
+                return;
+            }
+            
+            require(['vs/editor/editor.main'], (monaco) => {
+                const container = document.getElementById('inlineDiffEditor');
+                if (!container) return;
+                
+                monaco.editor.setTheme('vs-dark');
+                
+                const ext = filePath.split('.').pop();
+                const languageMap = {
+                    'js': 'javascript', 'ts': 'typescript', 'jsx': 'javascript',
+                    'tsx': 'typescript', 'py': 'python', 'go': 'go',
+                    'html': 'html', 'css': 'css', 'json': 'json', 'md': 'markdown'
+                };
+                const language = languageMap[ext] || 'plaintext';
+                
+                // 创建 Inline Diff Editor
+                const diffEditor = monaco.editor.createDiffEditor(container, {
+                    theme: 'vs-dark',
+                    renderSideBySide: false,  // ✅ Inline 模式！
+                    readOnly: true,
+                    automaticLayout: true,
+                    minimap: { enabled: false }
+                });
+                
+                const originalModel = monaco.editor.createModel(originalContent, language);
+                const modifiedModel = monaco.editor.createModel(finalContent, language);
+                
+                diffEditor.setModel({
+                    original: originalModel,
+                    modified: modifiedModel
+                });
+                
+                console.log('✅ Inline Diff Editor 已创建');
+            });
+        }, 100);
+    }
+    
+    /**
+     * @deprecated 旧的模态框方法
      */
     async openDiffEditorModal(filePath, serverId, toolCallId) {
         console.log('🎨 openDiffEditorModal:', { filePath, serverId, toolCallId });

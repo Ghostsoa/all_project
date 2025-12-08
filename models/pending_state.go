@@ -48,9 +48,82 @@ func GetPendingStateManager() *PendingStateManager {
 		manager := &PendingStateManager{
 			states: make(map[string]*ConversationPending),
 		}
+
+		// 🔧 启动时加载所有已保存的 pending 状态
+		if err := manager.loadAllStates(); err != nil {
+			log.Printf("⚠️ 加载 pending 状态失败: %v", err)
+		}
+
 		pendingStateManagerInstance = manager
 	})
 	return pendingStateManagerInstance
+}
+
+// loadAllStates 加载所有已保存的 pending 状态
+func (m *PendingStateManager) loadAllStates() error {
+	// 获取所有服务器的 pending 目录
+	serverIDs := []string{"local"}
+
+	// 尝试从配置获取远程服务器
+	servers, err := storage.GetServers()
+	if err == nil {
+		for _, srv := range servers {
+			serverIDs = append(serverIDs, srv.ID)
+		}
+	}
+
+	loadedCount := 0
+	for _, serverID := range serverIDs {
+		dir := storage.GetPendingStateDir(serverID)
+
+		// 检查目录是否存在
+		if _, err := os.Stat(dir); os.IsNotExist(err) {
+			continue
+		}
+
+		// 读取目录下所有 JSON 文件
+		files, err := os.ReadDir(dir)
+		if err != nil {
+			log.Printf("⚠️ 读取 pending 目录失败 [%s]: %v", serverID, err)
+			continue
+		}
+
+		for _, file := range files {
+			if file.IsDir() || !strings.HasSuffix(file.Name(), ".json") {
+				continue
+			}
+
+			// 文件名格式: {conversationID}.json
+			conversationID := strings.TrimSuffix(file.Name(), ".json")
+			filePath := filepath.Join(dir, file.Name())
+
+			// 读取并解析 JSON
+			data, err := os.ReadFile(filePath)
+			if err != nil {
+				log.Printf("⚠️ 读取 pending 文件失败 [%s/%s]: %v", serverID, conversationID, err)
+				continue
+			}
+
+			var conv ConversationPending
+			if err := json.Unmarshal(data, &conv); err != nil {
+				log.Printf("⚠️ 解析 pending JSON 失败 [%s/%s]: %v", serverID, conversationID, err)
+				continue
+			}
+
+			// 存储到内存
+			stateKey := getStateKey(serverID, conversationID)
+			m.states[stateKey] = &conv
+			loadedCount++
+
+			log.Printf("✅ 加载 pending 状态: [%s] %s (%d轮)", serverID, conversationID, len(conv.Turns))
+		}
+	}
+
+	if loadedCount > 0 {
+		log.Printf("📊 总共加载了 %d 个 pending 状态", loadedCount)
+	}
+
+	return nil
 }
 
 // getStateKey 获取状态key
