@@ -1141,7 +1141,17 @@ class AIToolsManager {
         // 读取原始文件内容
         let originalContent = '';
         try {
-            const response = await fetch(`/api/files/read?path=${encodeURIComponent(filePath)}&server_id=${serverId || 'local'}`);
+            // 根据 serverId 选择正确的端点
+            const isLocal = !serverId || serverId === 'local';
+            const endpoint = isLocal ? '/api/local/files/read' : '/api/files/read';
+            
+            let url = `${endpoint}?path=${encodeURIComponent(filePath)}`;
+            if (!isLocal) {
+                const sessionId = this.getSessionIdByServerId(serverId);
+                url = `${endpoint}?session_id=${sessionId}&path=${encodeURIComponent(filePath)}`;
+            }
+            
+            const response = await fetch(url);
             const data = await response.json();
             if (data.success) {
                 originalContent = data.content;
