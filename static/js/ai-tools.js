@@ -1316,11 +1316,38 @@ class AIToolsManager {
         
         console.log(`📄 原始: ${originalContent.length} 字符, 最终: ${finalContent.length} 字符`);
         
+        // 🎯 计算第一个编辑操作的行号位置（用于跳转）
+        let startLine = null;
+        let endLine = null;
+        
+        if (allPendingEdits.length > 0 && allPendingEdits[0].edit.operations && allPendingEdits[0].edit.operations.length > 0) {
+            const firstOp = allPendingEdits[0].edit.operations[0];
+            if (firstOp.old_string) {
+                // 在原始内容中查找 old_string 的位置
+                const idx = originalContent.indexOf(firstOp.old_string);
+                if (idx !== -1) {
+                    // 计算这个位置之前有多少行
+                    const beforeText = originalContent.substring(0, idx);
+                    const linesBefore = (beforeText.match(/\n/g) || []).length;
+                    startLine = linesBefore + 1; // 1-indexed
+                    
+                    // 计算 old_string 跨越多少行
+                    const oldLines = (firstOp.old_string.match(/\n/g) || []).length;
+                    endLine = startLine + oldLines;
+                    
+                    console.log(`🎯 计算编辑位置: 行 ${startLine}-${endLine}`);
+                }
+            }
+        }
+        
         // 🔧 现在直接在普通文件编辑器中显示 Diff，不再单独创建 Diff Tab
         // 只需打开文件即可，editor.js 会自动检测 pending edits 并显示 diff
         const sessionId = serverId === 'local' ? 'local' : this.getSessionIdByServerId(serverId);
         if (window.openFile) {
-            window.openFile(filePath, serverId, sessionId);
+            // 如果计算出了行号，传递跳转参数
+            const options = startLine ? { startLine, endLine } : {};
+            window.openFile(filePath, serverId, sessionId, 0, options);
+            console.log(`📂 打开文件并跳转到: 行 ${startLine || '(无)'}`);
         } else {
             console.warn('⚠️ window.openFile 函数不存在');
         }
