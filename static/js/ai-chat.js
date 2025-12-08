@@ -2426,39 +2426,35 @@ function appendToolCallLoading(messageElement, toolData) {
     }
     
     const { tool_call_id, name } = toolData;
-    let toolHTML = '';
     
-    // 🎯 针对 edit/write 类工具，使用特殊的卡片容器样式
-    if (name.includes('edit') || name.includes('write')) {
+    // 判断是否是编辑类工具（使用 tool-card 样式）
+    const isEditOrWrite = name === 'edit_file' || name === 'write_file';
+    
+    let toolHTML;
+    if (isEditOrWrite) {
+        // 编辑/写入工具：使用 tool-card 样式
         toolHTML = `
-            <div class="tool-call tool-loading" data-tool-call-id="${tool_call_id}">
-                <div class="tool-result-expandable" style="padding: 10px; background: rgba(30, 30, 30, 0.6); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 6px;">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <div style="display: flex; align-items: center; gap: 8px;">
-                            <i class="fa-solid fa-file-pen" style="color: #60a5fa;"></i>
-                            <span class="tool-simple-text" style="font-family: monospace; font-weight: bold; color: #e2e8f0;">${name}</span>
-                        </div>
-                        <div class="tool-status" style="display: flex; align-items: center; font-size: 0.9em; color: rgba(255,255,255,0.7);">
-                            <i class="fa-solid fa-circle-notch fa-spin" style="margin-right: 8px; color: #60a5fa;"></i>
-                            <span class="tool-progress-text">准备中...</span>
-                        </div>
+            <div class="tool-call tool-loading" data-tool-call-id="${tool_call_id}" data-tool-name="${name}">
+                <div class="tool-card tool-card-loading">
+                    <div class="tool-card-left">
+                        <span class="tool-card-icon"><i class="fa-solid fa-file-code" style="color: #888;"></i></span>
+                        <span class="tool-card-name">${name}</span>
+                    </div>
+                    <div class="tool-card-right">
+                        <i class="fa-solid fa-circle-notch fa-spin" style="margin-right: 6px; font-size: 12px; opacity: 0.8;"></i>
+                        <span class="tool-progress-text" style="font-size: 11px; opacity: 0.7;">准备中...</span>
                     </div>
                 </div>
             </div>
         `;
     } else {
-        // 其他简单工具（如 read, ls, grep），使用紧凑样式
+        // 简单工具（read等）：使用 tool-simple 样式
         toolHTML = `
-            <div class="tool-call tool-loading" data-tool-call-id="${tool_call_id}">
-                <div class="tool-simple executing" style="display: flex; justify-content: space-between; align-items: center;">
-                    <div style="display: flex; align-items: center; overflow: hidden; flex: 1;">
-                        <i class="fa-solid fa-code tool-simple-icon"></i>
-                        <span class="tool-simple-text" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 8px;">${name}</span>
-                    </div>
-                    <div class="tool-status" style="display: flex; align-items: center; font-size: 0.9em; opacity: 0.8; flex-shrink: 0;">
-                        <i class="fa-solid fa-circle-notch fa-spin" style="margin-right: 6px; font-size: 11px;"></i>
-                        <span class="tool-progress-text">准备中...</span>
-                    </div>
+            <div class="tool-call tool-loading" data-tool-call-id="${tool_call_id}" data-tool-name="${name}">
+                <div class="tool-simple executing">
+                    <i class="fa-solid fa-book-open tool-simple-icon"></i>
+                    <span class="tool-simple-text">${name}</span>
+                    <span class="tool-progress-text" style="margin-left: 8px; opacity: 0.6;">...</span>
                 </div>
             </div>
         `;
@@ -2485,28 +2481,47 @@ function updateToolCallProgress(messageElement, toolData) {
     const toolElement = messageElement.querySelector(`[data-tool-call-id="${tool_call_id}"]`);
     if (!toolElement) return;
     
-    const textEl = toolElement.querySelector('.tool-simple-text');
-    const toolName = textEl?.textContent.split(' ')[0] || '';
+    const toolName = toolElement.getAttribute('data-tool-name') || '';
+    const isEditOrWrite = toolName === 'edit_file' || toolName === 'write_file';
     
-    // 1. 尝试从参数中提取文件名（更新标题）
+    // 1. 尝试从参数中提取文件名和路径
     const match = currentArgs.match(/"(?:file_)?path":\s*"([^"]+)/);
     if (match) {
         const fullPath = match[1];
         const fileName = fullPath.split(/[/\\]/).pop(); // 只取文件名
         
-        if (textEl && fileName && !textEl.textContent.includes(fileName)) {
-            // 对于 edit 类工具，保持原有样式但添加文件名
-            textEl.textContent = `${toolName} ${fileName}`;
-            textEl.title = fullPath;
+        if (isEditOrWrite) {
+            // tool-card 样式：更新文件名和图标
+            const nameEl = toolElement.querySelector('.tool-card-name');
+            const iconEl = toolElement.querySelector('.tool-card-icon');
+            
+            if (nameEl && fileName && nameEl.textContent !== fileName) {
+                nameEl.textContent = fileName;
+                nameEl.title = fullPath; // 悬停显示全路径
+                
+                // 更新文件图标
+                if (iconEl && window.aiToolsManager) {
+                    iconEl.innerHTML = window.aiToolsManager.getFileIconHTML(fileName);
+                }
+            }
+        } else {
+            // tool-simple 样式：更新文本
+            const textEl = toolElement.querySelector('.tool-simple-text');
+            if (textEl && fileName && !textEl.textContent.includes(fileName)) {
+                textEl.textContent = fileName;
+                textEl.title = fullPath;
+            }
         }
     }
     
     // 2. 更新右侧进度文字
     const progressEl = toolElement.querySelector('.tool-progress-text');
     if (progressEl && currentArgs) {
-        if (toolName.includes('edit') || toolName.includes('write')) {
+        if (isEditOrWrite) {
+            // edit/write 显示实时字符数
             progressEl.textContent = `生成中... (${currentArgs.length} 字符)`;
         } else {
+            // read 等简单工具不显示字符数
             progressEl.textContent = '读取中...';
         }
     }
