@@ -461,3 +461,84 @@
     padding-left: 28px;
     margin-top: 2px;
 }
+
+/* ==================== URL 内容展示 ==================== */
+.url-content-body {
+    padding: 12px;
+    line-height: 1.6;
+    color: rgba(255, 255, 255, 0.8);
+    font-size: 12px;
+}
+
+.url-content-body h1 {
+    font-size: 18px;
+    font-weight: bold;
+    margin: 16px 0 8px 0;
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.url-content-body h2 {
+    font-size: 16px;
+    font-weight: bold;
+    margin: 14px 0 6px 0;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.url-content-body h3 {
+    font-size: 14px;
+    font-weight: bold;
+    margin: 12px 0 4px 0;
+    color: rgba(255, 255, 255, 0.85);
+}
+
+.url-content-body pre {
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 8px;
+    margin: 8px 0;
+    overflow-x: auto;
+}
+
+.url-content-body code {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+.url-content-body strong {
+    font-weight: bold;
+    color: rgba(255, 255, 255, 0.95);
+}
+
+.url-content-body a {
+    color: #4A9EFF;
+    text-decoration: none;
+}
+
+.url-content-body a:hover {
+    text-decoration: underline;
+}
+
+.url-content-code {
+    padding: 8px;
+}
+
+.url-content-code pre {
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    padding: 12px;
+    margin: 0;
+    overflow-x: auto;
+    max-height: 400px;
+    overflow-y: auto;
+}
+
+.url-content-code code {
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    color: rgba(255, 255, 255, 0.85);
+    line-height: 1.5;
+    white-space: pre;
+}

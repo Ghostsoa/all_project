@@ -64,6 +64,11 @@ class AIToolsManager {
             return this.renderBaiduSearchTool(toolResult, toolCallId);
         }
         
+        // read_url_content特殊处理
+        if (toolName === 'read_url_content') {
+            return this.renderReadURLContentTool(toolResult, toolCallId);
+        }
+        
         // 文件操作工具列表
         const fileOperationTools = ['read_file', 'write_file', 'edit_file', 'list_directory', 'grep_search', 'find_files'];
         
@@ -540,20 +545,16 @@ class AIToolsManager {
      * 渲染baidu_search工具结果（展开式搜索结果列表）
      */
     renderBaiduSearchTool(result, toolCallId) {
-        console.log('🔍 renderBaiduSearchTool 接收到的result:', result);
-        
-        // 获取结果文本
+        // 获取结果文本（result应该是JSON字符串）
         let resultText = typeof result === 'string' ? result : (result.content || result.result || '');
-        console.log('📝 resultText类型:', typeof resultText, '长度:', resultText.length);
-        console.log('📝 resultText前100字符:', resultText.substring(0, 100));
         
         // 解析JSON格式的搜索结果
         let searchData;
         try {
             searchData = JSON.parse(resultText);
         } catch (e) {
-            console.error('解析百度搜索结果失败:', e);
-            console.error('原始文本:', resultText);
+            console.error('❌ 解析百度搜索结果失败:', e);
+            console.error('原始内容(前200字符):', resultText.substring(0, 200));
             return `
                 <div class="tool-call">
                     <div class="tool-simple completed">
@@ -619,6 +620,205 @@ class AIToolsManager {
                 </div>
             </div>
         `;
+    }
+
+    /**
+     * 渲染read_url_content工具结果（可展开式）
+     */
+    renderReadURLContentTool(result, toolCallId) {
+        let resultText = typeof result === 'string' ? result : (result.content || result.result || '');
+        
+        // 解析JSON格式的结果
+        let urlData;
+        try {
+            urlData = JSON.parse(resultText);
+        } catch (e) {
+            console.error('❌ 解析URL内容结果失败:', e);
+            return `
+                <div class="tool-call">
+                    <div class="tool-simple completed">
+                        <i class="fa-solid fa-link tool-simple-icon"></i>
+                        read_url_content: 解析结果失败
+                    </div>
+                </div>
+            `;
+        }
+        
+        const { type, url, title, content, meta } = urlData;
+        
+        // 根据类型选择不同的渲染方式
+        if (type === 'github_repo') {
+            return this.renderGitHubRepo(urlData, toolCallId);
+        } else if (type === 'github_file') {
+            return this.renderGitHubFile(urlData, toolCallId);
+        } else {
+            return this.renderWebPage(urlData, toolCallId);
+        }
+    }
+    
+    /**
+     * 渲染GitHub仓库
+     */
+    renderGitHubRepo(data, toolCallId) {
+        const { url, title, content, meta } = data;
+        const { owner, repo, description, stars, forks, language, topics, tree } = meta || {};
+        
+        // 构建头部信息
+        let headerInfo = '';
+        if (stars !== undefined) {
+            headerInfo += `⭐ ${this.formatNumber(stars)}`;
+        }
+        if (forks !== undefined) {
+            headerInfo += ` | 🍴 ${this.formatNumber(forks)}`;
+        }
+        if (language) {
+            headerInfo += ` | ${this.escapeHtml(language)}`;
+        }
+        
+        const resultId = `url-content-${toolCallId}`;
+        
+        return `
+            <div class="tool-call">
+                <div class="tool-result-expandable">
+                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
+                        <i class="fa-brands fa-github tool-result-icon"></i>
+                        <span class="tool-result-title">
+                            ${this.escapeHtml(title || url)}
+                        </span>
+                        <span class="tool-result-count">${headerInfo}</span>
+                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
+                    </div>
+                    <div class="tool-result-content" id="${resultId}">
+                        <div class="url-content-body">
+                            ${this.renderMarkdown(content)}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    /**
+     * 渲染GitHub文件
+     */
+    renderGitHubFile(data, toolCallId) {
+        const { url, title, content, meta } = data;
+        const { owner, repo, path, size } = meta || {};
+        
+        const sizeText = size ? this.formatFileSize(size) : '';
+        const resultId = `url-content-${toolCallId}`;
+        
+        return `
+            <div class="tool-call">
+                <div class="tool-result-expandable">
+                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
+                        <i class="fa-solid fa-file-code tool-result-icon"></i>
+                        <span class="tool-result-title">
+                            ${this.escapeHtml(title || path)}
+                        </span>
+                        <span class="tool-result-count">${owner}/${repo} ${sizeText}</span>
+                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
+                    </div>
+                    <div class="tool-result-content" id="${resultId}">
+                        <div class="url-content-code">
+                            <pre><code>${this.escapeHtml(content)}</code></pre>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    /**
+     * 渲染普通网页
+     */
+    renderWebPage(data, toolCallId) {
+        const { url, title, content, meta } = data;
+        const { author, site_name } = meta || {};
+        
+        let headerInfo = '';
+        if (site_name) {
+            headerInfo += this.escapeHtml(site_name);
+        }
+        if (author) {
+            headerInfo += (headerInfo ? ' | ' : '') + this.escapeHtml(author);
+        }
+        
+        const resultId = `url-content-${toolCallId}`;
+        
+        return `
+            <div class="tool-call">
+                <div class="tool-result-expandable">
+                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
+                        <i class="fa-solid fa-globe tool-result-icon"></i>
+                        <span class="tool-result-title">
+                            ${this.escapeHtml(title || url)}
+                        </span>
+                        <span class="tool-result-count">${headerInfo}</span>
+                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
+                    </div>
+                    <div class="tool-result-content" id="${resultId}">
+                        <div class="url-content-body">
+                            <div style="white-space: pre-wrap; line-height: 1.6;">${this.escapeHtml(content)}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    /**
+     * 简单的Markdown渲染（基础支持）
+     */
+    renderMarkdown(markdown) {
+        if (!markdown) return '';
+        
+        let html = this.escapeHtml(markdown);
+        
+        // 代码块
+        html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
+        
+        // 标题
+        html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
+        html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
+        html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
+        
+        // 粗体
+        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
+        
+        // 链接
+        html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank">$1</a>');
+        
+        // 换行
+        html = html.replace(/\n/g, '<br>');
+        
+        return html;
+    }
+    
+    /**
+     * 格式化数字（1000 -> 1K）
+     */
+    formatNumber(num) {
+        if (num >= 1000000) {
+            return (num / 1000000).toFixed(1) + 'M';
+        }
+        if (num >= 1000) {
+            return (num / 1000).toFixed(1) + 'K';
+        }
+        return num.toString();
+    }
+    
+    /**
+     * 格式化文件大小
+     */
+    formatFileSize(bytes) {
+        if (bytes >= 1024 * 1024) {
+            return (bytes / (1024 * 1024)).toFixed(1) + 'MB';
+        }
+        if (bytes >= 1024) {
+            return (bytes / 1024).toFixed(1) + 'KB';
+        }
+        return bytes + 'B';
     }
 
     /**

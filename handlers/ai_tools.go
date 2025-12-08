@@ -46,6 +46,10 @@ func (te *ToolExecutor) Execute(toolName string, argsJSON string, conversationID
 	case "baidu_search":
 		return tools.ExecuteBaiduSearch(argsJSON)
 
+	// URL内容读取
+	case "read_url_content":
+		return tools.ExecuteReadURLContent(argsJSON)
+
 	default:
 		return "", fmt.Errorf("未知工具: %s", toolName)
 	}
@@ -73,6 +77,9 @@ func GetToolsDefinition(config *storage.AIConfig) []map[string]interface{} {
 	if config != nil && config.BaiduSearchAPIKey != "" {
 		toolDefs = append(toolDefs, tools.GetBaiduSearchDefinition())
 	}
+
+	// 添加URL内容读取工具
+	toolDefs = append(toolDefs, tools.GetReadURLContentDefinition())
 
 	return toolDefs
 }
