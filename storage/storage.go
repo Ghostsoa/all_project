@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io/ioutil"
@@ -306,9 +307,13 @@ func writeJSON(path string, v interface{}) error {
 	mu.Lock()
 	defer mu.Unlock()
 
-	data, err := json.MarshalIndent(v, "", "  ")
-	if err != nil {
+	// 使用自定义编码器，禁用 HTML 转义
+	buf := new(bytes.Buffer)
+	encoder := json.NewEncoder(buf)
+	encoder.SetEscapeHTML(false) // 关键：不转义 HTML
+	encoder.SetIndent("", "  ")  // 保持格式化
+	if err := encoder.Encode(v); err != nil {
 		return err
 	}
-	return ioutil.WriteFile(path, data, 0644)
+	return ioutil.WriteFile(path, buf.Bytes(), 0644)
 }
