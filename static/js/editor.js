@@ -503,7 +503,7 @@ function initializeDiffEditor(tabId, filePath, originalContent, modifiedContent,
     // 创建 Inline Diff Editor
     const diffEditor = monaco.editor.createDiffEditor(container, {
         theme: 'vs-dark',
-        renderSideBySide: false,  // ✅ Inline 模式
+        renderSideBySide: false,  // ✅ Inline 模式（单列显示差异）
         readOnly: false,  // 可编辑
         automaticLayout: true,
         fontSize: 13,
@@ -512,21 +512,15 @@ function initializeDiffEditor(tabId, filePath, originalContent, modifiedContent,
         renderOverviewRuler: false,  // 隐藏右侧概览
         renderIndicators: true,  // 显示变更指示器
         ignoreTrimWhitespace: false,  // 不忽略空格差异
+        originalEditable: false,  // 原始内容不可编辑
+        enableSplitViewResizing: false,  // 禁用分割视图调整
         scrollbar: {
             vertical: 'auto',
             horizontal: 'auto',
             verticalScrollbarSize: 10,
             horizontalScrollbarSize: 10,
             alwaysConsumeMouseWheel: false
-        },
-        glyphMargin: false,
-        folding: false,
-        lineDecorationsWidth: 10,
-        lineNumbersMinChars: 3,
-        renderLineHighlight: 'none',  // 禁用行高亮避免视觉混乱
-        // 只显示修改后的行号（隐藏原始行号列）
-        originalEditable: false,
-        enableSplitViewResizing: false
+        }
     });
     
     const originalModel = monaco.editor.createModel(originalContent, language);
