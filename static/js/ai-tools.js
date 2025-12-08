@@ -1187,323 +1187,16 @@ class AIToolsManager {
         
         console.log(`📄 原始: ${originalContent.length} 字符, 最终: ${finalContent.length} 字符`);
         
-        // 在主编辑器中打开 Diff Tab
-        if (window.createDiffTab) {
-            window.createDiffTab(diffPath, filePath, originalContent, finalContent);
+        // 🔧 现在直接在普通文件编辑器中显示 Diff，不再单独创建 Diff Tab
+        // 只需打开文件即可，editor.js 会自动检测 pending edits 并显示 diff
+        const sessionId = serverId === 'local' ? 'local' : this.getSessionIdByServerId(serverId);
+        if (window.openFile) {
+            window.openFile(filePath, serverId, sessionId);
         } else {
-            // 降级：如果没有专用的 diff tab 功能，使用简化的显示
-            this.showInlineDiff(filePath, originalContent, finalContent);
+            console.warn('⚠️ window.openFile 函数不存在');
         }
     }
     
-    /**
-     * 显示内联 Diff（作为 Tab）
-     */
-    showInlineDiff(filePath, originalContent, finalContent) {
-        const fileName = filePath.split('/').pop();
-        const tabId = 'diff-' + Date.now();
-        
-        // 1. 创建 Tab 标签
-        const tabsList = document.getElementById('contentTabsList');
-        if (!tabsList) {
-            console.error('❌ 找不到标签栏');
-            return;
-        }
-        
-        // 取消所有其他标签的激活状态
-        tabsList.querySelectorAll('.content-tab-item').forEach(tab => {
-            tab.classList.remove('active');
-        });
-        
-        // 获取文件图标（使用 editor.js 的函数）
-        const fileIcon = window.getFileIconHTML ? window.getFileIconHTML(fileName) : '📊';
-        
-        const tabHTML = `
-            <div class="content-tab-item active" data-tab-id="${tabId}" data-path="${filePath}" onclick="window.switchContentTab('${tabId}')">
-                <span class="tab-icon">${fileIcon}</span>
-                <span class="tab-name">[Diff] ${fileName}</span>
-                <span class="tab-close" onclick="event.stopPropagation(); window.closeContentTab('${tabId}')">×</span>
-            </div>
-        `;
-        tabsList.insertAdjacentHTML('beforeend', tabHTML);
-        
-        // 2. 创建编辑器容器
-        const contentContainer = document.getElementById('contentContainer');
-        if (!contentContainer) {
-            console.error('❌ 找不到内容容器');
-            return;
-        }
-        
-        // 隐藏其他内容
-        contentContainer.querySelectorAll('.editor-pane, .terminal-pane').forEach(pane => {
-            pane.classList.remove('active');
-        });
-        
-        const editorHTML = `
-            <div class="editor-pane active" id="${tabId}" data-path="${filePath}">
-                <div class="diff-editor-wrapper" id="${tabId}-diff"></div>
-            </div>
-        `;
-        contentContainer.insertAdjacentHTML('beforeend', editorHTML);
-        
-        // 3. 使用 require 加载 Monaco
-        setTimeout(() => {
-            if (typeof require === 'undefined') {
-                console.error('❌ AMD 加载器未就绪');
-                return;
-            }
-            
-            require(['vs/editor/editor.main'], (monaco) => {
-                const container = document.getElementById(`${tabId}-diff`);
-                if (!container) {
-                    console.error('❌ 找不到 diff 容器');
-                    return;
-                }
-                
-                monaco.editor.setTheme('vs-dark');
-                
-                const ext = filePath.split('.').pop();
-                const languageMap = {
-                    'js': 'javascript', 'ts': 'typescript', 'jsx': 'javascript',
-                    'tsx': 'typescript', 'py': 'python', 'go': 'go',
-                    'html': 'html', 'css': 'css', 'json': 'json', 'md': 'markdown'
-                };
-                const language = languageMap[ext] || 'plaintext';
-                
-                // 创建 Inline Diff Editor
-                const diffEditor = monaco.editor.createDiffEditor(container, {
-                    theme: 'vs-dark',
-                    renderSideBySide: false,  // ✅ Inline 模式！
-                    readOnly: true,
-                    automaticLayout: true,
-                    minimap: { enabled: false },
-                    renderOverviewRuler: false,  // 隐藏右侧滚动条缩略图
-                    scrollbar: {
-                        vertical: 'auto',
-                        horizontal: 'auto',
-                        verticalScrollbarSize: 10,
-                        horizontalScrollbarSize: 10
-                    }
-                });
-                
-                const originalModel = monaco.editor.createModel(originalContent, language);
-                const modifiedModel = monaco.editor.createModel(finalContent, language);
-                
-                diffEditor.setModel({
-                    original: originalModel,
-                    modified: modifiedModel
-                });
-                
-                // 保存 diff editor 实例到全局，以便关闭时销毁
-                if (!window.diffEditorInstances) {
-                    window.diffEditorInstances = new Map();
-                }
-                window.diffEditorInstances.set(tabId, diffEditor);
-                
-                console.log('✅ Diff Tab 已创建:', tabId);
-            });
-        }, 100);
-    }
-    
-    /**
-     * @deprecated 旧的模态框方法
-     */
-    async openDiffEditorModal(filePath, serverId, toolCallId) {
-        console.log('🎨 openDiffEditorModal:', { filePath, serverId, toolCallId });
-        
-        // 🔧 收集该文件的所有 pending edits
-        const allPendingEdits = [];
-        for (const [tid, edit] of this.pendingEdits.entries()) {
-            if (edit.file_path === filePath && edit.status === 'pending' && edit.type === 'edit' && edit.operations) {
-                allPendingEdits.push({ toolCallId: tid, edit });
-            }
-        }
-        console.log(`📋 该文件有 ${allPendingEdits.length} 个pending edits`);
-        
-        // 读取原始文件内容
-        let originalContent = '';
-        try {
-            // 根据 serverId 选择正确的端点
-            const isLocal = !serverId || serverId === 'local';
-            const endpoint = isLocal ? '/api/local/files/read' : '/api/files/read';
-            
-            let url = `${endpoint}?path=${encodeURIComponent(filePath)}`;
-            if (!isLocal) {
-                const sessionId = this.getSessionIdByServerId(serverId);
-                url = `${endpoint}?session_id=${sessionId}&path=${encodeURIComponent(filePath)}`;
-            }
-            
-            const response = await fetch(url);
-            const data = await response.json();
-            if (data.success) {
-                originalContent = data.content;
-            } else {
-                throw new Error(data.error || '读取文件失败');
-            }
-        } catch (error) {
-            console.error('读取文件失败:', error);
-            this.showToast('无法读取文件内容', 'error');
-            return;
-        }
-        
-        // 链式应用所有 pending edits 得到最终内容
-        let finalContent = originalContent;
-        console.log(`🔄 开始链式应用 ${allPendingEdits.length} 个pending edits...`);
-        
-        for (const { toolCallId: tid, edit } of allPendingEdits) {
-            console.log(`  📝 应用 edit: ${tid}`);
-            for (const op of edit.operations) {
-                if (op.old_string !== undefined && op.new_string !== undefined) {
-                    const idx = finalContent.indexOf(op.old_string);
-                    if (idx !== -1) {
-                        finalContent = finalContent.substring(0, idx) + op.new_string + finalContent.substring(idx + op.old_string.length);
-                        console.log(`    ✅ 替换: ${op.old_string.length} → ${op.new_string.length} 字符`);
-                    } else {
-                        console.warn(`    ⚠️ 未找到 old_string（前50字符）:`, op.old_string.substring(0, 50));
-                    }
-                }
-            }
-        }
-        
-        console.log(`📄 原始: ${originalContent.length} 字符, 最终: ${finalContent.length} 字符`);
-        
-        // 创建模态框
-        this.createDiffModal(filePath, originalContent, finalContent, allPendingEdits);
-    }
-    
-    /**
-     * 创建 Diff Editor 模态框
-     */
-    createDiffModal(filePath, originalContent, finalContent, pendingEdits) {
-        // 创建模态框HTML
-        const modal = document.createElement('div');
-        modal.className = 'diff-modal';
-        modal.innerHTML = `
-            <div class="diff-modal-backdrop" onclick="aiToolsManager.closeDiffModal()"></div>
-            <div class="diff-modal-content">
-                <div class="diff-modal-header">
-                    <h3>📝 Diff Preview: ${filePath.split('/').pop()}</h3>
-                    <div class="diff-modal-actions">
-                        <button class="btn btn-secondary" onclick="aiToolsManager.closeDiffModal()">
-                            <i class="fa-solid fa-times"></i> 关闭
-                        </button>
-                    </div>
-                </div>
-                <div class="diff-editor-container" id="diffEditorContainer"></div>
-            </div>
-        `;
-        
-        document.body.appendChild(modal);
-        this.currentDiffModal = modal;
-        
-        // 添加 ESC 键关闭
-        this.diffModalEscHandler = (e) => {
-            if (e.key === 'Escape') {
-                this.closeDiffModal();
-            }
-        };
-        document.addEventListener('keydown', this.diffModalEscHandler);
-        
-        // 等待 DOM 渲染和 Monaco 加载
-        const initDiffEditor = () => {
-            const container = document.getElementById('diffEditorContainer');
-            if (!container) {
-                console.error('❌ diffEditorContainer not found');
-                return;
-            }
-            
-            // Monaco 使用 AMD 加载器，需要用 require 来访问
-            if (typeof require === 'undefined') {
-                console.log('⏳ AMD 加载器尚未加载，等待中...');
-                setTimeout(initDiffEditor, 200);
-                return;
-            }
-            
-            console.log('✅ AMD 加载器已就绪，加载 Monaco...');
-            
-            // 使用 require 加载 Monaco Editor
-            require(['vs/editor/editor.main'], (monaco) => {
-                if (!monaco) {
-                    console.error('❌ Monaco Editor 加载失败');
-                    this.showToast('编辑器加载失败', 'error');
-                    return;
-                }
-                
-                console.log('✅ Monaco Editor 已加载');
-                
-                // 设置暗色主题
-                monaco.editor.setTheme('vs-dark');
-                
-                // 获取文件语言
-                const ext = filePath.split('.').pop();
-                const languageMap = {
-                    'js': 'javascript',
-                    'ts': 'typescript',
-                    'jsx': 'javascript',
-                    'tsx': 'typescript',
-                    'py': 'python',
-                    'go': 'go',
-                    'html': 'html',
-                    'css': 'css',
-                    'json': 'json',
-                    'md': 'markdown'
-                };
-                const language = languageMap[ext] || 'plaintext';
-                
-                // 创建 Monaco Diff Editor
-                const diffEditor = monaco.editor.createDiffEditor(container, {
-                    theme: 'vs-dark',  // 暗色主题
-                    enableSplitViewResizing: true,
-                    renderSideBySide: true,
-                    readOnly: true,
-                    automaticLayout: true,
-                    minimap: { enabled: false }
-                });
-                
-                // 创建模型
-                const originalModel = monaco.editor.createModel(originalContent, language);
-                const modifiedModel = monaco.editor.createModel(finalContent, language);
-                
-                // 设置模型
-                diffEditor.setModel({
-                    original: originalModel,
-                    modified: modifiedModel
-                });
-                
-                this.currentDiffEditor = diffEditor;
-                console.log('✅ Diff Editor 已创建');
-            });  // 关闭 require 回调
-        };
-        
-        // 开始初始化
-        setTimeout(initDiffEditor, 100);
-    }
-    
-    /**
-     * 关闭 Diff Modal
-     */
-    closeDiffModal() {
-        if (this.currentDiffModal) {
-            // 销毁编辑器
-            if (this.currentDiffEditor) {
-                this.currentDiffEditor.dispose();
-                this.currentDiffEditor = null;
-            }
-            
-            // 移除 ESC 键监听
-            if (this.diffModalEscHandler) {
-                document.removeEventListener('keydown', this.diffModalEscHandler);
-                this.diffModalEscHandler = null;
-            }
-            
-            // 移除模态框
-            this.currentDiffModal.remove();
-            this.currentDiffModal = null;
-            
-            console.log('✅ Diff Modal 已关闭');
-        }
-    }
-
     /**
      * HTML 转义
      */
@@ -1511,6 +1204,50 @@ class AIToolsManager {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    /**
+     * 检查文件是否有 pending edits
+     */
+    hasPendingEditsForFile(filePath) {
+        for (const [tid, edit] of this.pendingEdits.entries()) {
+            if (edit.file_path === filePath && edit.status === 'pending' && edit.type === 'edit') {
+                return true;
+            }
+        }
+        return false;
+    }
+    
+    /**
+     * 应用所有 pending edits，返回最终内容
+     */
+    async applyAllPendingEdits(filePath, originalContent) {
+        // 收集该文件的所有 pending edits
+        const allPendingEdits = [];
+        for (const [tid, edit] of this.pendingEdits.entries()) {
+            if (edit.file_path === filePath && edit.status === 'pending' && edit.type === 'edit' && edit.operations) {
+                allPendingEdits.push({ toolCallId: tid, edit });
+            }
+        }
+        
+        if (allPendingEdits.length === 0) {
+            return originalContent;
+        }
+        
+        // 链式应用所有 pending edits
+        let finalContent = originalContent;
+        for (const { toolCallId: tid, edit } of allPendingEdits) {
+            for (const op of edit.operations) {
+                if (op.old_string !== undefined && op.new_string !== undefined) {
+                    const idx = finalContent.indexOf(op.old_string);
+                    if (idx !== -1) {
+                        finalContent = finalContent.substring(0, idx) + op.new_string + finalContent.substring(idx + op.old_string.length);
+                    }
+                }
+            }
+        }
+        
+        return finalContent;
     }
 
     // ==================== 辅助方法 ====================

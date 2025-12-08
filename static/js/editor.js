@@ -480,38 +480,69 @@ function initializeEditor(tabId, filePath, content) {
     const saveBtn = document.querySelector(`[data-tab-id="${tabId}"] .editor-save-btn`);
     if (saveBtn) saveBtn.disabled = false;
     
-    // 初始化Monaco编辑器
+    // 🔧 统一使用 Diff Editor
     const fileName = filePath.split('/').pop();
     require(['vs/editor/editor.main'], function() {
-        const editor = monaco.editor.create(container, {
-            value: content,
-            language: getLanguage(fileName),
-            theme: 'vs-dark',
-            automaticLayout: true,
-            fontSize: 13,
-            minimap: { enabled: true },
-            scrollBeyondLastLine: false,
-            wordWrap: 'on'
-        });
-        
-        // 保存编辑器实例
-        editorInstances.set(tabId, editor);
-        
-        // Ctrl+S保存
-        editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
-            window.saveFile(tabId);
-        });
-        
-        // 监听内容变化
-        let changeTimeout;
-        editor.getModel().onDidChangeContent(() => {
-            // 防抖，避免频繁标记
-            clearTimeout(changeTimeout);
-            changeTimeout = setTimeout(() => {
-                markAsModified(tabId);
-            }, 100);
-        });
+        initializeDiffEditor(tabId, filePath, content, fileName);
     });
+}
+
+// 初始化 Diff Editor（统一用于所有文本文件）
+async function initializeDiffEditor(tabId, filePath, originalContent, fileName) {
+    const container = document.getElementById(tabId);
+    
+    // 获取应用所有 pending edits 后的最终内容
+    let finalContent = originalContent;
+    if (window.aiToolsManager) {
+        finalContent = await window.aiToolsManager.applyAllPendingEdits(filePath, originalContent);
+    }
+    
+    const language = getLanguage(fileName);
+    
+    // 创建 Inline Diff Editor
+    const diffEditor = monaco.editor.createDiffEditor(container, {
+        theme: 'vs-dark',
+        renderSideBySide: false,  // Inline 模式
+        readOnly: false,  // 可编辑
+        automaticLayout: true,
+        fontSize: 13,
+        minimap: { enabled: false },
+        scrollBeyondLastLine: false,
+        renderOverviewRuler: false,
+        scrollbar: {
+            vertical: 'auto',
+            horizontal: 'auto',
+            verticalScrollbarSize: 10,
+            horizontalScrollbarSize: 10
+        }
+    });
+    
+    const originalModel = monaco.editor.createModel(originalContent, language);
+    const modifiedModel = monaco.editor.createModel(finalContent, language);
+    
+    diffEditor.setModel({
+        original: originalModel,
+        modified: modifiedModel
+    });
+    
+    // 保存 diff editor 实例
+    editorInstances.set(tabId, diffEditor.getModifiedEditor());  // 保存可编辑的部分
+    
+    // Ctrl+S保存
+    diffEditor.getModifiedEditor().addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
+        window.saveFile(tabId);
+    });
+    
+    // 监听内容变化
+    let changeTimeout;
+    diffEditor.getModifiedEditor().getModel().onDidChangeContent(() => {
+        clearTimeout(changeTimeout);
+        changeTimeout = setTimeout(() => {
+            markAsModified(tabId);
+        }, 100);
+    });
+    
+    console.log('✅ Diff Editor 已初始化:', { tabId, filePath, hasDiff: originalContent !== finalContent });
 }
 
 function createEditorTab(filePath, serverID, sessionID, content) {
@@ -790,39 +821,6 @@ window.closeContentTab = async function(id) {
         if (filePath) {
             openFiles.delete(filePath);
         }
-        
-        // 如果关闭的是当前标签，切换到相邻标签
-        if (isCurrentlyActive && targetTab) {
-            if (targetTab.isTerminal && window.switchToTerminal) {
-                window.switchToTerminal(targetTab.id);
-            } else {
-                window.switchContentTab(targetTab.id);
-            }
-        }
-    }
-    // 如果是 Diff 标签
-    else if (id.startsWith('diff-')) {
-        // 如果关闭的是当前激活的标签，找到要切换到的标签
-        let targetTab = null;
-        if (isCurrentlyActive) {
-            targetTab = findAdjacentTab(id);
-        }
-        
-        const tab = document.querySelector(`.content-tab-item[data-tab-id="${id}"]`);
-        const pane = document.getElementById(id);
-        
-        tab?.remove();
-        pane?.remove();
-        
-        // 销毁 diff editor 实例
-        if (window.diffEditorInstances && window.diffEditorInstances.has(id)) {
-            const diffEditor = window.diffEditorInstances.get(id);
-            diffEditor.dispose();
-            window.diffEditorInstances.delete(id);
-            console.log('✅ Diff Editor 实例已销毁:', id);
-        }
-        
-        console.log('✅ Diff Tab 已关闭:', id);
         
         // 如果关闭的是当前标签，切换到相邻标签
         if (isCurrentlyActive && targetTab) {
