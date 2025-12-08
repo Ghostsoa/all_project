@@ -503,7 +503,7 @@ function initializeDiffEditor(tabId, filePath, originalContent, modifiedContent,
     // 创建 Inline Diff Editor
     const diffEditor = monaco.editor.createDiffEditor(container, {
         theme: 'vs-dark',
-        renderSideBySide: false,  // ✅ Inline 模式（两列）
+        renderSideBySide: false,  // ✅ Inline 模式
         readOnly: false,  // 可编辑
         automaticLayout: true,
         fontSize: 13,
@@ -512,23 +512,13 @@ function initializeDiffEditor(tabId, filePath, originalContent, modifiedContent,
         renderOverviewRuler: false,  // 隐藏右侧概览
         renderIndicators: true,  // 显示变更指示器
         ignoreTrimWhitespace: false,  // 不忽略空格差异
-        renderMarginRevertIcon: false,  // 不显示还原图标
-        diffWordWrap: 'on',  // 自动换行
-        // ✅ 折叠相同的行，只显示差异部分
-        hideUnchangedRegions: {
-            enabled: true,           // 启用折叠
-            revealLineCount: 20,     // 展开时显示 20 行
-            minimumLineCount: 3,     // 至少 3 行相同才折叠
-            contextLineCount: 2      // 差异上下各保留 2 行
-        },
         scrollbar: {
             vertical: 'auto',
             horizontal: 'auto',
             verticalScrollbarSize: 10,
             horizontalScrollbarSize: 10,
-            alwaysConsumeMouseWheel: false  // 允许滚动穿透
+            alwaysConsumeMouseWheel: false
         },
-        // 修改编辑器的边距，减少空白
         glyphMargin: false,
         folding: false,
         lineDecorationsWidth: 10,
