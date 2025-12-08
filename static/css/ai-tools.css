@@ -351,55 +351,6 @@
     to { transform: rotate(360deg); }
 }
 
-/* ==================== Monaco Diff 装饰样式 ==================== */
-
-/* 删除行（红色背景，标记在原始行上） */
-.diff-line-deleted {
-    background-color: rgba(239, 68, 68, 0.3) !important;
-    opacity: 1 !important;
-}
-
-/* 删除行的Glyph */
-.diff-glyph-deleted {
-    background-color: #ef4444;
-    width: 4px !important;
-    margin-left: 3px;
-}
-
-/* Zone Widget 容器 */
-.diff-zone-widget {
-    background-color: transparent;
-    padding: 0;
-    margin: 0;
-}
-
-/* Zone Widget 中的每一行 */
-.diff-zone-line {
-    display: block;
-    white-space: pre;
-    padding: 0;
-    margin: 0;
-}
-
-/* 添加行（绿色，在Zone中） */
-.diff-zone-added {
-    background-color: rgba(16, 185, 129, 0.3);
-    color: #6ee7b7;
-}
-
-/* 逐字符高亮 - 删除的字符（深红色背景） */
-.diff-char-deleted {
-    background-color: rgba(239, 68, 68, 0.5);
-    color: #fca5a5;
-}
-
-/* 逐字符高亮 - 添加的字符（深绿色背景） */
-.diff-char-added {
-    background-color: rgba(16, 185, 129, 0.5);
-    color: #86efac;
-    font-weight: 500;
-}
-
 /* ==================== 百度搜索结果样式 ==================== */
 .search-result-item {
     padding: 10px 12px;
@@ -541,4 +492,88 @@
     color: rgba(255, 255, 255, 0.85);
     line-height: 1.5;
     white-space: pre;
+}
+
+/* ==================== Diff Editor Modal ==================== */
+
+.diff-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 10000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.diff-modal-backdrop {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    backdrop-filter: blur(4px);
+}
+
+.diff-modal-content {
+    position: relative;
+    width: 90%;
+    height: 85%;
+    max-width: 1400px;
+    background: #1e1e1e;
+    border-radius: 8px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+}
+
+.diff-modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 16px 20px;
+    background: #252526;
+    border-bottom: 1px solid #3e3e42;
+}
+
+.diff-modal-header h3 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 500;
+    color: #cccccc;
+}
+
+.diff-modal-actions {
+    display: flex;
+    gap: 8px;
+}
+
+.diff-modal-actions .btn {
+    padding: 6px 16px;
+    font-size: 13px;
+    border-radius: 4px;
+    border: none;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: background 0.2s;
+}
+
+.diff-modal-actions .btn-secondary {
+    background: #3a3d41;
+    color: #cccccc;
+}
+
+.diff-modal-actions .btn-secondary:hover {
+    background: #45494e;
+}
+
+.diff-editor-container {
+    flex: 1;
+    overflow: hidden;
 }

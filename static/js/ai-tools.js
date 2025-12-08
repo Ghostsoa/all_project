@@ -422,11 +422,6 @@ class AIToolsManager {
         
         console.log('💾 保存到pendingEdits:', this.pendingEdits.get(toolCallId));
         
-        // 自动检查并应用到已打开的编辑器
-        setTimeout(() => {
-            this.autoApplyToOpenEditor(toolCallId);
-        }, 100);
-        
         // 更新Pending Actions Bar
         this.updatePendingActionsBar();
         
@@ -1099,86 +1094,42 @@ class AIToolsManager {
     async openFileWithDiff(edit, toolCallId) {
         const { server_id, file_path, operations, type } = edit;
         
-        console.log('🔍 打开文件并显示diff:', { file_path, server_id, type, operations });
+        console.log('🔍 打开 Diff Editor:', { file_path, server_id, type, operations });
         
         try {
             // Write 工具：没有diff，只打开文件显示内容
             if (type === 'write') {
                 console.log('📝 Write工具：打开文件预览');
-                // TODO: 可以显示将要创建的内容
                 this.showToast('点击Accept将创建此文件', 'info');
                 return;
             }
             
-            // Edit 工具：需要显示diff
+            // Edit 工具：使用 Diff Editor 显示
             if (!operations || operations.length === 0) {
                 console.warn('⚠️ 没有operations数据，无法显示diff');
                 this.showToast('无diff数据', 'warning');
                 return;
             }
             
-            // 1. 获取当前 sessionID
-            const sessionID = this.getCurrentSessionId();
-            console.log('🔑 获取到的sessionID:', sessionID);
-            
-            if (!sessionID) {
-                console.error('❌ sessionID为空，无法打开文件');
-                this.showToast('无法获取当前会话ID', 'error');
-                return;
-            }
-            
-            // 2. 打开文件（调用 editor.js 的函数）
-            console.log('📂 准备打开文件:', { file_path, server_id, sessionID });
-            
-            // 本地文件
-            if (server_id === 'local' || sessionID === 'local') {
-                console.log('📂 打开本地文件');
-                if (window.openLocalFile) {
-                    await window.openLocalFile(file_path);
-                } else if (window.openFile) {
-                    await window.openFile(file_path);
-                } else {
-                    console.error('❌ 未找到本地文件打开函数');
-                    this.showToast('无法打开本地文件', 'error');
-                    return;
-                }
-            } else {
-                // 远程文件
-                console.log('📂 打开远程文件');
-                if (window.openFileEditor) {
-                    await window.openFileEditor(file_path, server_id, sessionID);
-                } else if (window.openFile) {
-                    await window.openFile(file_path, server_id, sessionID);
-                } else {
-                    console.error('❌ 未找到远程文件打开函数');
-                    this.showToast('无法打开远程文件', 'error');
-                    return;
-                }
-            }
-            
-            // 3. 等待编辑器加载完成（给一点时间）
-            await new Promise(resolve => setTimeout(resolve, 300));
-            
-            // 4. 应用 diff decorations
-            console.log('🎨 应用diff装饰');
-            this.applyDiffDecorations(file_path, operations, toolCallId);
+            // 直接打开 Diff Editor 模态框
+            this.openDiffEditorModal(file_path, server_id, toolCallId);
             
         } catch (error) {
-            console.error('打开文件失败:', error);
-            this.showToast('无法打开文件: ' + error.message, 'error');
+            console.error('打开Diff Editor失败:', error);
+            this.showToast('无法打开Diff Editor: ' + error.message, 'error');
         }
     }
 
     /**
-     * 应用 diff 装饰
+     * 打开 Diff Editor 模态框
      * @param {string} filePath 
-     * @param {Array} operations 
+     * @param {string} serverId 
      * @param {string} toolCallId 
      */
-    applyDiffDecorations(filePath, operations, toolCallId) {
-        console.log('🎨 applyDiffDecorations:', { filePath, operations, toolCallId });
+    async openDiffEditorModal(filePath, serverId, toolCallId) {
+        console.log('🎨 openDiffEditorModal:', { filePath, serverId, toolCallId });
         
-        // 🔧 收集该文件的所有 pending edits（按创建顺序）
+        // 🔧 收集该文件的所有 pending edits
         const allPendingEdits = [];
         for (const [tid, edit] of this.pendingEdits.entries()) {
             if (edit.file_path === filePath && edit.status === 'pending' && edit.type === 'edit' && edit.operations) {
@@ -1187,51 +1138,24 @@ class AIToolsManager {
         }
         console.log(`📋 该文件有 ${allPendingEdits.length} 个pending edits`);
         
-        // 先清除同一文件的所有pending装饰（避免叠加显示）
-        for (const { edit } of allPendingEdits) {
-            if (edit.zoneIds) {
-                console.log('🧹 清除旧的diff装饰');
-                // 清除装饰
-                if (edit.decorationIds && edit.editorInstance) {
-                    edit.editorInstance.deltaDecorations(edit.decorationIds, []);
-                }
-                // 清除zones
-                if (edit.zoneIds && edit.editorInstance) {
-                    edit.editorInstance.changeViewZones(accessor => {
-                        edit.zoneIds.forEach(id => accessor.removeZone(id));
-                    });
-                }
-                edit.decorationIds = null;
-                edit.zoneIds = null;
-            }
-        }
-        
-        // 获取对应的编辑器实例
-        console.log('🔍 查找编辑器实例，getEditorByPath存在:', !!window.getEditorByPath);
-        let editor = window.getEditorByPath && window.getEditorByPath(filePath);
-        if (!editor) {
-            console.warn('❌ 找不到编辑器实例:', filePath);
-            console.log('尝试使用其他方法获取编辑器...');
-            
-            // 尝试从全局编辑器列表获取
-            if (window.editors && window.editors[filePath]) {
-                console.log('✅ 从window.editors获取编辑器');
-                editor = window.editors[filePath];
+        // 读取原始文件内容
+        let originalContent = '';
+        try {
+            const response = await fetch(`/api/files/read?path=${encodeURIComponent(filePath)}&server_id=${serverId || 'local'}`);
+            const data = await response.json();
+            if (data.success) {
+                originalContent = data.content;
             } else {
-                console.error('❌ 完全无法获取编辑器实例');
-                this.showToast('无法获取编辑器，请确保文件已打开', 'error');
-                return;
+                throw new Error(data.error || '读取文件失败');
             }
+        } catch (error) {
+            console.error('读取文件失败:', error);
+            this.showToast('无法读取文件内容', 'error');
+            return;
         }
-
-        console.log('✅ 获取到编辑器实例');
         
-        // 🔧 链式应用所有pending edits，得到最终内容
-        const model = editor.getModel();
-        const originalContent = model.getValue();
+        // 链式应用所有 pending edits 得到最终内容
         let finalContent = originalContent;
-        
-        console.log(`📄 原始文件: ${originalContent.length} 字符`);
         console.log(`🔄 开始链式应用 ${allPendingEdits.length} 个pending edits...`);
         
         for (const { toolCallId: tid, edit } of allPendingEdits) {
@@ -1249,284 +1173,118 @@ class AIToolsManager {
             }
         }
         
-        console.log(`📄 最终内容: ${finalContent.length} 字符`);
+        console.log(`📄 原始: ${originalContent.length} 字符, 最终: ${finalContent.length} 字符`);
         
-        // 🔧 基于原始和最终内容生成diff（使用简单的逐行对比）
-        const originalLines = originalContent.split('\n');
-        const finalLines = finalContent.split('\n');
-        const decorations = [];
-        const normalizedOperations = [];
+        // 创建模态框
+        this.createDiffModal(filePath, originalContent, finalContent, allPendingEdits);
+    }
+    
+    /**
+     * 创建 Diff Editor 模态框
+     */
+    createDiffModal(filePath, originalContent, finalContent, pendingEdits) {
+        // 创建模态框HTML
+        const modal = document.createElement('div');
+        modal.className = 'diff-modal';
+        modal.innerHTML = `
+            <div class="diff-modal-backdrop" onclick="aiToolsManager.closeDiffModal()"></div>
+            <div class="diff-modal-content">
+                <div class="diff-modal-header">
+                    <h3>📝 Diff Preview: ${filePath.split('/').pop()}</h3>
+                    <div class="diff-modal-actions">
+                        <button class="btn btn-secondary" onclick="aiToolsManager.closeDiffModal()">
+                            <i class="fa-solid fa-times"></i> 关闭
+                        </button>
+                    </div>
+                </div>
+                <div class="diff-editor-container" id="diffEditorContainer"></div>
+            </div>
+        `;
         
-        console.log(`📊 逐行对比: 原始 ${originalLines.length} 行 → 最终 ${finalLines.length} 行`);
+        document.body.appendChild(modal);
+        this.currentDiffModal = modal;
         
-        // 简单diff算法：找出所有不同的行
-        const maxLines = Math.max(originalLines.length, finalLines.length);
-        let diffStart = -1;
-        
-        for (let i = 0; i < maxLines; i++) {
-            const origLine = originalLines[i] || '';
-            const finalLine = finalLines[i] || '';
-            
-            if (origLine !== finalLine) {
-                if (diffStart === -1) diffStart = i;
-                
-                // 找到连续差异的结束点
-                let diffEnd = i;
-                while (diffEnd + 1 < maxLines && 
-                       (originalLines[diffEnd + 1] || '') !== (finalLines[diffEnd + 1] || '')) {
-                    diffEnd++;
-                }
-                
-                // 创建一个operation表示这段差异
-                // 确保不超过实际行数
-                const origEnd = Math.min(diffEnd + 1, originalLines.length);
-                const finalEnd = Math.min(diffEnd + 1, finalLines.length);
-                
-                const oldText = originalLines.slice(i, origEnd).join('\n');
-                const newText = finalLines.slice(i, finalEnd).join('\n');
-                
-                normalizedOperations.push({
-                    type: 'replace',
-                    start_line: i + 1,
-                    end_line: origEnd,  // 确保不超过原始文件行数
-                    old_text: oldText,
-                    new_text: newText
-                });
-                
-                console.log(`  📍 发现差异: 行 ${i + 1}-${diffEnd + 1}`);
-                
-                i = diffEnd; // 跳过已处理的行
-                diffStart = -1;
+        // 添加 ESC 键关闭
+        this.diffModalEscHandler = (e) => {
+            if (e.key === 'Escape') {
+                this.closeDiffModal();
             }
-        }
+        };
+        document.addEventListener('keydown', this.diffModalEscHandler);
         
-        console.log(`📝 生成了 ${normalizedOperations.length} 个diff operations`);
-        
-        // 渲染diff装饰
-        const zoneWidgets = [];
-        
-        normalizedOperations.forEach((op, index) => {
-            const { type, start_line, end_line, old_text, new_text } = op;
-            console.log(`  操作 ${index + 1}:`, { type, start_line, end_line, old_text, new_text });
-            
-            if (type === 'replace') {
-                const oldLines = old_text.split('\n');
-                const newLines = new_text.split('\n');
-                const maxLines = Math.max(oldLines.length, newLines.length);
-                
-                // 找出所有有变化的行的索引
-                const changedIndices = [];
-                for (let idx = 0; idx < maxLines; idx++) {
-                    const oldLine = oldLines[idx] || '';
-                    const newLine = newLines[idx] || '';
-                    if (oldLine !== newLine) {
-                        changedIndices.push(idx);
-                    }
-                }
-                
-                if (changedIndices.length === 0) {
-                    console.log('⚠️ 没有变化的行');
-                    return;
-                }
-                
-                // 把连续的变化行分组
-                const groups = [];
-                let currentGroup = [changedIndices[0]];
-                
-                for (let i = 1; i < changedIndices.length; i++) {
-                    if (changedIndices[i] === changedIndices[i-1] + 1) {
-                        // 连续
-                        currentGroup.push(changedIndices[i]);
-                    } else {
-                        // 不连续，开始新组
-                        groups.push(currentGroup);
-                        currentGroup = [changedIndices[i]];
-                    }
-                }
-                groups.push(currentGroup);
-                
-                console.log(`� 找到 ${groups.length} 组变化:`, groups);
-                
-                // 获取编辑器的字体配置
-                const editorOptions = editor.getOptions();
-                const fontSize = editorOptions.get(monaco.editor.EditorOption.fontSize);
-                const fontFamily = editorOptions.get(monaco.editor.EditorOption.fontFamily);
-                const lineHeight = editorOptions.get(monaco.editor.EditorOption.lineHeight);
-                
-                // 从后往前为每组创建Zone（避免行号偏移）
-                for (let groupIdx = groups.length - 1; groupIdx >= 0; groupIdx--) {
-                    const group = groups[groupIdx];
-                    const firstIdx = group[0];
-                    const lastIdx = group[group.length - 1];
-                    
-                    // 整个组内的所有行都标记为红色删除（包括中间没变化的行）
-                    for (let idx = firstIdx; idx <= lastIdx; idx++) {
-                        const lineNum = start_line + idx;
-                        
-                        // 🔧 确保行号不超过文件实际行数
-                        if (lineNum > model.getLineCount()) {
-                            console.warn(`  ⚠️ 跳过超出范围的行: ${lineNum} (文件总行数: ${model.getLineCount()})`);
-                            continue;
-                        }
-                        
-                        console.log(`  🔴 标记第 ${lineNum} 行为红色删除`);
-                        decorations.push({
-                            range: new monaco.Range(lineNum, 1, lineNum, model.getLineMaxColumn(lineNum)),
-                            options: {
-                                isWholeLine: true,
-                                className: 'diff-line-deleted',
-                                glyphMarginClassName: 'diff-glyph-deleted'
-                            }
-                        });
-                    }
-                    
-                    // 创建Zone只显示绿色添加行
-                    const domNode = document.createElement('div');
-                    domNode.className = 'diff-zone-widget';
-                    domNode.style.fontSize = `${fontSize}px`;
-                    domNode.style.fontFamily = fontFamily;
-                    domNode.style.lineHeight = `${lineHeight}px`;
-                    
-                    const linesHtml = [];
-                    
-                    // 显示整个组范围的所有绿色行（对应红色行）
-                    for (let idx = firstIdx; idx <= lastIdx; idx++) {
-                        const newLine = newLines[idx] || '';
-                        linesHtml.push(`<div class="diff-zone-line diff-zone-added">${this.escapeHtml(newLine)}</div>`);
-                    }
-                    
-                    domNode.innerHTML = linesHtml.join('');
-                    console.log(`📦 组 ${groupIdx + 1} 包含 ${linesHtml.length} 行HTML`);
-                    
-                    // 只有当有添加行时才创建Zone
-                    if (linesHtml.length > 0) {
-                        let zoneLineNumber = start_line + lastIdx;
-                        
-                        // 🔧 确保 Zone 插入位置不超过文件行数
-                        if (zoneLineNumber > model.getLineCount()) {
-                            zoneLineNumber = model.getLineCount();
-                            console.warn(`  ⚠️ Zone插入位置超出范围，调整为: ${zoneLineNumber}`);
-                        }
-                        
-                        console.log(`🎯 组 ${groupIdx + 1}: firstIdx=${firstIdx}, lastIdx=${lastIdx}, start_line=${start_line}`);
-                        console.log(`   Zone将插入在第 ${zoneLineNumber} 行之后`);
-                        
-                        const zoneWidget = {
-                            domNode: domNode,
-                            afterLineNumber: zoneLineNumber,
-                            heightInLines: linesHtml.length,
-                            suppressMouseDown: true
-                        };
-                        
-                        zoneWidgets.push(zoneWidget);
-                    }
-                }
+        // 等待 DOM 渲染
+        setTimeout(() => {
+            const container = document.getElementById('diffEditorContainer');
+            if (!container) {
+                console.error('❌ diffEditorContainer not found');
+                return;
             }
-        });
-
-        console.log('🎨 应用', decorations.length, '个装饰');
-        
-        // 应用装饰
-        const decorationIds = editor.deltaDecorations([], decorations);
-        console.log('✅ 装饰已应用，ID:', decorationIds);
-        
-        // 应用View Zones（在行下方插入diff显示）
-        const zoneIds = [];
-        if (zoneWidgets.length > 0) {
-            editor.changeViewZones((changeAccessor) => {
-                zoneWidgets.forEach(zone => {
-                    const id = changeAccessor.addZone(zone);
-                    zoneIds.push(id);
-                    console.log('✅ Zone Widget已添加，ID:', id);
-                });
+            
+            // 获取文件语言
+            const ext = filePath.split('.').pop();
+            const languageMap = {
+                'js': 'javascript',
+                'ts': 'typescript',
+                'jsx': 'javascript',
+                'tsx': 'typescript',
+                'py': 'python',
+                'go': 'go',
+                'html': 'html',
+                'css': 'css',
+                'json': 'json',
+                'md': 'markdown'
+            };
+            const language = languageMap[ext] || 'plaintext';
+            
+            // 创建 Monaco Diff Editor
+            const diffEditor = monaco.editor.createDiffEditor(container, {
+                enableSplitViewResizing: true,
+                renderSideBySide: true,
+                readOnly: true,
+                automaticLayout: true,
+                minimap: { enabled: false }
             });
-        }
-        
-        // 保存装饰ID和Zone IDs到编辑信息中
-        const edit = this.pendingEdits.get(toolCallId);
-        if (edit) {
-            edit.decorationIds = decorationIds;
-            edit.zoneIds = zoneIds;
-            edit.editorInstance = editor;
-            console.log('✅ 装饰ID和Zone IDs已保存到edit对象');
-        }
+            
+            // 创建模型
+            const originalModel = monaco.editor.createModel(originalContent, language);
+            const modifiedModel = monaco.editor.createModel(finalContent, language);
+            
+            // 设置模型
+            diffEditor.setModel({
+                original: originalModel,
+                modified: modifiedModel
+            });
+            
+            this.currentDiffEditor = diffEditor;
+            console.log('✅ Diff Editor 已创建');
+        }, 100);
     }
     
     /**
-     * 自动应用到已打开的编辑器
-     * @param {string} toolCallId 
+     * 关闭 Diff Modal
      */
-    autoApplyToOpenEditor(toolCallId) {
-        console.log('🔍 autoApplyToOpenEditor调用:', toolCallId);
-        
-        const edit = this.pendingEdits.get(toolCallId);
-        if (!edit || edit.type !== 'edit') {
-            console.log('❌ edit不存在或类型错误:', { edit, type: edit?.type });
-            return;
-        }
-        
-        const { file_path, operations, server_id } = edit;
-        console.log('📋 edit信息:', { file_path, operations: operations?.length, server_id });
-        
-        // 检查当前服务器是否匹配
-        const currentServerId = this.getCurrentServerId();
-        if (server_id !== currentServerId) {
-            console.log('⏭️ 服务器不匹配，跳过自动应用:', { current: currentServerId, target: server_id });
-            return;
-        }
-        
-        // 检查文件是否已打开
-        const editor = window.getEditorByPath && window.getEditorByPath(file_path);
-        if (!editor) {
-            console.log('⏭️ 文件未打开，跳过自动应用:', file_path);
-            return;
-        }
-        
-        // 检查这个edit是否是该文件的最后一个pending（只显示最后一个的累计diff）
-        let lastPendingToolCallId = null;
-        let pendingCount = 0;
-        for (const [tid, e] of this.pendingEdits.entries()) {
-            if (e.file_path === file_path && e.status === 'pending' && e.type === 'edit') {
-                lastPendingToolCallId = tid;  // Map保持插入顺序，最后遍历到的就是最新的
-                pendingCount++;
+    closeDiffModal() {
+        if (this.currentDiffModal) {
+            // 销毁编辑器
+            if (this.currentDiffEditor) {
+                this.currentDiffEditor.dispose();
+                this.currentDiffEditor = null;
             }
-        }
-        
-        console.log('📊 该文件pending统计:', { 总数: pendingCount, 最后一个: lastPendingToolCallId, 当前: toolCallId });
-        
-        if (lastPendingToolCallId !== toolCallId) {
-            console.log('⏭️ 不是最后一个pending，跳过显示diff');
-            return;
-        }
-        
-        console.log('✨ 自动应用diff到已打开的编辑器:', file_path);
-        this.applyDiffDecorations(file_path, operations, toolCallId);
-    }
-    
-    /**
-     * 检查所有pending的编辑，自动应用到已打开的编辑器
-     * 用于历史记录加载后
-     */
-    checkAllPendingEdits() {
-        console.log('🔍 检查所有pending编辑:', this.pendingEdits.size, '个');
-        
-        // 按文件分组，只显示每个文件的最后一个pending
-        const fileLatestEdits = new Map();  // filePath -> {toolCallId, edit}
-        
-        for (const [toolCallId, edit] of this.pendingEdits.entries()) {
-            if (edit.type === 'edit' && edit.status === 'pending') {
-                // 覆盖同文件的edit（保留最后一个）
-                fileLatestEdits.set(edit.file_path, { toolCallId, edit });
+            
+            // 移除 ESC 键监听
+            if (this.diffModalEscHandler) {
+                document.removeEventListener('keydown', this.diffModalEscHandler);
+                this.diffModalEscHandler = null;
             }
-        }
-        
-        // 只应用每个文件的最后一个pending
-        console.log(`📊 ${fileLatestEdits.size} 个文件有pending编辑`);
-        for (const { toolCallId } of fileLatestEdits.values()) {
-            this.autoApplyToOpenEditor(toolCallId);
+            
+            // 移除模态框
+            this.currentDiffModal.remove();
+            this.currentDiffModal = null;
+            
+            console.log('✅ Diff Modal 已关闭');
         }
     }
-    
+
     /**
      * HTML 转义
      */
@@ -1534,96 +1292,6 @@ class AIToolsManager {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
-    }
-    
-    /**
-     * 计算逐字符 diff
-     * @param {string} oldText 
-     * @param {string} newText 
-     * @returns {object} 包含高亮的HTML
-     */
-    computeCharDiff(oldText, newText) {
-        // 简单的逐字符对比算法
-        const oldChars = oldText.split('');
-        const newChars = newText.split('');
-        
-        let oldHtml = '';
-        let newHtml = '';
-        
-        // 找到公共前缀
-        let commonPrefix = 0;
-        while (commonPrefix < oldChars.length && 
-               commonPrefix < newChars.length && 
-               oldChars[commonPrefix] === newChars[commonPrefix]) {
-            commonPrefix++;
-        }
-        
-        // 找到公共后缀
-        let commonSuffix = 0;
-        while (commonSuffix < (oldChars.length - commonPrefix) && 
-               commonSuffix < (newChars.length - commonPrefix) && 
-               oldChars[oldChars.length - 1 - commonSuffix] === newChars[newChars.length - 1 - commonSuffix]) {
-            commonSuffix++;
-        }
-        
-        // 构建旧文本HTML（高亮变化部分）
-        oldHtml += this.escapeHtml(oldChars.slice(0, commonPrefix).join(''));
-        if (commonPrefix < oldChars.length - commonSuffix) {
-            oldHtml += `<span class="diff-char-deleted">${this.escapeHtml(oldChars.slice(commonPrefix, oldChars.length - commonSuffix).join(''))}</span>`;
-        }
-        oldHtml += this.escapeHtml(oldChars.slice(oldChars.length - commonSuffix).join(''));
-        
-        // 构建新文本HTML（高亮变化部分）
-        newHtml += this.escapeHtml(newChars.slice(0, commonPrefix).join(''));
-        if (commonPrefix < newChars.length - commonSuffix) {
-            newHtml += `<span class="diff-char-added">${this.escapeHtml(newChars.slice(commonPrefix, newChars.length - commonSuffix).join(''))}</span>`;
-        }
-        newHtml += this.escapeHtml(newChars.slice(newChars.length - commonSuffix).join(''));
-        
-        return { oldHtml, newHtml };
-    }
-
-    // ==================== 文件打开监听 ====================
-    
-    /**
-     * 当用户打开文件时检查是否有 pending edit
-     * @param {string} filePath 
-     * @param {string} serverId 
-     */
-    onFileOpened(filePath, serverId) {
-        console.log('📂 文件已打开，检查pending edits:', { filePath, serverId });
-        console.log('📋 当前pendingEdits:', this.pendingEdits);
-        
-        // 如果 serverId 为 null/undefined，尝试获取当前 serverId
-        if (!serverId) {
-            serverId = this.getCurrentServerId();
-            console.log('🔧 serverId为空，使用当前serverId:', serverId);
-        }
-        
-        // 查找该文件的 pending edit
-        let found = false;
-        for (const [toolCallId, edit] of this.pendingEdits.entries()) {
-            console.log('🔍 检查edit:', { 
-                toolCallId, 
-                edit_path: edit.file_path, 
-                edit_server: edit.server_id,
-                match: edit.file_path === filePath && edit.server_id === serverId
-            });
-            
-            if (edit.file_path === filePath && edit.server_id === serverId) {
-                console.log('✅ 找到匹配的pending edit，延迟应用diff');
-                found = true;
-                // 延迟应用 diff，等待编辑器完全初始化
-                setTimeout(() => {
-                    console.log('⏰ 延迟后应用diff');
-                    this.applyDiffDecorations(filePath, edit.operations, toolCallId);
-                }, 500);
-            }
-        }
-        
-        if (!found) {
-            console.log('❌ 没有找到匹配的pending edit');
-        }
     }
 
     // ==================== 辅助方法 ====================
@@ -1645,30 +1313,6 @@ class AIToolsManager {
         
         if (actions) {
             actions.remove();
-        }
-    }
-
-    /**
-     * 清除 diff 装饰
-     */
-    clearDiffDecorations(toolCallId) {
-        const edit = this.pendingEdits.get(toolCallId);
-        if (edit && edit.editorInstance) {
-            // 清除装饰
-            if (edit.decorationIds) {
-                edit.editorInstance.deltaDecorations(edit.decorationIds, []);
-                delete edit.decorationIds;
-            }
-            // 清除View Zones
-            if (edit.zoneIds && edit.zoneIds.length > 0) {
-                edit.editorInstance.changeViewZones((changeAccessor) => {
-                    edit.zoneIds.forEach(id => {
-                        changeAccessor.removeZone(id);
-                    });
-                });
-                delete edit.zoneIds;
-            }
-            delete edit.editorInstance;
         }
     }
 
@@ -1922,7 +1566,6 @@ class AIToolsManager {
             // 清空所有pending edits
             for (const [toolCallId, edit] of this.pendingEdits.entries()) {
                 this.updateToolStatus(toolCallId, 'accepted');
-                this.clearDiffDecorations(toolCallId);
                 this.appliedEdits.add(toolCallId);
             }
             
@@ -1932,11 +1575,7 @@ class AIToolsManager {
             // 更新Pending Actions Bar
             this.updatePendingActionsBar();
             
-            // Accept后不需要刷新编辑器，因为：
-            // 1. 后端写入的内容 = 当前pending内容（编辑器已经显示）
-            // 2. 已经清除了diff装饰
-            // 3. 刷新会触发"未保存"状态，造成困扰
-            console.log('✅ Accept All完成，已清除diff装饰');
+            console.log('✅ Accept All完成');
             
             this.showToast(`已确认所有修改 (${pendingCount}个)`, 'success');
         } catch (error) {
@@ -1977,7 +1616,6 @@ class AIToolsManager {
             const affectedFiles = new Set();
             for (const [toolCallId, edit] of this.pendingEdits.entries()) {
                 this.updateToolStatus(toolCallId, 'rejected');
-                this.clearDiffDecorations(toolCallId);
                 affectedFiles.add(edit.file_path);
             }
             
