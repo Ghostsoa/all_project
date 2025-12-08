@@ -69,9 +69,10 @@ func GetToolsDefinition(config *storage.AIConfig) []map[string]interface{} {
 	toolDefs = append(toolDefs, tools.GetFindFilesDefinition())
 
 	// 如果配置了CodeSearchModel，添加code_search工具
-	if config != nil && config.CodeSearchModel != "" {
-		toolDefs = append(toolDefs, tools.GetCodeSearchDefinition(config))
-	}
+	// 暂时禁用 code_search 工具（用于测试上下文管理）
+	// if config != nil && config.CodeSearchModel != "" {
+	// 	toolDefs = append(toolDefs, tools.GetCodeSearchDefinition(config))
+	// }
 
 	// 如果配置了BaiduSearchAPIKey，添加baidu_search工具
 	if config != nil && config.BaiduSearchAPIKey != "" {

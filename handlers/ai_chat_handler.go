@@ -160,8 +160,8 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		// 工具调用循环（最多20轮）
-		maxIterations := 20
+		// 工具调用循环（最多100轮）
+		maxIterations := 100
 		for iteration := 0; iteration < maxIterations; iteration++ {
 			// 调用OpenAI API (流式，支持工具调用)
 			toolCalls, assistantContent, reasoningContent, err := h.streamChatWithTools(
@@ -225,7 +225,7 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 				"tool_calls": toolCalls,
 			})
 
-			// 🔧 检查是否已达到上限（第20轮，iteration=19）
+			// 🔧 检查是否已达到上限（第100轮，iteration=99）
 			reachedLimit := (iteration >= maxIterations-1)
 
 			// 执行工具并收集结果
@@ -252,10 +252,10 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 
 				// 🔧 如果已达到上限，不执行工具，直接返回错误
 				if reachedLimit {
-					log.Printf("⚠️ 已达到工具调用上限（20次），返回错误给模型: %s", functionName)
+					log.Printf("⚠️ 已达到工具调用上限（100次），返回错误给模型: %s", functionName)
 					errorResult := map[string]interface{}{
 						"success": false,
-						"error":   "本轮工具调用已达到最大次数限制（20次）。请基于已有的工具执行结果给出最终答案，不要再调用任何工具。",
+						"error":   "本轮工具调用已达到最大次数限制（100次）。请基于已有的工具执行结果给出最终答案，不要再调用任何工具。",
 					}
 					errorJSON, _ := json.Marshal(errorResult)
 					result = string(errorJSON)
