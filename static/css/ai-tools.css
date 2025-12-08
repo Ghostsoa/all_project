@@ -545,3 +545,13 @@
     color: #93c5fd !important;
     transform: scale(0.98);
 }
+
+/* ==================== 工具执行动画 ==================== */
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.85;
+    }
+}

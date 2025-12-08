@@ -2534,16 +2534,28 @@ function updateToolCallProgress(messageElement, toolData) {
  */
 function updateToolCallToExecuting(toolElement, toolData) {
     const { name, arguments: args } = toolData;
+    const toolName = toolElement.getAttribute('data-tool-name') || name;
+    const isEditOrWrite = toolName === 'edit_file' || toolName === 'write_file';
     
-    // 更新样式为正式的executing样式（移除loading特有的结构）
-    // 这里其实复用已有的结构即可，只需要更新文字和停止字符数跳动
-    
-    const statusDiv = toolElement.querySelector('.tool-status');
-    if (statusDiv) {
-        // 变为流光动画状态，进度文字改为 "执行中..."
-        const progressEl = statusDiv.querySelector('.tool-progress-text');
+    if (isEditOrWrite) {
+        // tool-card 样式：移除字符数，只显示转圈圈
+        const progressEl = toolElement.querySelector('.tool-progress-text');
         if (progressEl) {
             progressEl.textContent = '执行中...';
+        }
+        
+        // 移除 tool-card-loading 类，可选添加执行动画
+        const toolCard = toolElement.querySelector('.tool-card');
+        if (toolCard) {
+            toolCard.classList.remove('tool-card-loading');
+            // 可选：添加一个微妙的脉冲动画
+            toolCard.style.animation = 'pulse 2s ease-in-out infinite';
+        }
+    } else {
+        // tool-simple 样式：保持流光动画
+        const progressEl = toolElement.querySelector('.tool-progress-text');
+        if (progressEl) {
+            progressEl.textContent = '...';
         }
     }
 }
