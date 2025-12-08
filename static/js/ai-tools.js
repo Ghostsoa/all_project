@@ -1230,6 +1230,13 @@ class AIToolsManager {
                 return;
             }
             
+            // 检查 Monaco 是否加载
+            if (typeof monaco === 'undefined') {
+                console.error('❌ Monaco Editor 未加载');
+                this.showToast('编辑器未加载完成', 'error');
+                return;
+            }
+            
             // 获取文件语言
             const ext = filePath.split('.').pop();
             const languageMap = {
