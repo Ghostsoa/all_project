@@ -343,6 +343,19 @@ func (h *AISessionsHandler) RevokeMessage(c *gin.Context) {
 
 	// 3. 恢复文件到上一个快照状态
 	for filePath, content := range allRestoredFiles {
+		// 如果快照标记为"文件不存在"，删除文件
+		if content == "<FILE_NOT_EXISTS>" {
+			if err := os.Remove(filePath); err != nil {
+				if !os.IsNotExist(err) {
+					log.Printf("⚠️ 删除文件失败 %s: %v", filePath, err)
+				}
+			} else {
+				log.Printf("✅ 删除文件（原本不存在）: %s", filePath)
+			}
+			continue
+		}
+
+		// 正常恢复文件内容
 		// 🔧 确保父目录存在
 		dir := filepath.Dir(filePath)
 		if err := os.MkdirAll(dir, 0755); err != nil {

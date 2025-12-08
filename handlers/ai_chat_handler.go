@@ -374,11 +374,19 @@ func (h *AIChatHandler) saveCurrentTurnSnapshot(sessionID string) {
 		for filePath := range allFiles {
 			// 读取磁盘内容
 			diskContent, err := os.ReadFile(filePath)
+			var diskContentStr string
 			if err != nil {
-				log.Printf("⚠️ [%s] 读取文件失败 %s: %v", serverID, filePath, err)
-				continue
+				// 文件不存在时，使用特殊标记表示"文件不存在"
+				if os.IsNotExist(err) {
+					diskContentStr = "<FILE_NOT_EXISTS>"
+					log.Printf("📝 [%s] 文件不存在，标记为不存在: %s", serverID, filePath)
+				} else {
+					log.Printf("⚠️ [%s] 读取文件失败 %s: %v", serverID, filePath, err)
+					continue
+				}
+			} else {
+				diskContentStr = string(diskContent)
 			}
-			diskContentStr := string(diskContent)
 
 			// 1. 保存Turn N快照 = 磁盘初始状态（如果还没保存）
 			_, hasSnapshot := historyManager.GetSnapshot(serverID, sessionID, filePath, currentTurn)

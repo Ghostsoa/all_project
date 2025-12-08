@@ -106,6 +106,14 @@ class AIToolsManager {
         if (status === 'pending' && toolCallArgs) {
             // 合并tool结果和tool_calls参数
             toolResult = { ...toolResult, ...toolCallArgs, type };
+            
+            // 对于 edit_file，需要将 old_string/new_string 包装成 operations 数组
+            if (type === 'edit' && toolCallArgs.old_string && toolCallArgs.new_string) {
+                toolResult.operations = [{
+                    old_string: toolCallArgs.old_string,
+                    new_string: toolCallArgs.new_string
+                }];
+            }
         }
         
         // 渲染pending状态（可交互）
