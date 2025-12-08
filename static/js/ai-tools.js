@@ -1278,13 +1278,17 @@ class AIToolsManager {
                 }
                 
                 // 创建一个operation表示这段差异
-                const oldText = originalLines.slice(i, Math.min(diffEnd + 1, originalLines.length)).join('\n');
-                const newText = finalLines.slice(i, Math.min(diffEnd + 1, finalLines.length)).join('\n');
+                // 确保不超过实际行数
+                const origEnd = Math.min(diffEnd + 1, originalLines.length);
+                const finalEnd = Math.min(diffEnd + 1, finalLines.length);
+                
+                const oldText = originalLines.slice(i, origEnd).join('\n');
+                const newText = finalLines.slice(i, finalEnd).join('\n');
                 
                 normalizedOperations.push({
                     type: 'replace',
                     start_line: i + 1,
-                    end_line: Math.min(diffEnd + 1, originalLines.length),
+                    end_line: origEnd,  // 确保不超过原始文件行数
                     old_text: oldText,
                     new_text: newText
                 });
@@ -1358,6 +1362,13 @@ class AIToolsManager {
                     // 整个组内的所有行都标记为红色删除（包括中间没变化的行）
                     for (let idx = firstIdx; idx <= lastIdx; idx++) {
                         const lineNum = start_line + idx;
+                        
+                        // 🔧 确保行号不超过文件实际行数
+                        if (lineNum > model.getLineCount()) {
+                            console.warn(`  ⚠️ 跳过超出范围的行: ${lineNum} (文件总行数: ${model.getLineCount()})`);
+                            continue;
+                        }
+                        
                         console.log(`  🔴 标记第 ${lineNum} 行为红色删除`);
                         decorations.push({
                             range: new monaco.Range(lineNum, 1, lineNum, model.getLineMaxColumn(lineNum)),
@@ -1389,7 +1400,14 @@ class AIToolsManager {
                     
                     // 只有当有添加行时才创建Zone
                     if (linesHtml.length > 0) {
-                        const zoneLineNumber = start_line + lastIdx;
+                        let zoneLineNumber = start_line + lastIdx;
+                        
+                        // 🔧 确保 Zone 插入位置不超过文件行数
+                        if (zoneLineNumber > model.getLineCount()) {
+                            zoneLineNumber = model.getLineCount();
+                            console.warn(`  ⚠️ Zone插入位置超出范围，调整为: ${zoneLineNumber}`);
+                        }
+                        
                         console.log(`🎯 组 ${groupIdx + 1}: firstIdx=${firstIdx}, lastIdx=${lastIdx}, start_line=${start_line}`);
                         console.log(`   Zone将插入在第 ${zoneLineNumber} 行之后`);
                         
