@@ -1574,10 +1574,11 @@ function createMessageElement(role, content, reasoning = null, messageId = null,
             window.currentHistoryMessages.forEach(msg => {
                 if (msg.role === 'tool' && msg.tool_call_id) {
                     try {
-                        // code_search返回纯文本（XML格式），不需要JSON.parse
+                        // 这些工具返回的是JSON字符串，直接使用不需要再parse
+                        const directUseTools = ['code_search', 'baidu_search', 'read_url_content'];
                         let result;
-                        if (msg.tool_name === 'code_search') {
-                            result = msg.content; // 直接使用原始文本
+                        if (directUseTools.includes(msg.tool_name)) {
+                            result = msg.content; // 直接使用原始内容
                         } else {
                             result = typeof msg.content === 'string' ? JSON.parse(msg.content) : msg.content;
                         }
