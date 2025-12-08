@@ -3,6 +3,7 @@ package tools
 import (
 	"all_project/models"
 	"all_project/storage"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -29,6 +30,24 @@ var globalGetSFTPClient GetSFTPClientFunc
 
 // 全局的SSH客户端获取器（用于执行命令）
 var globalGetSSHClient GetSSHClientFunc
+
+// toJSON 将对象转为 JSON 字符串（不转义 HTML 字符，避免 < > 等被转义导致编辑匹配失败）
+func toJSON(v interface{}) string {
+	buf := &bytes.Buffer{}
+	encoder := json.NewEncoder(buf)
+	encoder.SetEscapeHTML(false) // 关键：不转义 HTML
+	if err := encoder.Encode(v); err != nil {
+		// fallback 到普通 Marshal
+		data, _ := json.Marshal(v)
+		return string(data)
+	}
+	// 移除 Encoder 自动添加的换行符
+	result := buf.Bytes()
+	if len(result) > 0 && result[len(result)-1] == '\n' {
+		result = result[:len(result)-1]
+	}
+	return string(result)
+}
 
 // SetSFTPClientGetter 设置SFTP客户端获取器
 func SetSFTPClientGetter(getter GetSFTPClientFunc) {
@@ -329,8 +348,7 @@ func readFile(args FileOperationArgs, conversationID string) (string, error) {
 			"lines_read":  len(rangeLines),
 		}
 
-		resultJSON, _ := json.Marshal(result)
-		return string(resultJSON), nil
+		return toJSON(result), nil
 	}
 
 	// 完整读取（无行范围限制）
@@ -350,8 +368,7 @@ func readFile(args FileOperationArgs, conversationID string) (string, error) {
 		"total_lines": totalLines,
 	}
 
-	resultJSON, _ := json.Marshal(result)
-	return string(resultJSON), nil
+	return toJSON(result), nil
 }
 
 // writeFile 写入文件（创建或覆盖） - 记录到pending state
@@ -435,8 +452,7 @@ func writeFile(args FileOperationArgs, conversationID string, messageID string) 
 		"lines_added":   linesAdded,
 	}
 
-	resultJSON, _ := json.Marshal(result)
-	return string(resultJSON), nil
+	return toJSON(result), nil
 }
 
 // editFile 精确编辑文件（搜索替换）
@@ -519,8 +535,7 @@ func editFile(args FileOperationArgs, conversationID string, messageID string) (
 		"lines_added":   linesAdded,
 	}
 
-	resultJSON, _ := json.Marshal(result)
-	return string(resultJSON), nil
+	return toJSON(result), nil
 }
 
 // listDir 列出目录内容（支持本地和远程）
@@ -608,8 +623,7 @@ func listDir(args FileOperationArgs) (string, error) {
 		"truncated": truncated,
 	}
 
-	resultJSON, _ := json.Marshal(result)
-	return string(resultJSON), nil
+	return toJSON(result), nil
 }
 
 // grepSearch 搜索文件内容（支持正则表达式和文件类型过滤，支持本地和远程）
@@ -820,8 +834,7 @@ func grepSearch(args FileOperationArgs) (string, error) {
 		"truncated": truncated,
 	}
 
-	resultJSON, _ := json.Marshal(result)
-	return string(resultJSON), nil
+	return toJSON(result), nil
 }
 
 // findByName 按文件名搜索（支持通配符和深度限制，支持本地和远程）
@@ -991,8 +1004,7 @@ func findByName(args FileOperationArgs) (string, error) {
 		"truncated": truncated,
 	}
 
-	resultJSON, _ := json.Marshal(result)
-	return string(resultJSON), nil
+	return toJSON(result), nil
 }
 
 // 辅助函数
