@@ -488,32 +488,38 @@ function initializeEditor(tabId, filePath, originalContent, modifiedContent) {
     const saveBtn = document.querySelector(`[data-tab-id="${tabId}"] .editor-save-btn`);
     if (saveBtn) saveBtn.disabled = false;
     
-    // 🔧 统一使用 Diff Editor，数据已经准备好
     const fileName = filePath.split('/').pop();
+    
+    // 🎯 根据是否有差异选择编辑器类型
+    const hasDiff = originalContent !== modifiedContent;
+    
     require(['vs/editor/editor.main'], function() {
-        initializeDiffEditor(tabId, filePath, originalContent, modifiedContent, fileName);
+        if (hasDiff) {
+            // 有 pending edits，使用 Diff Editor 显示差异
+            initializeDiffEditor(tabId, filePath, originalContent, modifiedContent, fileName);
+        } else {
+            // 无 pending edits，使用普通 Editor
+            initializeNormalEditor(tabId, filePath, originalContent, fileName);
+        }
     });
 }
 
-// 初始化 Diff Editor（统一用于所有文本文件）
-function initializeDiffEditor(tabId, filePath, originalContent, modifiedContent, fileName) {
+// 初始化普通 Monaco Editor（无差异高亮）
+function initializeNormalEditor(tabId, filePath, content, fileName) {
     const container = document.getElementById(tabId);
     const language = getLanguage(fileName);
     
-    // 创建 Inline Diff Editor
-    const diffEditor = monaco.editor.createDiffEditor(container, {
+    const editor = monaco.editor.create(container, {
+        value: content,
+        language: language,
         theme: 'vs-dark',
-        renderSideBySide: false,  // ✅ Inline 模式（单列显示差异）
-        readOnly: false,  // 可编辑
         automaticLayout: true,
         fontSize: 13,
         minimap: { enabled: false },
         scrollBeyondLastLine: false,
-        renderOverviewRuler: false,  // 隐藏右侧概览
-        renderIndicators: true,  // 显示变更指示器
-        ignoreTrimWhitespace: false,  // 不忽略空格差异
-        originalEditable: false,  // 原始内容不可编辑
-        enableSplitViewResizing: false,  // 禁用分割视图调整
+        wordWrap: 'on',
+        lineNumbers: 'on',
+        renderLineHighlight: 'line',
         scrollbar: {
             vertical: 'auto',
             horizontal: 'auto',
@@ -523,22 +529,66 @@ function initializeDiffEditor(tabId, filePath, originalContent, modifiedContent,
         }
     });
     
+    // 保存编辑器实例
+    editorInstances.set(tabId, editor);
+    
+    // Ctrl+S保存
+    editor.addCommand(monaco.KeyMod.CtrlCmd | monaco.KeyCode.KeyS, function() {
+        window.saveFile(tabId);
+    });
+    
+    // 监听内容变化
+    let changeTimeout;
+    editor.getModel().onDidChangeContent(() => {
+        clearTimeout(changeTimeout);
+        changeTimeout = setTimeout(() => {
+            markAsModified(tabId);
+        }, 100);
+    });
+    
+    console.log('✅ 普通编辑器已初始化:', { tabId, filePath });
+}
+
+// 初始化 Diff Editor（用于有 pending edits 的文件）
+function initializeDiffEditor(tabId, filePath, originalContent, modifiedContent, fileName) {
+    const container = document.getElementById(tabId);
+    const language = getLanguage(fileName);
+    
+    // 创建 Inline Diff Editor
+    const diffEditor = monaco.editor.createDiffEditor(container, {
+        theme: 'vs-dark',
+        renderSideBySide: false,  // ✅ Inline 模式
+        readOnly: false,  // 可编辑
+        automaticLayout: true,
+        fontSize: 13,
+        minimap: { enabled: false },
+        scrollBeyondLastLine: false,
+        renderOverviewRuler: false,  // 隐藏右侧概览
+        renderIndicators: true,  // 显示变更指示器
+        ignoreTrimWhitespace: false,  // 不忽略空格差异
+        scrollbar: {
+            vertical: 'auto',
+            horizontal: 'auto',
+            verticalScrollbarSize: 10,
+            horizontalScrollbarSize: 10,
+            alwaysConsumeMouseWheel: false
+        },
+        glyphMargin: false,
+        folding: false,
+        lineDecorationsWidth: 10,
+        lineNumbersMinChars: 3,
+        renderLineHighlight: 'none',  // 禁用行高亮避免视觉混乱
+        // 只显示修改后的行号（隐藏原始行号列）
+        originalEditable: false,
+        enableSplitViewResizing: false
+    });
+    
     const originalModel = monaco.editor.createModel(originalContent, language);
     const modifiedModel = monaco.editor.createModel(modifiedContent, language);
     
     diffEditor.setModel({
         original: originalModel,
         modified: modifiedModel
-    });
-    
-    // 🔧 直接配置原始编辑器：禁用行号显示
-    const originalEditor = diffEditor.getOriginalEditor();
-    originalEditor.updateOptions({
-        lineNumbers: 'off',  // 关闭原始编辑器行号
-        glyphMargin: false,
-        folding: false,
-        lineDecorationsWidth: 0,
-        lineNumbersMinChars: 0
     });
     
     // 保存 diff editor 实例
@@ -558,7 +608,7 @@ function initializeDiffEditor(tabId, filePath, originalContent, modifiedContent,
         }, 100);
     });
     
-    console.log('✅ Diff Editor 已初始化:', { tabId, filePath, hasDiff: originalContent !== modifiedContent });
+    console.log('✅ Diff Editor 已初始化 (有 pending edits):', { tabId, filePath });
 }
 
 function createEditorTab(filePath, serverID, sessionID, content) {
