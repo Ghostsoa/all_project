@@ -1178,11 +1178,31 @@ class AIToolsManager {
     applyDiffDecorations(filePath, operations, toolCallId) {
         console.log('🎨 applyDiffDecorations:', { filePath, operations, toolCallId });
         
+        // 🔧 收集该文件的所有 pending edits（按创建顺序）
+        const allPendingEdits = [];
+        for (const [tid, edit] of this.pendingEdits.entries()) {
+            if (edit.file_path === filePath && edit.status === 'pending' && edit.type === 'edit' && edit.operations) {
+                allPendingEdits.push({ toolCallId: tid, edit });
+            }
+        }
+        console.log(`📋 该文件有 ${allPendingEdits.length} 个pending edits`);
+        
         // 先清除同一文件的所有pending装饰（避免叠加显示）
-        for (const [existingToolCallId, edit] of this.pendingEdits.entries()) {
-            if (edit.file_path === filePath && edit.status === 'pending' && edit.zoneIds) {
-                console.log('🧹 清除旧的diff装饰:', existingToolCallId);
-                this.clearDiffDecorations(existingToolCallId);
+        for (const { edit } of allPendingEdits) {
+            if (edit.zoneIds) {
+                console.log('🧹 清除旧的diff装饰');
+                // 清除装饰
+                if (edit.decorationIds && edit.editorInstance) {
+                    edit.editorInstance.deltaDecorations(edit.decorationIds, []);
+                }
+                // 清除zones
+                if (edit.zoneIds && edit.editorInstance) {
+                    edit.editorInstance.changeViewZones(accessor => {
+                        edit.zoneIds.forEach(id => accessor.removeZone(id));
+                    });
+                }
+                edit.decorationIds = null;
+                edit.zoneIds = null;
             }
         }
         
@@ -1205,61 +1225,80 @@ class AIToolsManager {
         }
 
         console.log('✅ 获取到编辑器实例');
-        const decorations = [];
-        console.log('✅ 获取到编辑器实例');
         
-        console.log('📝 处理operations:', operations.length, '个操作');
+        // 🔧 链式应用所有pending edits，得到最终内容
+        const model = editor.getModel();
+        const originalContent = model.getValue();
+        let finalContent = originalContent;
         
-        // 转换 operations 格式：从 {old_string, new_string} 转为 {type, start_line, end_line, old_text, new_text}
-        const normalizedOperations = operations.map((op, index) => {
-            // 如果已经是标准格式，直接返回
-            if (op.type && op.start_line !== undefined) {
-                return op;
+        console.log(`📄 原始文件: ${originalContent.length} 字符`);
+        console.log(`🔄 开始链式应用 ${allPendingEdits.length} 个pending edits...`);
+        
+        for (const { toolCallId: tid, edit } of allPendingEdits) {
+            console.log(`  📝 应用 edit: ${tid}`);
+            for (const op of edit.operations) {
+                if (op.old_string !== undefined && op.new_string !== undefined) {
+                    const idx = finalContent.indexOf(op.old_string);
+                    if (idx !== -1) {
+                        finalContent = finalContent.substring(0, idx) + op.new_string + finalContent.substring(idx + op.old_string.length);
+                        console.log(`    ✅ 替换: ${op.old_string.length} → ${op.new_string.length} 字符`);
+                    } else {
+                        console.warn(`    ⚠️ 未找到 old_string（前50字符）:`, op.old_string.substring(0, 50));
+                    }
+                }
             }
+        }
+        
+        console.log(`📄 最终内容: ${finalContent.length} 字符`);
+        
+        // 🔧 基于原始和最终内容生成diff（使用简单的逐行对比）
+        const originalLines = originalContent.split('\n');
+        const finalLines = finalContent.split('\n');
+        const decorations = [];
+        const normalizedOperations = [];
+        
+        console.log(`📊 逐行对比: 原始 ${originalLines.length} 行 → 最终 ${finalLines.length} 行`);
+        
+        // 简单diff算法：找出所有不同的行
+        const maxLines = Math.max(originalLines.length, finalLines.length);
+        let diffStart = -1;
+        
+        for (let i = 0; i < maxLines; i++) {
+            const origLine = originalLines[i] || '';
+            const finalLine = finalLines[i] || '';
             
-            // 如果是 edit_file 格式 (old_string/new_string)，需要转换
-            if (op.old_string !== undefined || op.new_string !== undefined) {
-                const oldString = op.old_string || '';
-                const newString = op.new_string || '';
+            if (origLine !== finalLine) {
+                if (diffStart === -1) diffStart = i;
                 
-                console.log(`  🔄 转换操作 ${index + 1}:`, { 
-                    old_len: oldString.length, 
-                    new_len: newString.length 
-                });
-                
-                // 在编辑器中搜索 old_string 的位置
-                const model = editor.getModel();
-                const fullText = model.getValue();
-                const oldIndex = fullText.indexOf(oldString);
-                
-                if (oldIndex === -1) {
-                    console.warn(`⚠️ 未找到 old_string:`, oldString.substring(0, 50));
-                    return null;
+                // 找到连续差异的结束点
+                let diffEnd = i;
+                while (diffEnd + 1 < maxLines && 
+                       (originalLines[diffEnd + 1] || '') !== (finalLines[diffEnd + 1] || '')) {
+                    diffEnd++;
                 }
                 
-                // 计算起始行号
-                const textBeforeOld = fullText.substring(0, oldIndex);
-                const startLine = (textBeforeOld.match(/\n/g) || []).length + 1;
-                const endLine = startLine + (oldString.match(/\n/g) || []).length;
+                // 创建一个operation表示这段差异
+                const oldText = originalLines.slice(i, Math.min(diffEnd + 1, originalLines.length)).join('\n');
+                const newText = finalLines.slice(i, Math.min(diffEnd + 1, finalLines.length)).join('\n');
                 
-                console.log(`  ✅ 找到位置: 行 ${startLine}-${endLine}`);
-                
-                return {
+                normalizedOperations.push({
                     type: 'replace',
-                    start_line: startLine,
-                    end_line: endLine,
-                    old_text: oldString,
-                    new_text: newString
-                };
+                    start_line: i + 1,
+                    end_line: Math.min(diffEnd + 1, originalLines.length),
+                    old_text: oldText,
+                    new_text: newText
+                });
+                
+                console.log(`  📍 发现差异: 行 ${i + 1}-${diffEnd + 1}`);
+                
+                i = diffEnd; // 跳过已处理的行
+                diffStart = -1;
             }
-            
-            console.warn(`  ⚠️ 未知的操作格式:`, op);
-            return null;
-        }).filter(op => op !== null);
+        }
         
-        console.log('📝 标准化后的operations:', normalizedOperations.length, '个操作');
+        console.log(`📝 生成了 ${normalizedOperations.length} 个diff operations`);
         
-        // 收集zone widgets
+        // 渲染diff装饰
         const zoneWidgets = [];
         
         normalizedOperations.forEach((op, index) => {
