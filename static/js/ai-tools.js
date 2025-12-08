@@ -1230,52 +1230,63 @@ class AIToolsManager {
                 return;
             }
             
-            // 检查 Monaco 是否加载
-            if (typeof monaco === 'undefined' || typeof window.monaco === 'undefined') {
-                console.log('⏳ Monaco Editor 尚未加载，等待中...');
-                setTimeout(initDiffEditor, 200);  // 200ms 后重试
+            // Monaco 使用 AMD 加载器，需要用 require 来访问
+            if (typeof require === 'undefined') {
+                console.log('⏳ AMD 加载器尚未加载，等待中...');
+                setTimeout(initDiffEditor, 200);
                 return;
             }
             
-            console.log('✅ Monaco Editor 已加载');
+            console.log('✅ AMD 加载器已就绪，加载 Monaco...');
             
-            // 获取文件语言
-            const ext = filePath.split('.').pop();
-            const languageMap = {
-                'js': 'javascript',
-                'ts': 'typescript',
-                'jsx': 'javascript',
-                'tsx': 'typescript',
-                'py': 'python',
-                'go': 'go',
-                'html': 'html',
-                'css': 'css',
-                'json': 'json',
-                'md': 'markdown'
-            };
-            const language = languageMap[ext] || 'plaintext';
-            
-            // 创建 Monaco Diff Editor
-            const diffEditor = monaco.editor.createDiffEditor(container, {
-                enableSplitViewResizing: true,
-                renderSideBySide: true,
-                readOnly: true,
-                automaticLayout: true,
-                minimap: { enabled: false }
-            });
-            
-            // 创建模型
-            const originalModel = monaco.editor.createModel(originalContent, language);
-            const modifiedModel = monaco.editor.createModel(finalContent, language);
-            
-            // 设置模型
-            diffEditor.setModel({
-                original: originalModel,
-                modified: modifiedModel
-            });
-            
-            this.currentDiffEditor = diffEditor;
-            console.log('✅ Diff Editor 已创建');
+            // 使用 require 加载 Monaco Editor
+            require(['vs/editor/editor.main'], (monaco) => {
+                if (!monaco) {
+                    console.error('❌ Monaco Editor 加载失败');
+                    this.showToast('编辑器加载失败', 'error');
+                    return;
+                }
+                
+                console.log('✅ Monaco Editor 已加载');
+                
+                // 获取文件语言
+                const ext = filePath.split('.').pop();
+                const languageMap = {
+                    'js': 'javascript',
+                    'ts': 'typescript',
+                    'jsx': 'javascript',
+                    'tsx': 'typescript',
+                    'py': 'python',
+                    'go': 'go',
+                    'html': 'html',
+                    'css': 'css',
+                    'json': 'json',
+                    'md': 'markdown'
+                };
+                const language = languageMap[ext] || 'plaintext';
+                
+                // 创建 Monaco Diff Editor
+                const diffEditor = monaco.editor.createDiffEditor(container, {
+                    enableSplitViewResizing: true,
+                    renderSideBySide: true,
+                    readOnly: true,
+                    automaticLayout: true,
+                    minimap: { enabled: false }
+                });
+                
+                // 创建模型
+                const originalModel = monaco.editor.createModel(originalContent, language);
+                const modifiedModel = monaco.editor.createModel(finalContent, language);
+                
+                // 设置模型
+                diffEditor.setModel({
+                    original: originalModel,
+                    modified: modifiedModel
+                });
+                
+                this.currentDiffEditor = diffEditor;
+                console.log('✅ Diff Editor 已创建');
+            });  // 关闭 require 回调
         };
         
         // 开始初始化
