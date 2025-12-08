@@ -692,17 +692,20 @@ func buildDynamicSystemPrompt(basePrompt string) string {
 		return basePrompt
 	}
 
-	// 如果没有服务器，返回原始prompt
-	if len(servers) == 0 {
-		return basePrompt
-	}
-
-	// 构建服务器列表文本（简洁版：只包含名称和server_id）
+	// 构建服务器列表文本（包含本地服务器和远程服务器）
 	serverListText := "\n\n## 📡 可用服务器列表\n\n"
 
+	// 1. 首先添加本地服务器（始终可用）
+	serverListText += "- 本地服务器 (server_id: `local`)\n"
+
+	// 2. 添加配置的远程服务器
 	for _, server := range servers {
 		serverListText += fmt.Sprintf("- %s (server_id: `%s`)\n", server.Name, server.ID)
 	}
+
+	serverListText += "\n**说明**：\n"
+	serverListText += "- 使用 `server_id: \"local\"` 操作本地文件系统\n"
+	serverListText += "- 使用远程服务器的 `server_id` 操作对应服务器的文件系统\n"
 
 	// 将服务器列表附加到原始prompt后面
 	return basePrompt + serverListText
