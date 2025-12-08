@@ -1444,7 +1444,15 @@ async function streamChat(sessionId, message, thinkingId) {
                         }
                     }
                     
-                    appendToolCall(messageElement, data);
+                    // 🎯 关键修改：检查是否已有 loading 元素
+                    const existingToolElement = messageElement.querySelector(`[data-tool-call-id="${data.tool_call_id}"]`);
+                    if (existingToolElement) {
+                        // 复用现有元素，更新为执行中状态
+                        updateToolCallToExecuting(existingToolElement, data);
+                    } else {
+                        // 没有则创建新元素（非流式情况）
+                        appendToolCall(messageElement, data);
+                    }
                     
                     currentBlockText = '';
                     currentContentDiv = null;
@@ -2417,15 +2425,20 @@ function appendToolCallLoading(messageElement, toolData) {
         return;
     }
     
-    const { tool_call_id, name, index } = toolData;
+    const { tool_call_id, name } = toolData;
     
-    // 创建loading状态的工具卡片
+    // 渲染更紧凑的Loading状态
     const toolHTML = `
         <div class="tool-call tool-loading" data-tool-call-id="${tool_call_id}">
-            <div class="tool-simple executing">
-                <i class="fa-solid fa-spinner fa-spin tool-simple-icon"></i>
-                <span class="tool-simple-text">${name}</span>
-                <span class="tool-loading-dots">构建参数中...</span>
+            <div class="tool-simple executing" style="display: flex; justify-content: space-between; align-items: center;">
+                <div style="display: flex; align-items: center; overflow: hidden; flex: 1;">
+                    <i class="fa-solid fa-code tool-simple-icon"></i>
+                    <span class="tool-simple-text" style="white-space: nowrap; overflow: hidden; text-overflow: ellipsis; margin-right: 8px;">${name}</span>
+                </div>
+                <div class="tool-status" style="display: flex; align-items: center; font-size: 0.9em; opacity: 0.8; flex-shrink: 0;">
+                    <i class="fa-solid fa-circle-notch fa-spin" style="margin-right: 6px; font-size: 11px;"></i>
+                    <span class="tool-progress-text">准备中...</span>
+                </div>
             </div>
         </div>
     `;
@@ -2451,41 +2464,75 @@ function updateToolCallProgress(messageElement, toolData) {
     const toolElement = messageElement.querySelector(`[data-tool-call-id="${tool_call_id}"]`);
     if (!toolElement) return;
     
-    // 更新显示的参数（可选，显示字符数）
-    const dotsElement = toolElement.querySelector('.tool-loading-dots');
-    if (dotsElement && currentArgs) {
-        dotsElement.textContent = `构建参数中... (${currentArgs.length} 字符)`;
+    const toolName = toolElement.querySelector('.tool-simple-text')?.textContent.split(' ')[0] || '';
+    
+    // 1. 尝试从参数中提取文件名（更新标题）
+    // 匹配 "path": "xxx" 或 "file_path": "xxx"
+    const match = currentArgs.match(/"(?:file_)?path":\s*"([^"]+)/);
+    if (match) {
+        const fullPath = match[1];
+        const fileName = fullPath.split(/[/\\]/).pop(); // 只取文件名
+        
+        const textEl = toolElement.querySelector('.tool-simple-text');
+        if (textEl && fileName && !textEl.textContent.includes(fileName)) {
+            textEl.textContent = `${toolName} ${fileName}`;
+            textEl.title = fullPath; // 鼠标悬停显示全路径
+        }
+    }
+    
+    // 2. 更新右侧进度文字
+    const progressEl = toolElement.querySelector('.tool-progress-text');
+    if (progressEl && currentArgs) {
+        // 只有 edit/write 类工具显示字符数，read类显示简洁信息
+        if (toolName.includes('edit') || toolName.includes('write')) {
+            progressEl.textContent = `生成中... (${currentArgs.length} 字符)`;
+        } else {
+            progressEl.textContent = '读取中...';
+        }
     }
 }
 
 /**
- * 添加工具调用（执行中状态）
+ * 更新工具为正式执行状态（从Loading变为Executing）
+ * @param {HTMLElement} toolElement 
+ * @param {Object} toolData 
+ */
+function updateToolCallToExecuting(toolElement, toolData) {
+    const { name, arguments: args } = toolData;
+    
+    // 更新样式为正式的executing样式（移除loading特有的结构）
+    // 这里其实复用已有的结构即可，只需要更新文字和停止字符数跳动
+    
+    const statusDiv = toolElement.querySelector('.tool-status');
+    if (statusDiv) {
+        // 变为流光动画状态，进度文字改为 "执行中..."
+        const progressEl = statusDiv.querySelector('.tool-progress-text');
+        if (progressEl) {
+            progressEl.textContent = '执行中...';
+        }
+    }
+}
+
+/**
+ * 添加工具调用（执行中状态）- 兼容旧逻辑
  * @param {HTMLElement} messageElement 
  * @param {Object} toolData - {tool_call_id, name, arguments}
  */
 function appendToolCall(messageElement, toolData) {
     const contentWrapper = messageElement.querySelector('.message-content-wrapper');
-    if (!contentWrapper) {
-        console.error('未找到 .message-content-wrapper');
-        return;
-    }
+    if (!contentWrapper) return;
     
     // 渲染执行中的工具
     const toolHTML = aiToolsManager.renderExecutingTool(toolData);
     
-    // 添加到 message-wrapper 中，在 message-content 后面
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = toolHTML;
-    
-    // 获取第一个元素节点（跳过可能的文本节点）
     const toolElement = tempDiv.querySelector('.tool-call');
-    if (!toolElement) {
-        console.error('无法找到工具元素:', toolHTML);
-        return;
-    }
     
-    toolElement.setAttribute('data-tool-call-id', toolData.tool_call_id);
-    contentWrapper.appendChild(toolElement);  // 添加到 content-wrapper，不会被文本更新清空
+    if (toolElement) {
+        toolElement.setAttribute('data-tool-call-id', toolData.tool_call_id);
+        contentWrapper.appendChild(toolElement);
+    }
 }
 
 /**
