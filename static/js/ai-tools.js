@@ -2,16 +2,38 @@
 
 class AIToolsManager {
     constructor() {
-        // 待处理的编辑预览
         this.pendingEdits = new Map();
+        this.editors = new Map();
+        this.currentServerId = 'local';
         
         // 已应用的编辑（localStorage持久化）
         this.appliedEdits = new Set(
             JSON.parse(localStorage.getItem('appliedEdits') || '[]')
         );
         
+        // 统一的工具配置（图标、显示名称、类型）
+        this.toolConfig = {
+            'read_file': { icon: 'file-lines', name: 'Read', type: 'simple' },
+            'write_file': { icon: 'file-code', name: 'Write', type: 'card' },
+            'edit_file': { icon: 'file-code', name: 'Edit', type: 'card' },
+            'list_directory': { icon: 'folder-open', name: 'List', type: 'expandable' },
+            'grep_search': { icon: 'magnifying-glass', name: 'Search', type: 'expandable' },
+            'find_files': { icon: 'file-magnifying-glass', name: 'Find', type: 'expandable' },
+            'code_search': { icon: 'magnifying-glass-chart', name: 'Code Search', type: 'expandable' },
+            'baidu_search': { icon: 'magnifying-glass', name: 'Baidu Search', type: 'expandable' },
+            'read_url_content': { icon: 'link', name: 'Read URL', type: 'expandable' },
+            'find_method': { icon: 'code', name: 'Find Method', type: 'expandable' }
+        };
+        
         // 初始化Pending Actions Bar显示
         setTimeout(() => this.updatePendingActionsBar(), 100);
+    }
+    
+    /**
+     * 获取工具配置
+     */
+    getToolConfig(toolName) {
+        return this.toolConfig[toolName] || { icon: 'wrench', name: toolName, type: 'simple' };
     }
 
     /**
@@ -155,16 +177,37 @@ class AIToolsManager {
     }
     
     /**
-     * 渲染失败的工具
+     * 渲染失败的工具（统一入口）
      */
     renderFailedTool(result, toolName) {
         const error = result.error || '未知错误';
+        return this.renderErrorState(toolName, error);
+    }
+    
+    /**
+     * 统一的错误状态渲染
+     */
+    renderErrorState(toolName, message, icon = 'circle-exclamation') {
         return `
             <div class="tool-call">
                 <div class="tool-simple completed" style="color: rgba(255, 255, 255, 0.5);">
-                    <i class="fa-solid fa-circle-exclamation tool-simple-icon" style="color: #ef4444;"></i>
+                    <i class="fa-solid fa-${icon} tool-simple-icon" style="color: #ef4444;"></i>
                     <span style="color: rgba(255, 255, 255, 0.75); font-weight: 500;">${toolName}</span>
-                    <span style="color: rgba(255, 255, 255, 0.4); margin-left: 8px;">${error}</span>
+                    <span style="color: rgba(255, 255, 255, 0.4); margin-left: 8px;">${message}</span>
+                </div>
+            </div>
+        `;
+    }
+    
+    /**
+     * 统一的空结果状态渲染
+     */
+    renderEmptyState(toolName, message, icon = 'circle-xmark') {
+        return `
+            <div class="tool-call">
+                <div class="tool-simple completed" style="color: rgba(255, 255, 255, 0.4);">
+                    <i class="fa-solid fa-${icon} tool-simple-icon" style="opacity: 0.5;"></i>
+                    <span>${toolName}: ${message}</span>
                 </div>
             </div>
         `;
@@ -254,7 +297,7 @@ class AIToolsManager {
         return `
             <div class="tool-call">
                 <div class="tool-simple completed${clickableClass}">
-                    <i class="fa-solid fa-book-open tool-simple-icon"></i>
+                    <i class="fa-solid fa-file-lines tool-simple-icon"></i>
                     Read ${displayText}
                 </div>
             </div>
@@ -291,25 +334,10 @@ class AIToolsManager {
         
         // 截断提示
         const truncatedWarning = truncated ? `<div class="tool-truncated-warning">${truncated_msg}</div>` : '';
+        const content = truncatedWarning + (filesHTML || '<div class="grep-no-matches">Empty directory</div>');
+        const title = `list "<strong>${dirName}</strong>"`;
         
-        return `
-            <div class="tool-call">
-                <div class="tool-result-expandable">
-                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <i class="fa-solid fa-folder-open tool-result-icon"></i>
-                        <span class="tool-result-title">
-                            list "<strong>${dirName}</strong>"
-                        </span>
-                        <span class="tool-result-count">${count} items</span>
-                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
-                    </div>
-                    <div class="tool-result-content" id="${resultId}">
-                        ${truncatedWarning}
-                        ${filesHTML || '<div class="grep-no-matches">Empty directory</div>'}
-                    </div>
-                </div>
-            </div>
-        `;
+        return this.renderExpandableContainer('list_directory', title, `${count} items`, content, resultId);
     }
 
     /**
@@ -330,68 +358,122 @@ class AIToolsManager {
         // 生成唯一ID用于折叠
         const resultId = `grep-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
         
-        // 渲染匹配列表（带上下文）
-        let matchesHTML = '';
-        if (matches.length > 0) {
-            matchesHTML = matches.map(match => {
-                const relativePath = match.file_path.replace(/\\/g, '/');
-                const displayPath = relativePath.length > 60 ? '...' + relativePath.slice(-57) : relativePath;
-                
-                // 渲染上下文
-                let contextHTML = '';
-                if (match.context_before && match.context_before.length > 0) {
-                    contextHTML += match.context_before.map((line, idx) => 
-                        `<div class="grep-context-line">${match.line - match.context_before.length + idx}: ${this.escapeHtml(line)}</div>`
-                    ).join('');
+        // 使用统一的 renderMatchItem 渲染
+        const matchesHTML = matches.map(match => {
+            return this.renderMatchItem(
+                match.file_path,
+                match.line,
+                match.line,
+                match.content,
+                {
+                    before: match.context_before,
+                    after: match.context_after
                 }
-                contextHTML += `<div class="grep-match-line-content">${match.line}: ${this.escapeHtml(match.content)}</div>`;
-                if (match.context_after && match.context_after.length > 0) {
-                    contextHTML += match.context_after.map((line, idx) => 
-                        `<div class="grep-context-line">${match.line + idx + 1}: ${this.escapeHtml(line)}</div>`
-                    ).join('');
-                }
-                
-                return `
-                    <div class="grep-match-item">
-                        <div class="grep-match-header">
-                            <span class="grep-match-path">${displayPath}</span>
-                            <span class="grep-match-line">#${match.line}</span>
-                        </div>
-                        <div class="grep-match-context">
-                            ${contextHTML}
-                        </div>
-                    </div>
-                `;
-            }).join('');
-        }
+            );
+        }).join('');
         
         // 截断提示
         const truncatedWarning = truncated ? `<div class="tool-truncated-warning">${truncated_msg}</div>` : '';
+        const content = truncatedWarning + (matchesHTML || '<div class="grep-no-matches">No matches found</div>');
+        const title = `${searchType} grep "<strong>${query}</strong>"`;
         
-        return `
-            <div class="tool-call">
-                <div class="tool-result-expandable">
-                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <i class="fa-solid fa-magnifying-glass tool-result-icon"></i>
-                        <span class="tool-result-title">
-                            ${searchType} grep "<strong>${query}</strong>"
-                        </span>
-                        <span class="tool-result-count">${match_count} matches in ${file_count} files</span>
-                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
-                    </div>
-                    <div class="tool-result-content" id="${resultId}">
-                        ${truncatedWarning}
-                        ${matchesHTML || '<div class="grep-no-matches">No matches found</div>'}
-                    </div>
-                </div>
-            </div>
-        `;
+        return this.renderExpandableContainer('grep_search', title, `${match_count} matches in ${file_count} files`, content, resultId);
     }
     
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
+    }
+    
+    /**
+     * 统一渲染可展开容器
+     * @param {string} toolName - 工具名称
+     * @param {string} title - 标题
+     * @param {string} count - 统计信息
+     * @param {string} content - 内容HTML
+     * @param {string} resultId - 结果ID
+     * @param {boolean} expanded - 是否默认展开
+     * @param {string} customIcon - 自定义图标（可选，如 'fa-brands fa-github'）
+     */
+    renderExpandableContainer(toolName, title, count, content, resultId, expanded = false, customIcon = null) {
+        const config = this.getToolConfig(toolName);
+        const iconHTML = customIcon || `fa-solid fa-${config.icon}`;
+        
+        return `
+            <div class="tool-call">
+                <div class="tool-result-expandable${expanded ? ' expanded' : ''}">
+                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
+                        <i class="${iconHTML} tool-result-icon"></i>
+                        <span class="tool-result-title">${title}</span>
+                        <span class="tool-result-count">${count}</span>
+                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
+                    </div>
+                    <div class="tool-result-content" id="${resultId}">
+                        ${content}
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+    
+    /**
+     * 统一渲染匹配项（grep/find_method 通用）
+     */
+    renderMatchItem(filePath, startLine, endLine, matchContent, context = null, language = null) {
+        const fileName = filePath.split('/').pop() || filePath;
+        const fileIcon = this.getFileIconHTML(fileName);
+        const lineCount = endLine - startLine + 1;
+        
+        // 语言标签（不用emoji）
+        let langTag = '';
+        if (language) {
+            const langNames = {
+                'go': 'Go',
+                'python': 'Python',
+                'java': 'Java',
+                'javascript': 'JS',
+                'typescript': 'TS'
+            };
+            const langName = langNames[language] || language;
+            langTag = `<span style="color: #10b981; font-size: 10px; margin-left: 4px;">${langName}</span>`;
+        }
+        
+        // 上下文
+        let contextHTML = '';
+        if (context) {
+            if (context.before && context.before.length > 0) {
+                contextHTML += context.before.map((line, idx) => 
+                    `<div class="grep-context-line">${startLine - context.before.length + idx}: ${this.escapeHtml(line)}</div>`
+                ).join('');
+            }
+            contextHTML += `<div class="grep-match-line-content">${startLine}: ${this.escapeHtml(matchContent)}</div>`;
+            if (context.after && context.after.length > 0) {
+                contextHTML += context.after.map((line, idx) => 
+                    `<div class="grep-context-line">${startLine + idx + 1}: ${this.escapeHtml(line)}</div>`
+                ).join('');
+            }
+        } else {
+            contextHTML = `<div class="grep-context-line" style="color: rgba(255,255,255,0.7);">${this.escapeHtml(matchContent)}</div>`;
+        }
+        
+        return `
+            <div class="grep-match-item">
+                <div class="grep-match-header">
+                    <i class="${fileIcon} grep-match-icon"></i>
+                    <span class="grep-match-path" 
+                        onclick="aiToolsManager.openFileAtLine('${filePath.replace(/\\/g, '\\\\')}', 'local', ${startLine}, ${endLine})"
+                        style="cursor: pointer; color: #3b82f6; text-decoration: underline;"
+                        title="点击跳转到文件">
+                        ${this.escapeHtml(filePath)}
+                    </span>
+                    <span class="grep-match-line">#${startLine}-${endLine} (${lineCount} lines)${langTag}</span>
+                </div>
+                <div class="grep-match-context">
+                    ${contextHTML}
+                </div>
+            </div>
+        `;
     }
 
     /**
@@ -429,25 +511,10 @@ class AIToolsManager {
         
         // 截断提示
         const truncatedWarning = truncated ? `<div class="tool-truncated-warning">${truncated_msg}</div>` : '';
+        const content = truncatedWarning + (filesHTML || '<div class="grep-no-matches">No files found</div>');
+        const title = `find "<strong>${pattern}</strong>"`;
         
-        return `
-            <div class="tool-call">
-                <div class="tool-result-expandable">
-                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <i class="fa-solid fa-file-magnifying-glass tool-result-icon"></i>
-                        <span class="tool-result-title">
-                            find "<strong>${pattern}</strong>"
-                        </span>
-                        <span class="tool-result-count">${count} files</span>
-                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
-                    </div>
-                    <div class="tool-result-content" id="${resultId}">
-                        ${truncatedWarning}
-                        ${filesHTML || '<div class="grep-no-matches">No files found</div>'}
-                    </div>
-                </div>
-            </div>
-        `;
+        return this.renderExpandableContainer('find_files', title, `${count} files`, content, resultId);
     }
 
     // ==================== 复杂工具（edit/write）====================
@@ -554,28 +621,7 @@ class AIToolsManager {
         }
         
         if (files.length === 0) {
-            // 没有找到文件标签，显示原始内容或提示
-            if (resultText && resultText.trim().length > 0) {
-                return `
-                    <div class="tool-call">
-                        <div class="tool-simple completed">
-                            <i class="fa-solid fa-magnifying-glass-chart tool-simple-icon"></i>
-                            code_search (查看详情)
-                        </div>
-                        <div style="white-space: pre-wrap; font-family: monospace; font-size: 12px; color: rgba(255,255,255,0.7); padding: 8px; background: rgba(0,0,0,0.2); border-radius: 4px; margin-top: 4px;">
-                            ${this.escapeHtml(resultText)}
-                        </div>
-                    </div>
-                `;
-            }
-            return `
-                <div class="tool-call">
-                    <div class="tool-simple completed">
-                        <i class="fa-solid fa-magnifying-glass-chart tool-simple-icon"></i>
-                        code_search: No results
-                    </div>
-                </div>
-            `;
+            return this.renderEmptyState('code_search', 'No results', 'magnifying-glass-chart');
         }
         
         // 渲染文件列表（类似grep结果）
@@ -594,23 +640,7 @@ class AIToolsManager {
             `;
         }).join('');
         
-        return `
-            <div class="tool-call">
-                <div class="tool-result-expandable">
-                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <i class="fa-solid fa-magnifying-glass-chart tool-result-icon"></i>
-                        <span class="tool-result-title">
-                            code_search
-                        </span>
-                        <span class="tool-result-count">${files.length} snippets</span>
-                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
-                    </div>
-                    <div class="tool-result-content" id="${resultId}">
-                        ${filesHTML}
-                    </div>
-                </div>
-            </div>
-        `;
+        return this.renderExpandableContainer('code_search', 'code_search', `${files.length} snippets`, filesHTML, resultId);
     }
     
     /**
@@ -623,96 +653,36 @@ class AIToolsManager {
             resultData = typeof result === 'string' ? JSON.parse(result) : result;
         } catch (e) {
             console.error('❌ 解析find_method结果失败:', e);
-            return `
-                <div class="tool-call">
-                    <div class="tool-simple completed">
-                        <i class="fa-solid fa-code tool-simple-icon"></i>
-                        find_method: 解析结果失败
-                    </div>
-                </div>
-            `;
+            return this.renderErrorState('find_method', '解析结果失败', 'code');
         }
         
-        const { success, results = [], count, error } = resultData;
-        
-        // 如果失败
-        if (!success || error) {
-            return `
-                <div class="tool-call">
-                    <div class="tool-simple completed">
-                        <i class="fa-solid fa-code tool-simple-icon"></i>
-                        find_method: ${error || '执行失败'}
-                    </div>
-                </div>
-            `;
+        if (!resultData.success) {
+            const error = resultData.error || '执行失败';
+            return this.renderErrorState('find_method', error, 'code');
         }
         
-        // 如果没有结果
-        if (count === 0 || results.length === 0) {
-            return `
-                <div class="tool-call">
-                    <div class="tool-simple completed">
-                        <i class="fa-solid fa-code tool-simple-icon"></i>
-                        find_method: 未找到方法定义
-                    </div>
-                </div>
-            `;
+        const { results, count } = resultData;
+        if (!results || results.length === 0) {
+            return this.renderEmptyState('find_method', '未找到方法定义', 'code');
         }
+        
+        // 生成唯一ID用于折叠
+        const resultId = `find-method-${toolCallId}`;
         
         // 渲染方法列表
-        const resultId = `find-method-${toolCallId}`;
         const methodsHTML = results.map((method) => {
-            const fileName = method.file_path.split('/').pop() || method.file_path;
-            const fileIcon = this.getFileIconHTML(fileName);
-            const lineCount = method.end_line - method.start_line + 1;
-            
-            // 语言图标
-            const langIcons = {
-                'go': '🔵',
-                'python': '🐍',
-                'java': '☕',
-                'javascript': '💛'
-            };
-            const langIcon = langIcons[method.language] || '📄';
-            
-            return `
-                <div class="grep-match-item">
-                    <div class="grep-match-header">
-                        <i class="${fileIcon} grep-match-icon"></i>
-                        <span class="grep-match-path" 
-                            onclick="aiToolsManager.openFileAtLine('${method.file_path.replace(/\\/g, '\\\\')}', 'local', ${method.start_line}, ${method.end_line})"
-                            style="cursor: pointer; color: #3b82f6; text-decoration: underline;"
-                            title="点击跳转到文件">
-                            ${this.escapeHtml(method.file_path)}
-                        </span>
-                        <span class="grep-match-line">${langIcon} #${method.start_line}-${method.end_line} (${lineCount} lines)</span>
-                    </div>
-                    <div class="grep-match-context">
-                        <div class="grep-context-line" style="color: rgba(255,255,255,0.7);">
-                            ${this.escapeHtml(method.signature)}
-                        </div>
-                    </div>
-                </div>
-            `;
+            return this.renderMatchItem(
+                method.file_path,
+                method.start_line,
+                method.end_line,
+                method.signature,
+                null, // 无上下文
+                method.language
+            );
         }).join('');
         
-        return `
-            <div class="tool-call">
-                <div class="tool-result-expandable expanded">
-                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <i class="fa-solid fa-code tool-result-icon"></i>
-                        <span class="tool-result-title">
-                            find_method "<strong>${results[0]?.method_name || 'unknown'}</strong>"
-                        </span>
-                        <span class="tool-result-count">${count} definitions</span>
-                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
-                    </div>
-                    <div class="tool-result-content" id="${resultId}">
-                        ${methodsHTML}
-                    </div>
-                </div>
-            </div>
-        `;
+        const title = `find_method "<strong>${results[0]?.method_name || 'unknown'}</strong>"`;
+        return this.renderExpandableContainer('find_method', title, `${count} definitions`, methodsHTML, resultId, true);
     }
     
     /**
@@ -729,28 +699,14 @@ class AIToolsManager {
         } catch (e) {
             console.error('❌ 解析百度搜索结果失败:', e);
             console.error('原始内容(前200字符):', resultText.substring(0, 200));
-            return `
-                <div class="tool-call">
-                    <div class="tool-simple completed">
-                        <i class="fa-solid fa-magnifying-glass tool-simple-icon"></i>
-                        baidu_search: 解析结果失败
-                    </div>
-                </div>
-            `;
+            return this.renderErrorState('baidu_search', '解析结果失败', 'magnifying-glass');
         }
         
         const { query, count, results } = searchData;
         
         // 如果没有搜索结果
         if (!results || results.length === 0) {
-            return `
-                <div class="tool-call">
-                    <div class="tool-simple completed">
-                        <i class="fa-solid fa-magnifying-glass tool-simple-icon"></i>
-                        baidu_search: "${this.escapeHtml(query)}" - 未找到相关结果
-                    </div>
-                </div>
-            `;
+            return this.renderEmptyState('baidu_search', `"${this.escapeHtml(query)}" - 未找到相关结果`, 'magnifying-glass');
         }
         
         // 渲染搜索结果列表
@@ -772,28 +728,13 @@ class AIToolsManager {
                         </a>
                     </div>
                     ${content ? `<div class="search-result-content">${this.escapeHtml(content)}</div>` : ''}
-                    ${item.date ? `<div class="search-result-date">📅 ${this.escapeHtml(item.date)}</div>` : ''}
+                    ${item.date ? `<div class="search-result-date">${this.escapeHtml(item.date)}</div>` : ''}
                 </div>
             `;
         }).join('');
         
-        return `
-            <div class="tool-call">
-                <div class="tool-result-expandable expanded">
-                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <i class="fa-solid fa-magnifying-glass tool-result-icon"></i>
-                        <span class="tool-result-title">
-                            "${this.escapeHtml(query)}"
-                        </span>
-                        <span class="tool-result-count">${count} 条结果</span>
-                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
-                    </div>
-                    <div class="tool-result-content" id="${resultId}">
-                        ${resultsHTML}
-                    </div>
-                </div>
-            </div>
-        `;
+        const title = `"${this.escapeHtml(query)}"`;
+        return this.renderExpandableContainer('baidu_search', title, `${count} 条结果`, resultsHTML, resultId, true);
     }
 
     /**
@@ -808,14 +749,7 @@ class AIToolsManager {
             urlData = JSON.parse(resultText);
         } catch (e) {
             console.error('❌ 解析URL内容结果失败:', e);
-            return `
-                <div class="tool-call">
-                    <div class="tool-simple completed">
-                        <i class="fa-solid fa-link tool-simple-icon"></i>
-                        read_url_content: 解析结果失败
-                    </div>
-                </div>
-            `;
+            return this.renderErrorState('read_url_content', '解析结果失败', 'link');
         }
         
         const { type, url, title, content, meta } = urlData;
@@ -840,36 +774,29 @@ class AIToolsManager {
         // 构建头部信息
         let headerInfo = '';
         if (stars !== undefined) {
-            headerInfo += `⭐ ${this.formatNumber(stars)}`;
+            headerInfo += `★ ${this.formatNumber(stars)}`;
         }
         if (forks !== undefined) {
-            headerInfo += ` | 🍴 ${this.formatNumber(forks)}`;
+            headerInfo += ` | Forks: ${this.formatNumber(forks)}`;
         }
         if (language) {
             headerInfo += ` | ${this.escapeHtml(language)}`;
         }
         
         const resultId = `url-content-${toolCallId}`;
+        // 使用 CDN 的 marked.js 渲染 Markdown
+        const renderedContent = window.marked && window.marked.parse ? window.marked.parse(content) : this.escapeHtml(content);
+        const contentHTML = `<div class="url-content-body markdown-body">${renderedContent}</div>`;
         
-        return `
-            <div class="tool-call">
-                <div class="tool-result-expandable">
-                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <i class="fa-brands fa-github tool-result-icon"></i>
-                        <span class="tool-result-title">
-                            ${this.escapeHtml(title || url)}
-                        </span>
-                        <span class="tool-result-count">${headerInfo}</span>
-                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
-                    </div>
-                    <div class="tool-result-content" id="${resultId}">
-                        <div class="url-content-body">
-                            ${this.renderMarkdown(content)}
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
+        return this.renderExpandableContainer(
+            'read_url_content', 
+            this.escapeHtml(title || url), 
+            headerInfo, 
+            contentHTML, 
+            resultId, 
+            false, 
+            'fa-brands fa-github'
+        );
     }
     
     /**
@@ -881,26 +808,17 @@ class AIToolsManager {
         
         const sizeText = size ? this.formatFileSize(size) : '';
         const resultId = `url-content-${toolCallId}`;
+        const contentHTML = `<div class="url-content-code"><pre><code>${this.escapeHtml(content)}</code></pre></div>`;
         
-        return `
-            <div class="tool-call">
-                <div class="tool-result-expandable">
-                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <i class="fa-solid fa-file-code tool-result-icon"></i>
-                        <span class="tool-result-title">
-                            ${this.escapeHtml(title || path)}
-                        </span>
-                        <span class="tool-result-count">${owner}/${repo} ${sizeText}</span>
-                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
-                    </div>
-                    <div class="tool-result-content" id="${resultId}">
-                        <div class="url-content-code">
-                            <pre><code>${this.escapeHtml(content)}</code></pre>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        `;
+        return this.renderExpandableContainer(
+            'read_url_content',
+            this.escapeHtml(title || path),
+            `${owner}/${repo} ${sizeText}`,
+            contentHTML,
+            resultId,
+            false,
+            'fa-solid fa-file-code'
+        );
     }
     
     /**
@@ -919,54 +837,21 @@ class AIToolsManager {
         }
         
         const resultId = `url-content-${toolCallId}`;
-        
-        return `
-            <div class="tool-call">
-                <div class="tool-result-expandable">
-                    <div class="tool-result-header" onclick="this.parentElement.classList.toggle('expanded')">
-                        <i class="fa-solid fa-globe tool-result-icon"></i>
-                        <span class="tool-result-title">
-                            ${this.escapeHtml(title || url)}
-                        </span>
-                        <span class="tool-result-count">${headerInfo}</span>
-                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
-                    </div>
-                    <div class="tool-result-content" id="${resultId}">
-                        <div class="url-content-body">
-                            <div style="white-space: pre-wrap; line-height: 1.6;">${this.escapeHtml(content)}</div>
-                        </div>
-                    </div>
-                </div>
+        const contentHTML = `
+            <div class="url-content-body">
+                <div style="white-space: pre-wrap; line-height: 1.6;">${this.escapeHtml(content)}</div>
             </div>
         `;
-    }
-    
-    /**
-     * 简单的Markdown渲染（基础支持）
-     */
-    renderMarkdown(markdown) {
-        if (!markdown) return '';
         
-        let html = this.escapeHtml(markdown);
-        
-        // 代码块
-        html = html.replace(/```([\s\S]*?)```/g, '<pre><code>$1</code></pre>');
-        
-        // 标题
-        html = html.replace(/^### (.+)$/gm, '<h3>$1</h3>');
-        html = html.replace(/^## (.+)$/gm, '<h2>$1</h2>');
-        html = html.replace(/^# (.+)$/gm, '<h1>$1</h1>');
-        
-        // 粗体
-        html = html.replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>');
-        
-        // 链接
-        html = html.replace(/\[(.+?)\]\((.+?)\)/g, '<a href="$2" target="_blank">$1</a>');
-        
-        // 换行
-        html = html.replace(/\n/g, '<br>');
-        
-        return html;
+        return this.renderExpandableContainer(
+            'read_url_content',
+            this.escapeHtml(title || url),
+            headerInfo,
+            contentHTML,
+            resultId,
+            false,
+            'fa-solid fa-globe'
+        );
     }
     
     /**
@@ -996,14 +881,19 @@ class AIToolsManager {
     }
 
     /**
-     * 通用工具渲染
+     * 通用工具渲染（使用统一配置）
      */
     renderGenericTool(result, toolName) {
+        const config = this.getToolConfig(toolName);
+        if (result.success === false) {
+            return this.renderErrorState(toolName, result.error || '执行失败', config.icon);
+        }
+        
         return `
             <div class="tool-call">
                 <div class="tool-simple completed">
-                    <i class="fa-solid fa-wrench tool-simple-icon"></i>
-                    ${toolName}: ${result.success ? '✓ Success' : '✗ Failed'}
+                    <i class="fa-solid fa-${config.icon} tool-simple-icon"></i>
+                    <span>${config.name}: <i class="fa-solid fa-check" style="color: #10b981; margin-left: 4px;"></i></span>
                 </div>
             </div>
         `;
@@ -1151,11 +1041,15 @@ class AIToolsManager {
             'edit_file': 'edit',
             'list_directory': 'list',
             'grep_search': 'grep',
-            'find_files': 'find'
+            'find_files': 'find',
+            'code_search': 'code_search',
+            'baidu_search': 'baidu_search',
+            'read_url_content': 'read_url',
+            'find_method': 'find_method'
         };
         const type = typeMap[name];
         
-        const { file_path, directory_path, search_path, query, pattern } = argsObj;
+        const { file_path, directory_path, search_path, query, pattern, url } = argsObj;
 
         if (type === 'read') {
             // read 保持简单样式（流光）
@@ -1163,13 +1057,13 @@ class AIToolsManager {
             return `
                 <div class="tool-call">
                     <div class="tool-simple executing">
-                        <i class="fa-solid fa-book-open tool-simple-icon"></i>
+                        <i class="fa-solid fa-file-lines tool-simple-icon"></i>
                         Reading <strong>${fileName}</strong>...
                     </div>
                 </div>
             `;
-        } else if (type === 'list' || type === 'grep' || type === 'find') {
-            // list/grep/find 使用容器样式（与完成后完全一致的结构）
+        } else if (type === 'list' || type === 'grep' || type === 'find' || type === 'code_search' || type === 'baidu_search' || type === 'read_url' || type === 'find_method') {
+            // list/grep/find/code_search/baidu_search/read_url 使用容器样式（与完成后完全一致的结构）
             let icon, title, subtitle;
             
             if (type === 'list') {
@@ -1184,6 +1078,22 @@ class AIToolsManager {
             } else if (type === 'find') {
                 icon = 'file-magnifying-glass';
                 title = `find "<strong>${pattern}</strong>"`;
+                subtitle = 'Searching...';
+            } else if (type === 'code_search') {
+                icon = 'magnifying-glass-chart';
+                title = `code_search "<strong>${query || ''}</strong>"`;
+                subtitle = 'Searching...';
+            } else if (type === 'baidu_search') {
+                icon = 'magnifying-glass';
+                title = `baidu_search "<strong>${query || ''}</strong>"`;
+                subtitle = 'Searching...';
+            } else if (type === 'read_url') {
+                icon = 'link';
+                title = `read_url ${url || ''}`;
+                subtitle = 'Loading...';
+            } else if (type === 'find_method') {
+                icon = 'code';
+                title = `find_method`;
                 subtitle = 'Searching...';
             }
             
@@ -1395,15 +1305,6 @@ class AIToolsManager {
         } else {
             console.warn('⚠️ window.openFile 函数不存在');
         }
-    }
-    
-    /**
-     * HTML 转义
-     */
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
     }
     
     /**

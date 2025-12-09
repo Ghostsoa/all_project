@@ -3,6 +3,7 @@ package tools
 import (
 	"encoding/json"
 	"fmt"
+	"os/exec"
 	"strings"
 
 	"golang.org/x/crypto/ssh"
@@ -202,20 +203,26 @@ func ExecuteFindMethod(argsJSON string) (string, error) {
 		return "", fmt.Errorf("解析参数失败: %v", err)
 	}
 
-	// 获取SSH客户端
-	sshClientInterface, err := getSSHClient(req.ServerID)
-	if err != nil {
-		return "", fmt.Errorf("获取SSH客户端失败: %v", err)
-	}
+	var response FindMethodResponse
 
-	// 类型断言为SSH客户端
-	sshClient, ok := sshClientInterface.(*ssh.Client)
-	if !ok {
-		return "", fmt.Errorf("SSH客户端类型断言失败")
-	}
+	// 判断是本地还是远程执行
+	if req.ServerID == "" || req.ServerID == "local" {
+		// 本地执行
+		response = FindMethodLocal(req)
+	} else {
+		// 远程执行（SSH）
+		sshClientInterface, err := getSSHClient(req.ServerID)
+		if err != nil {
+			return "", fmt.Errorf("获取SSH客户端失败: %v", err)
+		}
 
-	// 执行搜索
-	response := FindMethod(sshClient, req)
+		sshClient, ok := sshClientInterface.(*ssh.Client)
+		if !ok {
+			return "", fmt.Errorf("SSH客户端类型断言失败")
+		}
+
+		response = FindMethod(sshClient, req)
+	}
 
 	// 返回JSON结果
 	resultJSON, err := json.Marshal(response)
@@ -224,6 +231,37 @@ func ExecuteFindMethod(argsJSON string) (string, error) {
 	}
 
 	return string(resultJSON), nil
+}
+
+// FindMethodLocal 本地执行查找方法（不需要SSH）
+func FindMethodLocal(req FindMethodRequest) FindMethodResponse {
+	// 构建 bash 脚本
+	script := buildBashFindMethodScript(req.MethodName, req.Directory)
+
+	// 本地执行 bash 命令
+	cmd := exec.Command("bash", "-c", script)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return FindMethodResponse{
+			Success: false,
+			Error:   fmt.Sprintf("执行搜索失败: %v, output: %s", err, string(output)),
+		}
+	}
+
+	// 解析结果
+	results, err := parseFindMethodResults(string(output))
+	if err != nil {
+		return FindMethodResponse{
+			Success: false,
+			Error:   fmt.Sprintf("解析结果失败: %v", err),
+		}
+	}
+
+	return FindMethodResponse{
+		Success: true,
+		Results: results,
+		Count:   len(results),
+	}
 }
 
 // executeSSHCommand 执行 SSH 命令

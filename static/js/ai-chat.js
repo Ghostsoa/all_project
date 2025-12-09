@@ -2429,7 +2429,8 @@ function appendToolCallLoading(messageElement, toolData) {
     
     // 判断工具类型
     const isEditOrWrite = name === 'edit_file' || name === 'write_file';
-    const isExpandable = name === 'grep_search' || name === 'list_directory' || name === 'find_files';
+    const isExpandable = name === 'grep_search' || name === 'list_directory' || name === 'find_files' || 
+                         name === 'code_search' || name === 'baidu_search' || name === 'read_url_content' || name === 'find_method';
     
     let toolHTML;
     if (isEditOrWrite) {
@@ -2451,7 +2452,7 @@ function appendToolCallLoading(messageElement, toolData) {
             </div>
         `;
     } else if (isExpandable) {
-        // grep/list/find 工具：使用容器样式（与完成后完全一致的结构）
+        // 容器工具：使用容器样式（与完成后完全一致的结构）
         let icon, title;
         if (name === 'grep_search') {
             icon = 'magnifying-glass';
@@ -2462,6 +2463,18 @@ function appendToolCallLoading(messageElement, toolData) {
         } else if (name === 'find_files') {
             icon = 'file-magnifying-glass';
             title = 'Find';
+        } else if (name === 'code_search') {
+            icon = 'magnifying-glass-chart';
+            title = 'Code Search';
+        } else if (name === 'baidu_search') {
+            icon = 'magnifying-glass';
+            title = 'Baidu Search';
+        } else if (name === 'read_url_content') {
+            icon = 'link';
+            title = 'Read URL';
+        } else if (name === 'find_method') {
+            icon = 'code';
+            title = 'Find Method';
         }
         
         toolHTML = `
@@ -2481,10 +2494,14 @@ function appendToolCallLoading(messageElement, toolData) {
         `;
     } else {
         // 简单工具（read等）：使用 tool-simple 样式
+        // 根据工具名选择图标
+        let icon = 'file-lines'; // 默认文件图标
+        if (name === 'read_file') icon = 'file-lines';
+        
         toolHTML = `
             <div class="tool-call tool-loading" data-tool-call-id="${tool_call_id}" data-tool-name="${name}">
                 <div class="tool-simple executing">
-                    <i class="fa-solid fa-book-open tool-simple-icon"></i>
+                    <i class="fa-solid fa-${icon} tool-simple-icon"></i>
                     <span class="tool-simple-text">${name}</span>
                     <span class="tool-progress-text" style="margin-left: 8px; opacity: 0.6;">...</span>
                 </div>
@@ -2515,7 +2532,8 @@ function updateToolCallProgress(messageElement, toolData) {
     
     const toolName = toolElement.getAttribute('data-tool-name') || '';
     const isEditOrWrite = toolName === 'edit_file' || toolName === 'write_file';
-    const isExpandable = toolName === 'grep_search' || toolName === 'list_directory' || toolName === 'find_files';
+    const isExpandable = toolName === 'grep_search' || toolName === 'list_directory' || toolName === 'find_files' ||
+                         toolName === 'code_search' || toolName === 'baidu_search' || toolName === 'read_url_content' || toolName === 'find_method';
     
     // 1. 尝试从参数中提取信息
     if (isEditOrWrite) {
@@ -2599,7 +2617,8 @@ function updateToolCallToExecuting(toolElement, toolData) {
     const { name, arguments: args } = toolData;
     const toolName = toolElement.getAttribute('data-tool-name') || name;
     const isEditOrWrite = toolName === 'edit_file' || toolName === 'write_file';
-    const isExpandable = toolName === 'grep_search' || toolName === 'list_directory' || toolName === 'find_files';
+    const isExpandable = toolName === 'grep_search' || toolName === 'list_directory' || toolName === 'find_files' ||
+                         toolName === 'code_search' || toolName === 'baidu_search' || toolName === 'read_url_content' || toolName === 'find_method';
     
     if (isEditOrWrite) {
         // tool-card 样式：移除字符数，只显示转圈圈
