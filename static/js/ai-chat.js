@@ -2451,7 +2451,7 @@ function appendToolCallLoading(messageElement, toolData) {
             </div>
         `;
     } else if (isExpandable) {
-        // grep/list/find 工具：使用容器样式（与完成后一致）
+        // grep/list/find 工具：使用容器样式（与完成后完全一致的结构）
         let icon, title;
         if (name === 'grep_search') {
             icon = 'magnifying-glass';
@@ -2468,9 +2468,13 @@ function appendToolCallLoading(messageElement, toolData) {
             <div class="tool-call tool-loading" data-tool-call-id="${tool_call_id}" data-tool-name="${name}">
                 <div class="tool-result-expandable">
                     <div class="tool-result-header executing">
-                        <i class="fa-solid fa-${icon}" style="margin-right: 8px; font-size: 11px;"></i>
-                        <span style="flex: 1;">${title} ${name}</span>
-                        <span class="tool-result-count" style="font-size: 10px; opacity: 0.6;">准备中...</span>
+                        <i class="fa-solid fa-${icon} tool-result-icon"></i>
+                        <span class="tool-result-title">${title}</span>
+                        <span class="tool-result-count">
+                            <i class="fa-solid fa-circle-notch fa-spin" style="margin-right: 4px; font-size: 10px;"></i>
+                            <span>准备中...</span>
+                        </span>
+                        <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
                     </div>
                 </div>
             </div>
@@ -2534,23 +2538,23 @@ function updateToolCallProgress(messageElement, toolData) {
         }
     } else if (isExpandable) {
         // 容器样式：更新标题和参数信息
-        const titleEl = toolElement.querySelector('.tool-result-header span:first-of-type');
+        const titleEl = toolElement.querySelector('.tool-result-title');
         
         if (toolName === 'grep_search') {
             const queryMatch = currentArgs.match(/"query":\s*"([^"]+)/);
             if (queryMatch && titleEl) {
-                titleEl.textContent = `Search "${queryMatch[1]}"`;
+                titleEl.innerHTML = `grep "<strong>${queryMatch[1]}</strong>"`;
             }
         } else if (toolName === 'list_directory') {
             const pathMatch = currentArgs.match(/"(?:directory_)?path":\s*"([^"]+)/);
             if (pathMatch && titleEl) {
                 const dirName = pathMatch[1].split(/[/\\]/).pop() || pathMatch[1];
-                titleEl.textContent = `List ${dirName}`;
+                titleEl.innerHTML = `list "<strong>${dirName}</strong>"`;
             }
         } else if (toolName === 'find_files') {
             const patternMatch = currentArgs.match(/"pattern":\s*"([^"]+)/);
             if (patternMatch && titleEl) {
-                titleEl.textContent = `Find "${patternMatch[1]}"`;
+                titleEl.innerHTML = `find "<strong>${patternMatch[1]}</strong>"`;
             }
         }
     } else {
@@ -2574,7 +2578,7 @@ function updateToolCallProgress(messageElement, toolData) {
             progressEl.textContent = `生成中... (${currentArgs.length} 字符)`;
         }
     } else if (isExpandable) {
-        const countEl = toolElement.querySelector('.tool-result-count');
+        const countEl = toolElement.querySelector('.tool-result-count span');
         if (countEl) {
             countEl.textContent = '加载中...';
         }
@@ -2611,10 +2615,10 @@ function updateToolCallToExecuting(toolElement, toolData) {
             toolCard.style.animation = 'pulse 2s ease-in-out infinite';
         }
     } else if (isExpandable) {
-        // 容器样式：更新状态文字，保持流光动画
-        const countEl = toolElement.querySelector('.tool-result-count');
-        if (countEl) {
-            countEl.textContent = '执行中...';
+        // 容器样式：更新状态文字，保持转圈圈图标
+        const countTextEl = toolElement.querySelector('.tool-result-count span');
+        if (countTextEl) {
+            countTextEl.textContent = '执行中...';
         }
     } else {
         // tool-simple 样式：保持流光动画

@@ -1156,21 +1156,21 @@ class AIToolsManager {
                 </div>
             `;
         } else if (type === 'list' || type === 'grep' || type === 'find') {
-            // list/grep/find 使用容器样式（与完成后一致）
+            // list/grep/find 使用容器样式（与完成后完全一致的结构）
             let icon, title, subtitle;
             
             if (type === 'list') {
                 const dirName = (directory_path || file_path).split('/').pop() || '/';
                 icon = 'folder-open';
-                title = `List ${dirName}`;
+                title = `list "<strong>${dirName}</strong>"`;
                 subtitle = 'Loading...';
             } else if (type === 'grep') {
                 icon = 'magnifying-glass';
-                title = `Search "${query}"`;
+                title = `grep "<strong>${query}</strong>"`;
                 subtitle = 'Searching...';
             } else if (type === 'find') {
                 icon = 'file-magnifying-glass';
-                title = `Find "${pattern}"`;
+                title = `find "<strong>${pattern}</strong>"`;
                 subtitle = 'Searching...';
             }
             
@@ -1178,9 +1178,13 @@ class AIToolsManager {
                 <div class="tool-call">
                     <div class="tool-result-expandable">
                         <div class="tool-result-header executing">
-                            <i class="fa-solid fa-${icon}" style="margin-right: 8px; font-size: 11px;"></i>
-                            <span style="flex: 1;">${title}</span>
-                            <span class="tool-result-count" style="font-size: 10px; opacity: 0.6;">${subtitle}</span>
+                            <i class="fa-solid fa-${icon} tool-result-icon"></i>
+                            <span class="tool-result-title">${title}</span>
+                            <span class="tool-result-count">
+                                <i class="fa-solid fa-circle-notch fa-spin" style="margin-right: 4px; font-size: 10px;"></i>
+                                <span>${subtitle}</span>
+                            </span>
+                            <i class="fa-solid fa-chevron-down tool-result-toggle"></i>
                         </div>
                     </div>
                 </div>

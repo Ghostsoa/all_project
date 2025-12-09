@@ -83,26 +83,15 @@
     background: rgba(200, 200, 200, 0.12);
 }
 
-/* 执行中的 header 流光动画 */
+/* 执行中的 header 样式 */
 .tool-result-header.executing {
-    background: linear-gradient(
-        90deg,
-        rgba(150, 150, 150, 0.15) 0%,
-        rgba(255, 255, 255, 0.25) 50%,
-        rgba(150, 150, 150, 0.15) 100%
-    );
-    background-size: 200% 100%;
-    animation: shimmer-header 2s infinite linear;
-    cursor: default;
+    cursor: default !important;
+    pointer-events: none; /* 完全禁用点击 */
 }
 
-@keyframes shimmer-header {
-    0% {
-        background-position: -200% 0;
-    }
-    100% {
-        background-position: 200% 0;
-    }
+/* 执行中的 toggle 图标透明度降低 */
+.tool-result-header.executing .tool-result-toggle {
+    opacity: 0.2;
 }
 
 .tool-result-icon {
