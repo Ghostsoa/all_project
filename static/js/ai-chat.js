@@ -2433,10 +2433,12 @@ function appendToolCallLoading(messageElement, toolData) {
     let toolHTML;
     if (isEditOrWrite) {
         // 编辑/写入工具：使用 tool-card 样式
+        const badge = name === 'edit_file' ? '<span class="tool-operation-badge edit-badge">EDIT</span>' : '<span class="tool-operation-badge write-badge">NEW</span>';
         toolHTML = `
             <div class="tool-call tool-loading" data-tool-call-id="${tool_call_id}" data-tool-name="${name}">
                 <div class="tool-card tool-card-loading">
                     <div class="tool-card-left">
+                        ${badge}
                         <span class="tool-card-icon"><i class="fa-solid fa-file-code" style="color: #888;"></i></span>
                         <span class="tool-card-name">${name}</span>
                     </div>

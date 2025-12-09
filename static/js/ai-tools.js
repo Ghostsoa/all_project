@@ -161,9 +161,13 @@ class AIToolsManager {
         const error = result.error || '未知错误';
         return `
             <div class="tool-call">
-                <div class="tool-simple completed">
-                    <span class="tool-simple-icon">❌</span>
-                    &lt;${toolName}: ✗ Failed&gt; ${error}
+                <div class="tool-error-card">
+                    <div class="tool-error-header">
+                        <i class="fa-solid fa-circle-exclamation" style="color: #ef4444; margin-right: 8px;"></i>
+                        <span class="tool-error-name">${toolName}</span>
+                        <span class="tool-error-badge">Failed</span>
+                    </div>
+                    <div class="tool-error-message">${error}</div>
                 </div>
             </div>
         `;
@@ -177,7 +181,9 @@ class AIToolsManager {
         const fileName = file_path ? file_path.split('/').pop() : 'Unknown';
         const fileIcon = this.getFileIconHTML(fileName);
         
-        const statusText = status === 'accepted' ? '✓' : '✗';
+        const statusIcon = status === 'accepted' 
+            ? '<i class="fa-solid fa-check"></i>' 
+            : '<i class="fa-solid fa-xmark"></i>';
         const statusColor = status === 'accepted' ? '#10b981' : '#ef4444';
         
         return `
@@ -188,7 +194,7 @@ class AIToolsManager {
                         <span class="tool-card-name">${fileName}</span>
                     </div>
                     <div class="tool-card-right">
-                        <span class="tool-card-status" style="color: ${statusColor}">${statusText}</span>
+                        <span class="tool-card-status" style="color: ${statusColor}">${statusIcon}</span>
                     </div>
                 </div>
             </div>
@@ -456,6 +462,7 @@ class AIToolsManager {
             <div class="tool-call">
                 <div class="tool-card" data-tool-call-id="${toolCallId}" onclick="aiToolsManager.handleToolClick('${toolCallId}')">
                     <div class="tool-card-left">
+                        <span class="tool-operation-badge edit-badge">EDIT</span>
                         <span class="tool-card-icon">${fileIcon}</span>
                         <span class="tool-card-name">${fileName}</span>
                     </div>
@@ -493,6 +500,7 @@ class AIToolsManager {
             <div class="tool-call">
                 <div class="tool-card" data-tool-call-id="${toolCallId}" onclick="aiToolsManager.handleToolClick('${toolCallId}')">
                     <div class="tool-card-left">
+                        <span class="tool-operation-badge write-badge">NEW</span>
                         <span class="tool-card-icon">${fileIcon}</span>
                         <span class="tool-card-name">${fileName}</span>
                     </div>
@@ -1164,11 +1172,13 @@ class AIToolsManager {
             // edit/write 显示卡片 + spinner
             const fileName = file_path.split('/').pop();
             const fileIcon = this.getFileIconHTML(fileName);
+            const badge = type === 'edit' ? '<span class="tool-operation-badge edit-badge">EDIT</span>' : '<span class="tool-operation-badge write-badge">NEW</span>';
             
             return `
                 <div class="tool-call">
                     <div class="tool-card tool-card-loading">
                         <div class="tool-card-left">
+                            ${badge}
                             <span class="tool-card-icon">${fileIcon}</span>
                             <span class="tool-card-name">${fileName}</span>
                         </div>
@@ -1420,7 +1430,11 @@ class AIToolsManager {
         
         if (statusBadge) {
             statusBadge.className = `tool-status-badge tool-status-${status}`;
-            statusBadge.textContent = status === 'accepted' ? '✓ Accepted' : '✗ Rejected';
+            if (status === 'accepted') {
+                statusBadge.innerHTML = '<i class="fa-solid fa-check" style="margin-right: 4px;"></i>Accepted';
+            } else {
+                statusBadge.innerHTML = '<i class="fa-solid fa-xmark" style="margin-right: 4px;"></i>Rejected';
+            }
         }
         
         if (actions) {
