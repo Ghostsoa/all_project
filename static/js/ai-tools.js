@@ -316,8 +316,16 @@ class AIToolsManager {
      * 渲染 grep 工具（内容搜索）
      */
     renderGrepTool(result) {
-        const { query, path, file_count, match_count, matches = [], is_regex, truncated, truncated_msg } = result;
+        let { query, path, file_count, match_count, matches = [], is_regex, truncated, truncated_msg } = result;
         const searchType = is_regex ? 'Regex' : 'Text';
+        
+        // 如果后端未返回 file_count 和 match_count，从 matches 中计算
+        if (match_count === undefined || file_count === undefined) {
+            match_count = matches.length;
+            // 计算唯一文件数
+            const uniqueFiles = new Set(matches.map(m => m.file_path));
+            file_count = uniqueFiles.size;
+        }
         
         // 生成唯一ID用于折叠
         const resultId = `grep-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
@@ -390,7 +398,12 @@ class AIToolsManager {
      * 渲染 find 工具（文件名查找）
      */
     renderFindTool(result) {
-        const { pattern, path, count, results = [], truncated, truncated_msg } = result;
+        let { pattern, path, count, results = [], truncated, truncated_msg } = result;
+        
+        // 如果后端未返回 count，从 results 中计算
+        if (count === undefined) {
+            count = results.length;
+        }
         
         // 生成唯一ID用于折叠
         const resultId = `find-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
