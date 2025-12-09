@@ -83,6 +83,28 @@
     background: rgba(200, 200, 200, 0.12);
 }
 
+/* 执行中的 header 流光动画 */
+.tool-result-header.executing {
+    background: linear-gradient(
+        90deg,
+        rgba(150, 150, 150, 0.15) 0%,
+        rgba(255, 255, 255, 0.25) 50%,
+        rgba(150, 150, 150, 0.15) 100%
+    );
+    background-size: 200% 100%;
+    animation: shimmer-header 2s infinite linear;
+    cursor: default;
+}
+
+@keyframes shimmer-header {
+    0% {
+        background-position: -200% 0;
+    }
+    100% {
+        background-position: 200% 0;
+    }
+}
+
 .tool-result-icon {
     width: 14px;
     font-size: 12px;

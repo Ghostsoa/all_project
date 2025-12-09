@@ -1144,34 +1144,44 @@ class AIToolsManager {
         
         const { file_path, directory_path, search_path, query, pattern } = argsObj;
 
-        if (type === 'read' || type === 'list' || type === 'grep' || type === 'find') {
-            let icon, action, displayText;
+        if (type === 'read') {
+            // read 保持简单样式（流光）
+            const fileName = file_path.split('/').pop();
+            return `
+                <div class="tool-call">
+                    <div class="tool-simple executing">
+                        <i class="fa-solid fa-book-open tool-simple-icon"></i>
+                        Reading <strong>${fileName}</strong>...
+                    </div>
+                </div>
+            `;
+        } else if (type === 'list' || type === 'grep' || type === 'find') {
+            // list/grep/find 使用容器样式（与完成后一致）
+            let icon, title, subtitle;
             
-            if (type === 'read') {
-                const fileName = file_path.split('/').pop();
-                icon = 'book-open';
-                action = 'Reading';
-                displayText = fileName;
-            } else if (type === 'list') {
+            if (type === 'list') {
                 const dirName = (directory_path || file_path).split('/').pop() || '/';
                 icon = 'folder-open';
-                action = 'Listing';
-                displayText = dirName;
+                title = `List ${dirName}`;
+                subtitle = 'Loading...';
             } else if (type === 'grep') {
                 icon = 'magnifying-glass';
-                action = 'Searching';
-                displayText = `"${query}"`;
+                title = `Search "${query}"`;
+                subtitle = 'Searching...';
             } else if (type === 'find') {
                 icon = 'file-magnifying-glass';
-                action = 'Finding';
-                displayText = `"${pattern}"`;
+                title = `Find "${pattern}"`;
+                subtitle = 'Searching...';
             }
             
             return `
                 <div class="tool-call">
-                    <div class="tool-simple executing">
-                        <i class="fa-solid fa-${icon} tool-simple-icon"></i>
-                        ${action} <strong>${displayText}</strong>...
+                    <div class="tool-result-expandable">
+                        <div class="tool-result-header executing">
+                            <i class="fa-solid fa-${icon}" style="margin-right: 8px; font-size: 11px;"></i>
+                            <span style="flex: 1;">${title}</span>
+                            <span class="tool-result-count" style="font-size: 10px; opacity: 0.6;">${subtitle}</span>
+                        </div>
                     </div>
                 </div>
             `;
