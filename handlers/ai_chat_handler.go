@@ -219,11 +219,22 @@ func (h *AIChatHandler) ChatStream(w http.ResponseWriter, r *http.Request) {
 			})
 
 			// 添加助手的工具调用消息
-			messages = append(messages, map[string]interface{}{
+			toolCallMsg := map[string]interface{}{
 				"role":       "assistant",
 				"content":    assistantContent,
 				"tool_calls": toolCalls,
-			})
+			}
+			// 🤖 DeepSeek 特殊要求：工具调用必须包含 reasoning_content
+			isDeepSeek := strings.Contains(strings.ToLower(modelID), "deepseek")
+			if isDeepSeek {
+				if reasoningContent != "" {
+					toolCallMsg["reasoning_content"] = reasoningContent
+				} else {
+					// 如果没有推理内容，提供空字符串避免 API 错误
+					toolCallMsg["reasoning_content"] = ""
+				}
+			}
+			messages = append(messages, toolCallMsg)
 
 			// 🔧 检查是否已达到上限（第100轮，iteration=99）
 			reachedLimit := (iteration >= maxIterations-1)
@@ -433,6 +444,7 @@ func buildMessagesForAPI(history []storage.ChatMessage, systemPrompt string) []m
 		// 如果是 assistant 消息且有工具调用，添加 tool_calls
 		if msg.Role == "assistant" && len(msg.ToolCalls) > 0 {
 			message["tool_calls"] = msg.ToolCalls
+			// 注意：历史消息不添加 reasoning_content，只在当前轮次添加
 		}
 
 		// 如果是 tool 消息，添加 tool_call_id
