@@ -2427,8 +2427,9 @@ function appendToolCallLoading(messageElement, toolData) {
     
     const { tool_call_id, name } = toolData;
     
-    // 判断是否是编辑类工具（使用 tool-card 样式）
+    // 判断工具类型
     const isEditOrWrite = name === 'edit_file' || name === 'write_file';
+    const isExpandable = name === 'grep_search' || name === 'list_directory' || name === 'find_files';
     
     let toolHTML;
     if (isEditOrWrite) {
@@ -2445,6 +2446,31 @@ function appendToolCallLoading(messageElement, toolData) {
                     <div class="tool-card-right">
                         <i class="fa-solid fa-circle-notch fa-spin" style="margin-right: 6px; font-size: 12px; opacity: 0.8;"></i>
                         <span class="tool-progress-text" style="font-size: 11px; opacity: 0.7;">准备中...</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    } else if (isExpandable) {
+        // grep/list/find 工具：使用容器样式（与完成后一致）
+        let icon, title;
+        if (name === 'grep_search') {
+            icon = 'magnifying-glass';
+            title = 'Search';
+        } else if (name === 'list_directory') {
+            icon = 'folder-open';
+            title = 'List';
+        } else if (name === 'find_files') {
+            icon = 'file-magnifying-glass';
+            title = 'Find';
+        }
+        
+        toolHTML = `
+            <div class="tool-call tool-loading" data-tool-call-id="${tool_call_id}" data-tool-name="${name}">
+                <div class="tool-result-expandable">
+                    <div class="tool-result-header executing">
+                        <i class="fa-solid fa-${icon}" style="margin-right: 8px; font-size: 11px;"></i>
+                        <span style="flex: 1;">${title} ${name}</span>
+                        <span class="tool-result-count" style="font-size: 10px; opacity: 0.6;">准备中...</span>
                     </div>
                 </div>
             </div>
@@ -2485,29 +2511,54 @@ function updateToolCallProgress(messageElement, toolData) {
     
     const toolName = toolElement.getAttribute('data-tool-name') || '';
     const isEditOrWrite = toolName === 'edit_file' || toolName === 'write_file';
+    const isExpandable = toolName === 'grep_search' || toolName === 'list_directory' || toolName === 'find_files';
     
-    // 1. 尝试从参数中提取文件名和路径
-    const match = currentArgs.match(/"(?:file_)?path":\s*"([^"]+)/);
-    if (match) {
-        const fullPath = match[1];
-        const fileName = fullPath.split(/[/\\]/).pop(); // 只取文件名
-        
-        if (isEditOrWrite) {
-            // tool-card 样式：更新文件名和图标
+    // 1. 尝试从参数中提取信息
+    if (isEditOrWrite) {
+        // tool-card 样式：更新文件名和图标
+        const match = currentArgs.match(/"(?:file_)?path":\s*"([^"]+)/);
+        if (match) {
+            const fullPath = match[1];
+            const fileName = fullPath.split(/[/\\]/).pop();
             const nameEl = toolElement.querySelector('.tool-card-name');
             const iconEl = toolElement.querySelector('.tool-card-icon');
             
             if (nameEl && fileName && nameEl.textContent !== fileName) {
                 nameEl.textContent = fileName;
-                nameEl.title = fullPath; // 悬停显示全路径
+                nameEl.title = fullPath;
                 
-                // 更新文件图标
                 if (iconEl && window.aiToolsManager) {
                     iconEl.innerHTML = window.aiToolsManager.getFileIconHTML(fileName);
                 }
             }
-        } else {
-            // tool-simple 样式：更新文本
+        }
+    } else if (isExpandable) {
+        // 容器样式：更新标题和参数信息
+        const titleEl = toolElement.querySelector('.tool-result-header span:first-of-type');
+        
+        if (toolName === 'grep_search') {
+            const queryMatch = currentArgs.match(/"query":\s*"([^"]+)/);
+            if (queryMatch && titleEl) {
+                titleEl.textContent = `Search "${queryMatch[1]}"`;
+            }
+        } else if (toolName === 'list_directory') {
+            const pathMatch = currentArgs.match(/"(?:directory_)?path":\s*"([^"]+)/);
+            if (pathMatch && titleEl) {
+                const dirName = pathMatch[1].split(/[/\\]/).pop() || pathMatch[1];
+                titleEl.textContent = `List ${dirName}`;
+            }
+        } else if (toolName === 'find_files') {
+            const patternMatch = currentArgs.match(/"pattern":\s*"([^"]+)/);
+            if (patternMatch && titleEl) {
+                titleEl.textContent = `Find "${patternMatch[1]}"`;
+            }
+        }
+    } else {
+        // tool-simple 样式：更新文本
+        const match = currentArgs.match(/"(?:file_)?path":\s*"([^"]+)/);
+        if (match) {
+            const fullPath = match[1];
+            const fileName = fullPath.split(/[/\\]/).pop();
             const textEl = toolElement.querySelector('.tool-simple-text');
             if (textEl && fileName && !textEl.textContent.includes(fileName)) {
                 textEl.textContent = fileName;
@@ -2517,13 +2568,19 @@ function updateToolCallProgress(messageElement, toolData) {
     }
     
     // 2. 更新右侧进度文字
-    const progressEl = toolElement.querySelector('.tool-progress-text');
-    if (progressEl && currentArgs) {
-        if (isEditOrWrite) {
-            // edit/write 显示实时字符数
+    if (isEditOrWrite) {
+        const progressEl = toolElement.querySelector('.tool-progress-text');
+        if (progressEl && currentArgs) {
             progressEl.textContent = `生成中... (${currentArgs.length} 字符)`;
-        } else {
-            // read 等简单工具不显示字符数
+        }
+    } else if (isExpandable) {
+        const countEl = toolElement.querySelector('.tool-result-count');
+        if (countEl) {
+            countEl.textContent = '加载中...';
+        }
+    } else {
+        const progressEl = toolElement.querySelector('.tool-progress-text');
+        if (progressEl) {
             progressEl.textContent = '读取中...';
         }
     }
@@ -2538,6 +2595,7 @@ function updateToolCallToExecuting(toolElement, toolData) {
     const { name, arguments: args } = toolData;
     const toolName = toolElement.getAttribute('data-tool-name') || name;
     const isEditOrWrite = toolName === 'edit_file' || toolName === 'write_file';
+    const isExpandable = toolName === 'grep_search' || toolName === 'list_directory' || toolName === 'find_files';
     
     if (isEditOrWrite) {
         // tool-card 样式：移除字符数，只显示转圈圈
@@ -2550,8 +2608,13 @@ function updateToolCallToExecuting(toolElement, toolData) {
         const toolCard = toolElement.querySelector('.tool-card');
         if (toolCard) {
             toolCard.classList.remove('tool-card-loading');
-            // 可选：添加一个微妙的脉冲动画
             toolCard.style.animation = 'pulse 2s ease-in-out infinite';
+        }
+    } else if (isExpandable) {
+        // 容器样式：更新状态文字，保持流光动画
+        const countEl = toolElement.querySelector('.tool-result-count');
+        if (countEl) {
+            countEl.textContent = '执行中...';
         }
     } else {
         // tool-simple 样式：保持流光动画
