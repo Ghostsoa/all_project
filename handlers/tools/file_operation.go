@@ -714,6 +714,24 @@ func grepSearch(args FileOperationArgs) (string, error) {
 				return nil
 			}
 
+			// 跳过已知的二进制文件扩展名
+			ext := strings.ToLower(filepath.Ext(path))
+			binaryExts := []string{".exe", ".dll", ".so", ".dylib", ".bin", ".o", ".a",
+				".jpg", ".jpeg", ".png", ".gif", ".ico", ".pdf", ".zip", ".tar", ".gz",
+				".mp3", ".mp4", ".avi", ".mov", ".woff", ".woff2", ".ttf", ".eot"}
+			for _, binaryExt := range binaryExts {
+				if ext == binaryExt {
+					return nil // 跳过二进制文件
+				}
+			}
+			// 跳过没有扩展名的可执行文件（常见于Linux）
+			if ext == "" {
+				info, _ := d.Info()
+				if info != nil && info.Mode()&0111 != 0 { // 检查可执行权限
+					return nil
+				}
+			}
+
 			// 文件类型过滤
 			if len(args.Includes) > 0 {
 				matched := false
@@ -733,6 +751,12 @@ func grepSearch(args FileOperationArgs) (string, error) {
 			content, err := os.ReadFile(path)
 			if err != nil {
 				return nil // 跳过无法读取的文件
+			}
+
+			// 检测是否为二进制文件（检查前512字节）
+			checkSize := min(len(content), 512)
+			if isBinaryContent(content[:checkSize]) {
+				return nil // 跳过二进制文件
 			}
 
 			lines := strings.Split(string(content), "\n")
@@ -800,7 +824,7 @@ func grepSearch(args FileOperationArgs) (string, error) {
 		sshClient := sshClientInterface.(SSHClient)
 
 		// 构建grep命令
-		cmd := fmt.Sprintf("grep -rn")
+		cmd := fmt.Sprintf("grep -rnI") // -I: 跳过二进制文件
 		if args.IsRegex {
 			cmd += " -E" // 扩展正则
 		}
@@ -1138,4 +1162,31 @@ func calculateLineDiff(oldContent, newContent string) (linesDeleted, linesAdded 
 	}
 
 	return linesDeleted, linesAdded
+}
+
+// isBinaryContent 检测内容是否为二进制
+func isBinaryContent(data []byte) bool {
+	// 检查是否包含 NULL 字节或大量不可打印字符
+	nullCount := 0
+	nonPrintableCount := 0
+
+	for _, b := range data {
+		if b == 0 {
+			nullCount++
+			if nullCount > 3 { // 如果有超过3个NULL字节，认为是二进制
+				return true
+			}
+		}
+		// 检查不可打印字符（除了常见的空白字符）
+		if b < 32 && b != '\n' && b != '\r' && b != '\t' {
+			nonPrintableCount++
+		}
+	}
+
+	// 如果超过30%的字符不可打印，认为是二进制
+	if len(data) > 0 && float64(nonPrintableCount)/float64(len(data)) > 0.3 {
+		return true
+	}
+
+	return false
 }
