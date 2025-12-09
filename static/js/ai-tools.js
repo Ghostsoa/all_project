@@ -161,13 +161,10 @@ class AIToolsManager {
         const error = result.error || '未知错误';
         return `
             <div class="tool-call">
-                <div class="tool-error-card">
-                    <div class="tool-error-header">
-                        <i class="fa-solid fa-circle-exclamation" style="color: #ef4444; margin-right: 8px;"></i>
-                        <span class="tool-error-name">${toolName}</span>
-                        <span class="tool-error-badge">Failed</span>
-                    </div>
-                    <div class="tool-error-message">${error}</div>
+                <div class="tool-simple completed" style="color: rgba(255, 255, 255, 0.5);">
+                    <i class="fa-solid fa-circle-exclamation tool-simple-icon" style="color: #ef4444;"></i>
+                    <span style="color: rgba(255, 255, 255, 0.75); font-weight: 500;">${toolName}</span>
+                    <span style="color: rgba(255, 255, 255, 0.4); margin-left: 8px;">${error}</span>
                 </div>
             </div>
         `;
@@ -237,11 +234,21 @@ class AIToolsManager {
                 clickableClass = ' file-clickable';
             }
         } else if (total_lines) {
-            // 只有总行数，无行号范围
-            displayText = `<strong>${fileName}</strong> <span style="color: rgba(255,255,255,0.5);">(${total_lines} lines)</span>`;
+            // 只有总行数，无行号范围 - 也应该可以点击打开整个文件
+            displayText = `<strong class="file-name-link" style="color: #3b82f6; cursor: pointer; text-decoration: underline;" 
+                onclick="aiToolsManager.openFileAtLine('${file_path.replace(/\\/g, '\\\\')}', '${server_id || 'local'}', 1, ${total_lines})"
+                title="点击打开文件">
+                ${fileName}
+            </strong> <span style="color: rgba(255,255,255,0.5);">(${total_lines} lines)</span>`;
+            clickableClass = ' file-clickable';
         } else {
-            // 无任何行数信息
-            displayText = `<strong>${fileName}</strong>`;
+            // 无任何行数信息 - 也可以点击打开文件
+            displayText = `<strong class="file-name-link" style="color: #3b82f6; cursor: pointer; text-decoration: underline;" 
+                onclick="aiToolsManager.openFileAtLine('${file_path.replace(/\\/g, '\\\\')}', '${server_id || 'local'}', 1, 1)"
+                title="点击打开文件">
+                ${fileName}
+            </strong>`;
+            clickableClass = ' file-clickable';
         }
         
         return `
