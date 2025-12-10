@@ -422,7 +422,7 @@ func (h *AIChatHandler) saveCurrentTurnSnapshot(sessionID string) {
 	}
 }
 
-// buildMessagesForAPI 构建API消息列表
+// buildMessagesForAPI 构建API消息列表（限制最多101轮=202条历史消息）
 func buildMessagesForAPI(history []storage.ChatMessage, systemPrompt string) []map[string]interface{} {
 	messages := []map[string]interface{}{}
 
@@ -434,8 +434,26 @@ func buildMessagesForAPI(history []storage.ChatMessage, systemPrompt string) []m
 		})
 	}
 
+	// 🔧 滑动窗口：限制历史消息最多101轮（202条）
+	processedHistory := history
+	maxMessages := 202 // 101轮 = 202条消息
+	
+	if len(history) > maxMessages {
+		// 取最新的202条消息
+		processedHistory = history[len(history)-maxMessages:]
+		
+		// 检查第一条消息的role
+		if len(processedHistory) > 0 && processedHistory[0].Role == "tool" {
+			// 如果第一条是tool，删掉它（剩下201条）
+			processedHistory = processedHistory[1:]
+			log.Printf("🔧 历史消息截断：删除开头的tool消息，保留%d条消息", len(processedHistory))
+		} else {
+			log.Printf("🔧 历史消息截断：保留最新%d条消息", len(processedHistory))
+		}
+	}
+
 	// 添加历史消息
-	for _, msg := range history {
+	for _, msg := range processedHistory {
 		message := map[string]interface{}{
 			"role":    msg.Role,
 			"content": msg.Content,
